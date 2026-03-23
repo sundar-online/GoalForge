@@ -70,10 +70,10 @@ const HabitRow = ({ habit, goalId, logHabitTime, deleteHabit }) => {
 
   return (
     <>
-      <div style={{ padding: '14px 16px', borderRadius: 14, background: done ? 'rgba(34,197,94,0.05)' : 'var(--bg-dark-elem)', border: `1px solid ${done ? 'rgba(34,197,94,0.2)' : 'var(--border-light)'}`, display: 'flex', flexDirection: 'column', gap: 10, transition: 'all 0.3s' }}>
+      <div style={{ padding: '14px 16px', borderRadius: 14, background: done ? 'rgba(34,197,94,0.05)' : 'var(--bg-input)', border: `1px solid ${done ? 'rgba(34,197,94,0.2)' : 'var(--border-light)'}`, display: 'flex', flexDirection: 'column', gap: 10, transition: 'all 0.3s' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1 }}>
-            <div style={{ width: 28, height: 28, borderRadius: 8, background: done ? '#22c55e' : 'var(--bg-input)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.3s' }}>
+            <div style={{ width: 28, height: 28, borderRadius: 8, background: done ? '#22c55e' : 'var(--bg-card)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.3s', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
               {done ? <Check size={14} color="#fff" strokeWidth={3} /> : <Clock size={14} color="var(--text-muted)" />}
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
