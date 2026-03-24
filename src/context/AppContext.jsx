@@ -8,24 +8,6 @@ const addDays = (dateStr, n) => {
   return d.toISOString().split('T')[0];
 };
 
-// ── Seed Data ─────────────────────────────────────────────
-const SEED_GOALS = [
-  {
-    id: 'g1', title: 'Astro-App Launch', tag: 'Engineering',
-    deadline: addDays(TODAY(), 30), progress: 32, createdAt: TODAY(),
-    mode: 'ALL', streak: 5, missedDays: 0,
-    habits: [
-      { id: 'h1', title: 'Deep Code Session', timeSpent: 0 },
-      { id: 'h2', title: 'Architecture Review', timeSpent: 0 },
-    ],
-  },
-];
-
-const SEED_TASKS = [
-  { id: 't1', title: 'Team standup call', targetTime: 30, timeSpent: 0, priority: 'High', date: TODAY() },
-  { id: 't2', title: 'Review PRs', targetTime: 45, timeSpent: 0, priority: 'Medium', date: TODAY() },
-];
-
 export const isGoalDoneToday = (goal) => {
   if (!goal.habits || goal.habits.length === 0) return false;
   const doneHabits = goal.habits.filter(h => (h.timeSpent || 0) >= 15).length;
@@ -35,16 +17,34 @@ export const isGoalDoneToday = (goal) => {
 
 // ── Provider ──────────────────────────────────────────────
 export const AppProvider = ({ children }) => {
-  const [goals, setGoals] = useState(() => JSON.parse(localStorage.getItem('gf_goals_v4') || 'null') || SEED_GOALS);
-  const [dailyTasks, setDailyTasks] = useState(() => JSON.parse(localStorage.getItem('gf_tasks_v5') || 'null') || SEED_TASKS);
+  const [goals, setGoals] = useState(() => {
+    try {
+      const stored = localStorage.getItem('gf_goals_production');
+      if (stored) return Array.isArray(JSON.parse(stored)) ? JSON.parse(stored) : [];
+    } catch (e) {
+      console.error('[Storage ERROR] Failed to parse goals:', e);
+    }
+    return [];
+  });
+
+  const [tasks, setTasks] = useState(() => {
+    try {
+      const stored = localStorage.getItem('gf_tasks_prod_v2');
+      if (stored) return Array.isArray(JSON.parse(stored)) ? JSON.parse(stored) : [];
+    } catch (e) {
+      console.error('[Storage ERROR] Failed to parse tasks:', e);
+    }
+    return [];
+  });
+
   const [focusTime, setFocusTime] = useState(() => JSON.parse(localStorage.getItem('gf_focusTime') || '0'));
   const [focusHistory, setFocusHistory] = useState(() => JSON.parse(localStorage.getItem('gf_focusHistory') || '{}'));
   const [taskLogs, setTaskLogs] = useState(() => JSON.parse(localStorage.getItem('gf_taskLogs') || '{}'));
-  const [theme, setTheme] = useState(() => localStorage.getItem('gf_theme') || 'light');
+  const [theme, setTheme] = useState(() => localStorage.getItem('gf_theme') || 'dark');
 
-  // ── Persist ──
-  useEffect(() => { localStorage.setItem('gf_goals_v4', JSON.stringify(goals)); }, [goals]);
-  useEffect(() => { localStorage.setItem('gf_tasks_v5', JSON.stringify(dailyTasks)); }, [dailyTasks]);
+  // Persistence
+  useEffect(() => { localStorage.setItem('gf_goals_production', JSON.stringify(goals)); }, [goals]);
+  useEffect(() => { localStorage.setItem('gf_tasks_prod_v2', JSON.stringify(tasks)); }, [tasks]);
   useEffect(() => { localStorage.setItem('gf_focusTime', JSON.stringify(focusTime)); }, [focusTime]);
   useEffect(() => { localStorage.setItem('gf_focusHistory', JSON.stringify(focusHistory)); }, [focusHistory]);
   useEffect(() => { localStorage.setItem('gf_taskLogs', JSON.stringify(taskLogs)); }, [taskLogs]);
@@ -62,16 +62,13 @@ export const AppProvider = ({ children }) => {
     if (lastReset && lastReset !== today) {
       const yday = lastReset;
       
-      // Snapshot focus time
       setFocusHistory(prev => ({ ...prev, [yday]: JSON.parse(localStorage.getItem('gf_focusTime') || '0') }));
       setFocusTime(0);
 
-      // Process Goals (reset timeSpent, compute streaks)
       setGoals(prev => prev.map(goal => {
         goal.habits.forEach(h => {
           setTaskLogs(logs => ({ ...logs, [yday]: { ...(logs[yday] || {}), [h.id]: h.timeSpent || 0 } }));
         });
-
         const wasDone = isGoalDoneToday(goal);
         let newStreak = goal.streak || 0;
         let newMissed = goal.missedDays || 0;
@@ -92,31 +89,39 @@ export const AppProvider = ({ children }) => {
             }
           }
         }
-
         const updatedHabits = goal.habits.map(h => ({ ...h, timeSpent: 0 }));
         return { ...goal, habits: updatedHabits, streak: newStreak, missedDays: newMissed, progress: newProgress, deadline: newDeadline };
       }));
 
-      // Process Daily Tasks (reset timeSpent)
-      setDailyTasks(prev => prev.map(t => {
-        setTaskLogs(logs => ({ ...logs, [yday]: { ...(logs[yday] || {}), [t.id]: t.timeSpent || 0 } }));
-        return { ...t, timeSpent: 0 };
+      // Only reset DAILY tasks
+      setTasks(prev => prev.map(t => {
+        if (t.type === 'daily' || !t.type) { // Default legacy ones to daily
+          setTaskLogs(logs => ({ ...logs, [yday]: { ...(logs[yday] || {}), [t.id]: t.timeSpent || 0 } }));
+          return { ...t, timeSpent: 0 };
+        }
+        return t; // Do not reset Single or Range tasks!
       }));
     }
     localStorage.setItem('gf_lastReset', today);
   }, []);
 
-  // ── Computed Stats ────────────────────────────────────────
-  const todayTasks = dailyTasks; // tasks are now permanent
+  // ── Computed Filtering ────────────────────────────────────
+  const today = TODAY();
+  const todayTasks = tasks.filter(t => {
+    const type = t.type || 'daily';
+    if (type === 'daily') return true;
+    if (type === 'single') return t.targetDate === today;
+    if (type === 'range') return t.startDate <= today && t.endDate >= today;
+    return false;
+  });
 
   const completedGoals = goals.filter(g => isGoalDoneToday(g));
-  const completedNormalTasks = dailyTasks.filter(t => (t.timeSpent || 0) >= (t.targetTime || 15));
+  const completedNormalTasks = todayTasks.filter(t => (t.timeSpent || 0) >= (t.targetTime || 15));
   
-  const totalItems = dailyTasks.length + goals.length;
+  const totalItems = todayTasks.length + goals.length;
   const completedItems = completedGoals.length + completedNormalTasks.length;
   const accuracy = totalItems === 0 ? 100 : Math.round((completedItems / totalItems) * 100);
 
-  // Alerts
   const alerts = [];
   goals.forEach(goal => {
     if ((goal.missedDays || 0) >= 2) {
@@ -127,7 +132,7 @@ export const AppProvider = ({ children }) => {
     alerts.push({ type: 'danger', message: `Low productivity today — only ${accuracy}% accuracy.` });
   }
 
-  // ── Goal Actions ───────────────────────────────────────────
+  // ── Actions ───────────────────────────────────────────
   const addGoal = (goal) => setGoals(prev => [{ ...goal, id: Date.now().toString(), progress: 0, streak: 0, missedDays: 0, createdAt: TODAY(), habits: [] }, ...prev]);
   const updateGoal = (id, updates) => setGoals(prev => prev.map(g => g.id === id ? { ...g, ...updates } : g));
   const deleteGoal = (id) => setGoals(prev => prev.filter(g => g.id !== id));
@@ -147,22 +152,20 @@ export const AppProvider = ({ children }) => {
     }));
   };
 
-  // ── Task Actions ───────────────────────────────────────────
-  const addDailyTask = (task) => setDailyTasks(prev => [{ ...task, id: Date.now().toString(), timeSpent: 0, targetTime: task.targetTime || 30 }, ...prev]);
-  const updateDailyTask = (id, updates) => setDailyTasks(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
-  const deleteDailyTask = (id) => setDailyTasks(prev => prev.filter(t => t.id !== id));
+  const addTask = (task) => setTasks(prev => [{ ...task, id: Date.now().toString(), timeSpent: 0 }, ...prev]);
+  const updateTask = (id, updates) => setTasks(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
+  const deleteTask = (id) => setTasks(prev => prev.filter(t => t.id !== id));
   
-  const logDailyTaskTime = (id, minutes) => {
-    setDailyTasks(prev => prev.map(t => t.id === id ? { ...t, timeSpent: (t.timeSpent || 0) + minutes } : t));
+  const logTaskTime = (id, minutes) => {
+    setTasks(prev => prev.map(t => t.id === id ? { ...t, timeSpent: (t.timeSpent || 0) + minutes } : t));
   };
 
-  // ── Focus ───────────────────────────────────────────
   const addFocusTimeToHabit = (goalId, habitId, seconds) => {
     const mins = seconds / 60;
     setFocusTime(prev => prev + seconds);
     if (goalId && habitId) {
       if (goalId === 'DAILY_TASK') {
-        logDailyTaskTime(habitId, mins);
+        logTaskTime(habitId, mins);
       } else {
         logHabitTime(goalId, habitId, mins);
       }
@@ -174,10 +177,9 @@ export const AppProvider = ({ children }) => {
     <AppContext.Provider value={{
       goals, addGoal, updateGoal, deleteGoal,
       addHabit, deleteHabit, logHabitTime,
-      dailyTasks, todayTasks, addDailyTask, updateDailyTask, deleteDailyTask, logDailyTaskTime,
+      tasks, todayTasks, addTask, updateTask, deleteTask, logTaskTime,
       focusTime, focusHistory, addFocusTime, addFocusTimeToHabit,
-      taskLogs,
-      theme, toggleTheme,
+      taskLogs, theme, toggleTheme,
       accuracy, alerts, totalItems, completedItems,
     }}>
       {children}
