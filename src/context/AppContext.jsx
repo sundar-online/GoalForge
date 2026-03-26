@@ -10,7 +10,10 @@ const addDays = (dateStr, n) => {
 
 export const isGoalDoneToday = (goal) => {
   if (!goal.habits || goal.habits.length === 0) return false;
-  const doneHabits = goal.habits.filter(h => (h.timeSpent || 0) >= 15).length;
+  const doneHabits = goal.habits.filter(h => {
+    if (h.type === 'check') return h.completed;
+    return (h.timeSpent || 0) >= (h.targetTime || 15);
+  }).length;
   if (goal.mode === 'ANY') return doneHabits > 0;
   return doneHabits === goal.habits.length;
 };
@@ -42,12 +45,23 @@ export const AppProvider = ({ children }) => {
   const [taskLogs, setTaskLogs] = useState(() => JSON.parse(localStorage.getItem('gf_taskLogs') || '{}'));
   const [theme, setTheme] = useState(() => localStorage.getItem('gf_theme') || 'dark');
 
+  const [notes, setNotes] = useState(() => {
+    try {
+      const stored = localStorage.getItem('gf_notes_v1');
+      if (stored) return Array.isArray(JSON.parse(stored)) ? JSON.parse(stored) : [];
+    } catch (e) {
+      console.error('[Storage ERROR] Failed to parse notes:', e);
+    }
+    return [];
+  });
+
   // Persistence
   useEffect(() => { localStorage.setItem('gf_goals_production', JSON.stringify(goals)); }, [goals]);
   useEffect(() => { localStorage.setItem('gf_tasks_prod_v2', JSON.stringify(tasks)); }, [tasks]);
   useEffect(() => { localStorage.setItem('gf_focusTime', JSON.stringify(focusTime)); }, [focusTime]);
   useEffect(() => { localStorage.setItem('gf_focusHistory', JSON.stringify(focusHistory)); }, [focusHistory]);
   useEffect(() => { localStorage.setItem('gf_taskLogs', JSON.stringify(taskLogs)); }, [taskLogs]);
+  useEffect(() => { localStorage.setItem('gf_notes_v1', JSON.stringify(notes)); }, [notes]);
   useEffect(() => {
     localStorage.setItem('gf_theme', theme);
     document.documentElement.setAttribute('data-theme', theme);
@@ -67,7 +81,9 @@ export const AppProvider = ({ children }) => {
 
       setGoals(prev => prev.map(goal => {
         goal.habits.forEach(h => {
-          setTaskLogs(logs => ({ ...logs, [yday]: { ...(logs[yday] || {}), [h.id]: h.timeSpent || 0 } }));
+          if (h.type !== 'check') {
+            setTaskLogs(logs => ({ ...logs, [yday]: { ...(logs[yday] || {}), [h.id]: h.timeSpent || 0 } }));
+          }
         });
         const wasDone = isGoalDoneToday(goal);
         let newStreak = goal.streak || 0;
@@ -79,7 +95,7 @@ export const AppProvider = ({ children }) => {
           if (wasDone) {
             newStreak += 1;
             newMissed = 0;
-            newProgress = Math.min(100, newProgress + 5);
+            newProgress = Math.min(100, newProgress + 2);
           } else {
             newMissed += 1;
             if (newMissed >= 3) {
@@ -89,7 +105,7 @@ export const AppProvider = ({ children }) => {
             }
           }
         }
-        const updatedHabits = goal.habits.map(h => ({ ...h, timeSpent: 0 }));
+        const updatedHabits = goal.habits.map(h => ({ ...h, timeSpent: 0, completed: false }));
         return { ...goal, habits: updatedHabits, streak: newStreak, missedDays: newMissed, progress: newProgress, deadline: newDeadline };
       }));
 
@@ -118,8 +134,14 @@ export const AppProvider = ({ children }) => {
   const completedGoals = goals.filter(g => isGoalDoneToday(g));
   const completedNormalTasks = todayTasks.filter(t => (t.timeSpent || 0) >= (t.targetTime || 15));
   
-  const totalItems = todayTasks.length + goals.length;
-  const completedItems = completedGoals.length + completedNormalTasks.length;
+  const allHabits = goals.flatMap(g => g.habits);
+  const completedHabitsCount = allHabits.filter(h => {
+    if (h.type === 'check') return h.completed;
+    return (h.timeSpent || 0) >= (h.targetTime || 15);
+  }).length;
+
+  const totalItems = todayTasks.length + allHabits.length;
+  const completedItems = completedNormalTasks.length + completedHabitsCount;
   const accuracy = totalItems === 0 ? 100 : Math.round((completedItems / totalItems) * 100);
 
   const alerts = [];
@@ -138,7 +160,7 @@ export const AppProvider = ({ children }) => {
   const deleteGoal = (id) => setGoals(prev => prev.filter(g => g.id !== id));
 
   const addHabit = (goalId, habit) => setGoals(prev => prev.map(g =>
-    g.id === goalId ? { ...g, habits: [...g.habits, { ...habit, id: Date.now().toString(), timeSpent: 0 }] } : g
+    g.id === goalId ? { ...g, habits: [...g.habits, { ...habit, id: Date.now().toString(), timeSpent: 0, completed: false }] } : g
   ));
   const deleteHabit = (goalId, habitId) => setGoals(prev => prev.map(g =>
     g.id === goalId ? { ...g, habits: g.habits.filter(h => h.id !== habitId) } : g
@@ -152,6 +174,14 @@ export const AppProvider = ({ children }) => {
     }));
   };
 
+  const toggleHabitCheck = (goalId, habitId) => {
+    setGoals(prev => prev.map(goal => {
+      if (goal.id !== goalId) return goal;
+      const updatedHabits = goal.habits.map(h => h.id === habitId ? { ...h, completed: !h.completed } : h);
+      return { ...goal, habits: updatedHabits };
+    }));
+  };
+
   const addTask = (task) => setTasks(prev => [{ ...task, id: Date.now().toString(), timeSpent: 0 }, ...prev]);
   const updateTask = (id, updates) => setTasks(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
   const deleteTask = (id) => setTasks(prev => prev.filter(t => t.id !== id));
@@ -159,6 +189,16 @@ export const AppProvider = ({ children }) => {
   const logTaskTime = (id, minutes) => {
     setTasks(prev => prev.map(t => t.id === id ? { ...t, timeSpent: (t.timeSpent || 0) + minutes } : t));
   };
+
+  // ── Notes Actions ────────────────────────────────────
+  const addNote = (note) => {
+    const now = new Date().toISOString();
+    const newNote = { ...note, id: Date.now().toString(), created_at: now, updated_at: now };
+    setNotes(prev => [newNote, ...prev]);
+    return newNote;
+  };
+  const updateNote = (id, updates) => setNotes(prev => prev.map(n => n.id === id ? { ...n, ...updates } : n));
+  const deleteNote = (id) => setNotes(prev => prev.filter(n => n.id !== id));
 
   const addFocusTimeToHabit = (goalId, habitId, seconds) => {
     const mins = seconds / 60;
@@ -176,11 +216,12 @@ export const AppProvider = ({ children }) => {
   return (
     <AppContext.Provider value={{
       goals, addGoal, updateGoal, deleteGoal,
-      addHabit, deleteHabit, logHabitTime,
+      addHabit, deleteHabit, logHabitTime, toggleHabitCheck,
       tasks, todayTasks, addTask, updateTask, deleteTask, logTaskTime,
       focusTime, focusHistory, addFocusTime, addFocusTimeToHabit,
       taskLogs, theme, toggleTheme,
-      accuracy, alerts, totalItems, completedItems,
+      accuracy, alerts, totalItems, completedItems, allHabits,
+      notes, addNote, updateNote, deleteNote,
     }}>
       {children}
     </AppContext.Provider>

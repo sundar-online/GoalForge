@@ -163,7 +163,10 @@ export const Dashboard = ({ setView }) => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {goals.slice(0, 2).map(goal => {
             const habitsTotal = goal.habits.length;
-            const habitsDone = goal.habits.filter(h => (h.timeSpent || 0) >= 15).length;
+            const habitsDone = goal.habits.filter(h => {
+              if (h.type === 'check') return h.completed;
+              return (h.timeSpent || 0) >= (h.targetTime || 15);
+            }).length;
             return (
               <div key={goal.id} style={{ background: 'var(--bg-card)', borderRadius: 18, padding: '16px 18px', boxShadow: 'var(--shadow-sm)', border: '1px solid var(--border-light)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>

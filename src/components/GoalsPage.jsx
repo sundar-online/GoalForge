@@ -11,10 +11,12 @@ const TAG_COLORS = {
   General:     { bg: 'var(--bg-input)',          color: 'var(--text-muted)' },
 };
 
-// Extracted from AppContext locally to avoid circular UI imports, matches logic
 const isGoalDoneToday = (goal) => {
   if (!goal.habits || goal.habits.length === 0) return false;
-  const doneHabits = goal.habits.filter(h => (h.timeSpent || 0) >= 15).length;
+  const doneHabits = goal.habits.filter(h => {
+    if (h.type === 'check') return h.completed;
+    return (h.timeSpent || 0) >= (h.targetTime || 15);
+  }).length;
   if (goal.mode === 'ANY') return doneHabits > 0;
   return doneHabits === goal.habits.length;
 };
@@ -61,33 +63,41 @@ const LogTimeModal = ({ habit, goalId, onClose, logHabitTime }) => {
   );
 };
 
-// ── Habit Row ────────────────────────────────────────────────
-const HabitRow = ({ habit, goalId, logHabitTime, deleteHabit }) => {
+const HabitRow = ({ habit, goalId, logHabitTime, deleteHabit, toggleHabitCheck }) => {
   const [showLog, setShowLog] = useState(false);
-  const done = (habit.timeSpent || 0) >= 15;
-  const timeLeft = Math.max(0, 15 - (habit.timeSpent || 0));
-  const pct = Math.min(100, Math.round(((habit.timeSpent || 0) / 15) * 100));
+  const isCheck = habit.type === 'check';
+  const target = habit.targetTime || 15;
+  const done = isCheck ? habit.completed : (habit.timeSpent || 0) >= target;
+  const timeLeft = Math.max(0, target - (habit.timeSpent || 0));
+  const pct = isCheck ? (done ? 100 : 0) : Math.min(100, Math.round(((habit.timeSpent || 0) / target) * 100));
 
   return (
     <>
       <div style={{ padding: '14px 16px', borderRadius: 14, background: done ? 'rgba(34,197,94,0.05)' : 'var(--bg-input)', border: `1px solid ${done ? 'rgba(34,197,94,0.2)' : 'var(--border-light)'}`, display: 'flex', flexDirection: 'column', gap: 10, transition: 'all 0.3s' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1 }}>
-            <div style={{ width: 28, height: 28, borderRadius: 8, background: done ? '#22c55e' : 'var(--bg-card)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.3s', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
+            <button
+               onClick={() => { if (isCheck) toggleHabitCheck(goalId, habit.id); }}
+               style={{ width: 28, height: 28, borderRadius: 8, background: done ? '#22c55e' : 'var(--bg-card)', border: 'none', cursor: isCheck ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.3s', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}
+            >
               {done ? <Check size={14} color="#fff" strokeWidth={3} /> : <Clock size={14} color="var(--text-muted)" />}
-            </div>
+            </button>
             <div style={{ flex: 1, minWidth: 0 }}>
               <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: done ? '#22c55e' : 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{habit.title}</p>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 2, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>
-                  {habit.timeSpent || 0}m / 15m
-                  {!done && ` · ${timeLeft}m left`}
-                </span>
+                {isCheck ? (
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>Check-based</span>
+                ) : (
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>
+                    {habit.timeSpent || 0}m / {target}m
+                    {!done && ` · ${timeLeft}m left`}
+                  </span>
+                )}
               </div>
             </div>
           </div>
           <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-            {!done && (
+            {!done && !isCheck && (
               <button onClick={() => setShowLog(true)}
                 style={{ padding: '6px 12px', borderRadius: 10, background: 'var(--accent-blue)', border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700, color: '#fff', transition: 'all 0.2s' }}
                 onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
@@ -107,19 +117,18 @@ const HabitRow = ({ habit, goalId, logHabitTime, deleteHabit }) => {
           <div style={{ width: `${pct}%`, height: '100%', borderRadius: 999, background: done ? '#22c55e' : 'var(--accent-blue)', transition: 'width 0.5s ease' }} />
         </div>
       </div>
-      {showLog && <LogTimeModal habit={habit} goalId={goalId} onClose={() => setShowLog(false)} logHabitTime={logHabitTime} />}
+      {showLog && !isCheck && <LogTimeModal habit={habit} goalId={goalId} onClose={() => setShowLog(false)} logHabitTime={logHabitTime} />}
     </>
   );
 };
 
-// ── Goals Page ───────────────────────────────────────────────
 export const GoalsPage = () => {
-  const { goals, addGoal, deleteGoal, addHabit, deleteHabit, logHabitTime } = useAppContext();
+  const { goals, addGoal, deleteGoal, addHabit, deleteHabit, logHabitTime, toggleHabitCheck } = useAppContext();
   const [expandedGoal, setExpandedGoal] = useState(null);
   const [showAddGoal, setShowAddGoal] = useState(false);
   const [showAddHabit, setShowAddHabit] = useState(null);
   const [newGoal, setNewGoal] = useState({ title: '', tag: 'General', deadline: '', mode: 'ANY' });
-  const [newHabit, setNewHabit] = useState('');
+  const [newHabit, setNewHabit] = useState({ title: '', type: 'time', targetTime: 15 });
 
   const doneGoals = goals.filter(g => g.progress === 100).length;
   const activeGoals = goals.length - doneGoals;
@@ -135,9 +144,9 @@ export const GoalsPage = () => {
 
   const submitHabit = (e, goalId) => {
     e.preventDefault();
-    if (!newHabit.trim()) return;
-    addHabit(goalId, { title: newHabit });
-    setNewHabit('');
+    if (!newHabit.title.trim()) return;
+    addHabit(goalId, { title: newHabit.title, type: newHabit.type, targetTime: newHabit.type === 'time' ? parseInt(newHabit.targetTime, 10) : null });
+    setNewHabit({ title: '', type: 'time', targetTime: 15 });
     setShowAddHabit(null);
   };
 
@@ -220,7 +229,10 @@ export const GoalsPage = () => {
       {goals.map(goal => {
         const tc = TAG_COLORS[goal.tag] || TAG_COLORS.General;
         const isOpen = expandedGoal === goal.id;
-        const habitsDoneToday = goal.habits.filter(h => (h.timeSpent || 0) >= 15).length;
+        const habitsDoneToday = goal.habits.filter(h => {
+          if (h.type === 'check') return h.completed;
+          return (h.timeSpent || 0) >= (h.targetTime || 15);
+        }).length;
         const goalOffset = CIRC - (CIRC * (goal.progress || 0)) / 100;
         const mode = goal.mode || 'ANY';
         const doneToday = isGoalDoneToday(goal);
@@ -295,23 +307,34 @@ export const GoalsPage = () => {
                   </p>
                 )}
                 {goal.habits.map(h => (
-                  <HabitRow key={h.id} habit={h} goalId={goal.id} logHabitTime={logHabitTime} deleteHabit={deleteHabit} />
+                  <HabitRow key={h.id} habit={h} goalId={goal.id} logHabitTime={logHabitTime} deleteHabit={deleteHabit} toggleHabitCheck={toggleHabitCheck} />
                 ))}
 
                 {/* Add Habit */}
                 {showAddHabit === goal.id ? (
-                  <form onSubmit={e => submitHabit(e, goal.id)} style={{ display: 'flex', gap: 8 }}>
-                    <input autoFocus required type="text" value={newHabit} onChange={e => setNewHabit(e.target.value)}
-                      placeholder="Habit name (e.g. Deep Code Session)"
-                      style={{ flex: 1, border: '2px solid var(--accent-blue)', borderRadius: 12, padding: '10px 14px', fontSize: 14, fontWeight: 600, color: 'var(--text-main)', outline: 'none', background: 'var(--bg-card)' }} />
-                    <button type="submit"
-                      style={{ padding: '10px 16px', borderRadius: 12, background: 'var(--accent-blue)', border: 'none', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
-                      Add
-                    </button>
-                    <button type="button" onClick={() => { setShowAddHabit(null); setNewHabit(''); }}
-                      style={{ padding: '10px 12px', borderRadius: 12, background: 'var(--bg-input)', border: 'none', color: 'var(--text-muted)', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
-                      ✕
-                    </button>
+                  <form onSubmit={e => submitHabit(e, goal.id)} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <input autoFocus required type="text" value={newHabit.title} onChange={e => setNewHabit({ ...newHabit, title: e.target.value })}
+                      placeholder="Habit name (e.g. Reading)"
+                      style={{ border: '2px solid var(--accent-blue)', borderRadius: 12, padding: '10px 14px', fontSize: 14, fontWeight: 600, color: 'var(--text-main)', outline: 'none', background: 'var(--bg-card)' }} />
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <select value={newHabit.type} onChange={e => setNewHabit({ ...newHabit, type: e.target.value })} style={{ flex: 1, border: '1px solid var(--border-med)', borderRadius: 12, padding: '10px 12px', fontSize: 13, background: 'var(--bg-card)', color: 'var(--text-main)', outline: 'none' }}>
+                        <option value="time">Time-based</option>
+                        <option value="check">Check-based</option>
+                      </select>
+                      {newHabit.type === 'time' && (
+                        <input type="number" min="1" value={newHabit.targetTime} onChange={e => setNewHabit({ ...newHabit, targetTime: e.target.value })} placeholder="Mins" style={{ width: 80, border: '1px solid var(--border-med)', borderRadius: 12, padding: '10px 12px', fontSize: 13, background: 'var(--bg-card)', color: 'var(--text-main)', outline: 'none' }} />
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button type="submit"
+                        style={{ flex: 1, padding: '10px 16px', borderRadius: 12, background: 'var(--accent-blue)', border: 'none', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
+                        Add Habit
+                      </button>
+                      <button type="button" onClick={() => { setShowAddHabit(null); setNewHabit({ title: '', type: 'time', targetTime: 15 }); }}
+                        style={{ padding: '10px 16px', borderRadius: 12, background: 'var(--bg-input)', border: 'none', color: 'var(--text-muted)', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
+                        ✕ Cancel
+                      </button>
+                    </div>
                   </form>
                 ) : (
                   <button onClick={() => setShowAddHabit(goal.id)}

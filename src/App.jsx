@@ -6,6 +6,7 @@ import { Dashboard } from './components/Dashboard';
 import { GoalsPage } from './components/GoalsPage';
 import { DailyTasks } from './components/DailyTasks';
 import { FocusMode } from './components/FocusMode';
+import { NotesPage } from './components/NotesPage';
 import { AuthPage } from './components/AuthPage';
 
 function AppInner() {
@@ -14,12 +15,117 @@ function AppInner() {
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', background: '#f0f2f7', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14, fontFamily: '-apple-system, BlinkMacSystemFont, "Inter", sans-serif' }}>
-        <div style={{ width: 44, height: 44, borderRadius: 14, background: '#4d7cff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 16px rgba(77,124,255,0.35)', animation: 'pulse 1.5s ease-in-out infinite' }}>
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.95 7.07a2 2 0 012-2.18h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L10 12.52a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
+      <div style={{
+        minHeight: '100vh',
+        background: 'linear-gradient(145deg, #0b0c10 0%, #151720 40%, #1a1c2e 100%)',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        gap: 0,
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Inter", sans-serif',
+        overflow: 'hidden',
+        position: 'relative',
+      }}>
+        {/* Background glow */}
+        <div style={{
+          position: 'absolute', width: 320, height: 320, borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(77,124,255,0.15) 0%, transparent 70%)',
+          filter: 'blur(40px)', animation: 'glowPulse 3s ease-in-out infinite',
+        }} />
+
+        {/* Orbital rings container */}
+        <div style={{ position: 'relative', width: 120, height: 120, marginBottom: 32 }}>
+          {/* Outer orbit */}
+          <div style={{
+            position: 'absolute', inset: 0, borderRadius: '50%',
+            border: '1.5px solid rgba(77,124,255,0.12)',
+            animation: 'orbitSpin 8s linear infinite',
+          }}>
+            <div style={{
+              position: 'absolute', top: -4, left: '50%', transform: 'translateX(-50%)',
+              width: 8, height: 8, borderRadius: '50%',
+              background: '#5a85ff', boxShadow: '0 0 12px rgba(90,133,255,0.8)',
+            }} />
+          </div>
+
+          {/* Middle orbit */}
+          <div style={{
+            position: 'absolute', inset: 16, borderRadius: '50%',
+            border: '1px solid rgba(129,140,248,0.1)',
+            animation: 'orbitSpin 5s linear infinite reverse',
+          }}>
+            <div style={{
+              position: 'absolute', bottom: -3, left: '50%', transform: 'translateX(-50%)',
+              width: 6, height: 6, borderRadius: '50%',
+              background: '#818cf8', boxShadow: '0 0 10px rgba(129,140,248,0.7)',
+            }} />
+          </div>
+
+          {/* Center logo */}
+          <div style={{
+            position: 'absolute', inset: 30, borderRadius: 18,
+            background: 'linear-gradient(135deg, #4d7cff 0%, #818cf8 100%)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 8px 32px rgba(77,124,255,0.4), inset 0 1px 0 rgba(255,255,255,0.15)',
+            animation: 'logoPulse 2.5s ease-in-out infinite',
+          }}>
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+            </svg>
+          </div>
         </div>
-        <p style={{ fontSize: 13, fontWeight: 600, color: '#9ba3b8', margin: 0 }}>Loading GoalForge…</p>
-        <style>{`@keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.08)} }`}</style>
+
+        {/* Brand text */}
+        <h1 style={{
+          margin: 0, fontSize: 28, fontWeight: 900, letterSpacing: '-1px',
+          background: 'linear-gradient(135deg, #ffffff 0%, #94a3b8 100%)',
+          WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+          animation: 'fadeSlideUp 0.8s ease-out both',
+        }}>
+          GoalForge
+        </h1>
+
+        <p style={{
+          margin: '8px 0 0', fontSize: 13, fontWeight: 500, color: '#64748b',
+          letterSpacing: '0.08em',
+          animation: 'fadeSlideUp 0.8s ease-out 0.15s both',
+        }}>
+          Preparing your workspace
+        </p>
+
+        {/* Shimmer progress bar */}
+        <div style={{
+          marginTop: 28, width: 180, height: 3, borderRadius: 99,
+          background: 'rgba(255,255,255,0.06)', overflow: 'hidden',
+          animation: 'fadeSlideUp 0.8s ease-out 0.3s both',
+        }}>
+          <div style={{
+            width: '40%', height: '100%', borderRadius: 99,
+            background: 'linear-gradient(90deg, transparent, #5a85ff, transparent)',
+            animation: 'shimmer 1.5s ease-in-out infinite',
+          }} />
+        </div>
+
+        <style>{`
+          @keyframes orbitSpin {
+            from { transform: rotate(0deg); }
+            to   { transform: rotate(360deg); }
+          }
+          @keyframes logoPulse {
+            0%, 100% { transform: scale(1); }
+            50%      { transform: scale(1.06); }
+          }
+          @keyframes glowPulse {
+            0%, 100% { opacity: 0.6; transform: scale(1); }
+            50%      { opacity: 1; transform: scale(1.15); }
+          }
+          @keyframes shimmer {
+            0%   { transform: translateX(-200%); }
+            100% { transform: translateX(550%); }
+          }
+          @keyframes fadeSlideUp {
+            from { opacity: 0; transform: translateY(12px); }
+            to   { opacity: 1; transform: translateY(0); }
+          }
+        `}</style>
       </div>
     );
   }
@@ -31,6 +137,7 @@ function AppInner() {
       case 'dashboard': return <Dashboard setView={setCurrentView} />;
       case 'goals':     return <GoalsPage />;
       case 'tasks':     return <DailyTasks />;
+      case 'notes':     return <NotesPage />;
       case 'focus':     return <FocusMode />;
       default:          return <Dashboard setView={setCurrentView} />;
     }

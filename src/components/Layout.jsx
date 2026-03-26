@@ -1,10 +1,11 @@
 import React from 'react';
-import { Home, Target, CalendarCheck, Timer } from 'lucide-react';
+import { Home, Target, CalendarCheck, Timer, StickyNote } from 'lucide-react';
 
 const NAV = [
   { id: 'dashboard', icon: Home,          label: 'Home'   },
   { id: 'goals',     icon: Target,        label: 'Goals'  },
   { id: 'tasks',     icon: CalendarCheck, label: 'Tasks'  },
+  { id: 'notes',     icon: StickyNote,    label: 'Notes'  },
   { id: 'focus',     icon: Timer,         label: 'Focus'  },
 ];
 
