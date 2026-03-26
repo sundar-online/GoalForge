@@ -13,12 +13,15 @@ const TAG_COLORS = {
 
 const isGoalDoneToday = (goal) => {
   if (!goal.habits || goal.habits.length === 0) return false;
-  const doneHabits = goal.habits.filter(h => {
+  const doneHabitsCount = goal.habits.filter(h => {
     if (h.type === 'check') return h.completed;
+    if (h.type === 'count') return (h.currentCount || 0) >= (h.targetCount || 10);
     return (h.timeSpent || 0) >= (h.targetTime || 15);
   }).length;
-  if (goal.mode === 'ANY') return doneHabits > 0;
-  return doneHabits === goal.habits.length;
+  
+  if (goal.mode === 'ANY') return doneHabitsCount > 0;
+  if (goal.mode === 'CUSTOM') return doneHabitsCount >= (goal.minHabits || 1);
+  return doneHabitsCount === goal.habits.length; // Default ALL
 };
 
 // ── Log Time Modal ──────────────────────────────────────────
@@ -63,13 +66,19 @@ const LogTimeModal = ({ habit, goalId, onClose, logHabitTime }) => {
   );
 };
 
-const HabitRow = ({ habit, goalId, logHabitTime, deleteHabit, toggleHabitCheck }) => {
+const HabitRow = ({ habit, goalId, logHabitTime, deleteHabit, toggleHabitCheck, updateHabitCount }) => {
   const [showLog, setShowLog] = useState(false);
   const isCheck = habit.type === 'check';
-  const target = habit.targetTime || 15;
-  const done = isCheck ? habit.completed : (habit.timeSpent || 0) >= target;
-  const timeLeft = Math.max(0, target - (habit.timeSpent || 0));
-  const pct = isCheck ? (done ? 100 : 0) : Math.min(100, Math.round(((habit.timeSpent || 0) / target) * 100));
+  const isCount = habit.type === 'count';
+  
+  let done = false;
+  if (isCheck) done = habit.completed;
+  else if (isCount) done = (habit.currentCount || 0) >= (habit.targetCount || 10);
+  else done = (habit.timeSpent || 0) >= (habit.targetTime || 15);
+
+  const target = isCount ? habit.targetCount : (habit.targetTime || 15);
+  const current = isCount ? habit.currentCount : (habit.timeSpent || 0);
+  const pct = Math.min(100, Math.round((current / (target || 1)) * 100));
 
   return (
     <>
@@ -78,26 +87,32 @@ const HabitRow = ({ habit, goalId, logHabitTime, deleteHabit, toggleHabitCheck }
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1 }}>
             <button
                onClick={() => { if (isCheck) toggleHabitCheck(goalId, habit.id); }}
-               style={{ width: 28, height: 28, borderRadius: 8, background: done ? '#22c55e' : 'var(--bg-card)', border: 'none', cursor: isCheck ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.3s', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}
+               style={{ width: 32, height: 32, borderRadius: 10, background: done ? '#22c55e' : 'var(--bg-card)', border: 'none', cursor: isCheck ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.3s', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}
             >
-              {done ? <Check size={14} color="#fff" strokeWidth={3} /> : <Clock size={14} color="var(--text-muted)" />}
+              {done ? <Check size={16} color="#fff" strokeWidth={3} /> : <Clock size={16} color="var(--text-muted)" />}
             </button>
             <div style={{ flex: 1, minWidth: 0 }}>
               <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: done ? '#22c55e' : 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{habit.title}</p>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 2, flexWrap: 'wrap' }}>
                 {isCheck ? (
                   <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>Check-based</span>
+                ) : isCount ? (
+                   <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>{current} / {target} units done</span>
                 ) : (
                   <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>
-                    {habit.timeSpent || 0}m / {target}m
-                    {!done && ` · ${timeLeft}m left`}
+                    {current}m / {target}m
                   </span>
                 )}
               </div>
             </div>
           </div>
           <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-            {!done && !isCheck && (
+            {isCount ? (
+              <div style={{ display: 'flex', background: 'var(--bg-card)', borderRadius: 10, border: '1px solid var(--border-light)', overflow: 'hidden' }}>
+                 <button onClick={() => updateHabitCount(goalId, habit.id, -1)} style={{ padding: '6px 10px', border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-main)', fontSize: 16, fontWeight: 700 }}>−</button>
+                 <button onClick={() => updateHabitCount(goalId, habit.id, 1)} style={{ padding: '6px 10px', border: 'none', borderLeft: '1px solid var(--border-light)', background: 'none', cursor: 'pointer', color: 'var(--accent-blue)', fontSize: 16, fontWeight: 700 }}>+</button>
+              </div>
+            ) : !done && !isCheck && (
               <button onClick={() => setShowLog(true)}
                 style={{ padding: '6px 12px', borderRadius: 10, background: 'var(--accent-blue)', border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700, color: '#fff', transition: 'all 0.2s' }}
                 onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
@@ -117,18 +132,18 @@ const HabitRow = ({ habit, goalId, logHabitTime, deleteHabit, toggleHabitCheck }
           <div style={{ width: `${pct}%`, height: '100%', borderRadius: 999, background: done ? '#22c55e' : 'var(--accent-blue)', transition: 'width 0.5s ease' }} />
         </div>
       </div>
-      {showLog && !isCheck && <LogTimeModal habit={habit} goalId={goalId} onClose={() => setShowLog(false)} logHabitTime={logHabitTime} />}
+      {showLog && !isCheck && !isCount && <LogTimeModal habit={habit} goalId={goalId} onClose={() => setShowLog(false)} logHabitTime={logHabitTime} />}
     </>
   );
 };
 
 export const GoalsPage = () => {
-  const { goals, addGoal, deleteGoal, addHabit, deleteHabit, logHabitTime, toggleHabitCheck } = useAppContext();
+  const { goals, addGoal, deleteGoal, addHabit, deleteHabit, logHabitTime, toggleHabitCheck, updateHabitCount } = useAppContext();
   const [expandedGoal, setExpandedGoal] = useState(null);
   const [showAddGoal, setShowAddGoal] = useState(false);
   const [showAddHabit, setShowAddHabit] = useState(null);
-  const [newGoal, setNewGoal] = useState({ title: '', tag: 'General', deadline: '', mode: 'ANY' });
-  const [newHabit, setNewHabit] = useState({ title: '', type: 'time', targetTime: 15 });
+  const [newGoal, setNewGoal] = useState({ title: '', tag: 'General', deadline: '', mode: 'ANY', minHabits: 1 });
+  const [newHabit, setNewHabit] = useState({ title: '', type: 'time', targetTime: 15, targetCount: 10 });
 
   const doneGoals = goals.filter(g => g.progress === 100).length;
   const activeGoals = goals.length - doneGoals;
@@ -137,16 +152,21 @@ export const GoalsPage = () => {
   const submitGoal = (e) => {
     e.preventDefault();
     if (!newGoal.title.trim()) return;
-    addGoal({ ...newGoal, mode: newGoal.mode || 'ANY' });
-    setNewGoal({ title: '', tag: 'General', deadline: '', mode: 'ANY' });
+    addGoal({ ...newGoal, mode: newGoal.mode || 'ANY', minHabits: newGoal.mode === 'CUSTOM' ? parseInt(newGoal.minHabits, 10) : 1 });
+    setNewGoal({ title: '', tag: 'General', deadline: '', mode: 'ANY', minHabits: 1 });
     setShowAddGoal(false);
   };
 
   const submitHabit = (e, goalId) => {
     e.preventDefault();
     if (!newHabit.title.trim()) return;
-    addHabit(goalId, { title: newHabit.title, type: newHabit.type, targetTime: newHabit.type === 'time' ? parseInt(newHabit.targetTime, 10) : null });
-    setNewHabit({ title: '', type: 'time', targetTime: 15 });
+    addHabit(goalId, { 
+      title: newHabit.title, 
+      type: newHabit.type, 
+      targetTime: newHabit.type === 'time' ? parseInt(newHabit.targetTime, 10) : null,
+      targetCount: newHabit.type === 'count' ? parseInt(newHabit.targetCount, 10) : null
+    });
+    setNewHabit({ title: '', type: 'time', targetTime: 15, targetCount: 10 });
     setShowAddHabit(null);
   };
 
@@ -206,17 +226,24 @@ export const GoalsPage = () => {
 
           <div>
             <p style={{ margin: '0 0 6px', fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Daily Habit Mode</p>
-            <div style={{ display: 'flex', gap: 8 }}>
-              {['ANY', 'ALL'].map(m => (
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {['ANY', 'ALL', 'CUSTOM'].map(m => (
                 <div key={m} onClick={() => setNewGoal({ ...newGoal, mode: m })}
-                  style={{ flex: 1, padding: '12px 10px', borderRadius: 12, border: 'none', cursor: 'pointer', textAlign: 'center', background: newGoal.mode === m ? 'var(--accent-blue-light)' : 'var(--bg-input)', color: newGoal.mode === m ? 'var(--accent-blue)' : 'var(--text-muted)', border: `2px solid ${newGoal.mode === m ? 'var(--accent-blue)' : 'transparent'}`, transition: 'all 0.15s' }}>
-                  <p style={{ margin: 0, fontSize: 14, fontWeight: 800 }}>{m}</p>
-                  <p style={{ margin: '2px 0 0', fontSize: 10, fontWeight: 600, opacity: 0.8 }}>
-                    {m === 'ANY' ? '1+ habit/day' : 'Every habit/day'}
+                  style={{ flex: 1, padding: '10px', borderRadius: 12, cursor: 'pointer', textAlign: 'center', background: newGoal.mode === m ? 'var(--accent-blue-light)' : 'var(--bg-input)', color: newGoal.mode === m ? 'var(--accent-blue)' : 'var(--text-muted)', border: `2px solid ${newGoal.mode === m ? 'var(--accent-blue)' : 'transparent'}`, transition: 'all 0.15s' }}>
+                  <p style={{ margin: 0, fontSize: 12, fontWeight: 800 }}>{m}</p>
+                  <p style={{ margin: '2px 0 0', fontSize: 9, fontWeight: 600, opacity: 0.8 }}>
+                    {m === 'ANY' ? '1+' : m === 'ALL' ? 'All' : 'Set min'}
                   </p>
                 </div>
               ))}
             </div>
+            {newGoal.mode === 'CUSTOM' && (
+              <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 10 }}>
+                 <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: 'var(--text-main)' }}>Minimum habits to complete:</p>
+                 <input type="number" min="1" value={newGoal.minHabits} onChange={e => setNewGoal({ ...newGoal, minHabits: e.target.value })}
+                  style={{ width: 60, padding: '8px', borderRadius: 8, border: 'none', background: 'var(--bg-input)', color: 'var(--text-main)', fontWeight: 700 }} />
+              </div>
+            )}
           </div>
 
           <button type="submit" style={{ background: 'var(--bg-dark-elem)', color: 'var(--text-inverted)', border: '1px solid var(--border-light)', borderRadius: 12, padding: '13px', fontWeight: 700, fontSize: 14, cursor: 'pointer', marginTop: 4 }}>
@@ -231,6 +258,7 @@ export const GoalsPage = () => {
         const isOpen = expandedGoal === goal.id;
         const habitsDoneToday = goal.habits.filter(h => {
           if (h.type === 'check') return h.completed;
+          if (h.type === 'count') return (h.currentCount || 0) >= (h.targetCount || 10);
           return (h.timeSpent || 0) >= (h.targetTime || 15);
         }).length;
         const goalOffset = CIRC - (CIRC * (goal.progress || 0)) / 100;
@@ -269,7 +297,7 @@ export const GoalsPage = () => {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
                   <span style={{ fontSize: 10, fontWeight: 700, color: tc.color, background: tc.bg, padding: '3px 9px', borderRadius: 999 }}>{goal.tag}</span>
                   <span style={{ fontSize: 10, fontWeight: 700, background: 'var(--bg-input)', color: 'var(--text-main)', padding: '3px 9px', borderRadius: 999, display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <Layers size={10} /> Mode: {mode}
+                    <Layers size={10} /> Mode: {mode} {mode === 'CUSTOM' && `(${goal.minHabits})`}
                   </span>
                 </div>
                 <p style={{ margin: 0, fontSize: 16, fontWeight: 800, color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{goal.title}</p>
@@ -307,7 +335,7 @@ export const GoalsPage = () => {
                   </p>
                 )}
                 {goal.habits.map(h => (
-                  <HabitRow key={h.id} habit={h} goalId={goal.id} logHabitTime={logHabitTime} deleteHabit={deleteHabit} toggleHabitCheck={toggleHabitCheck} />
+                  <HabitRow key={h.id} habit={h} goalId={goal.id} logHabitTime={logHabitTime} deleteHabit={deleteHabit} toggleHabitCheck={toggleHabitCheck} updateHabitCount={updateHabitCount} />
                 ))}
 
                 {/* Add Habit */}
@@ -317,12 +345,16 @@ export const GoalsPage = () => {
                       placeholder="Habit name (e.g. Reading)"
                       style={{ border: '2px solid var(--accent-blue)', borderRadius: 12, padding: '10px 14px', fontSize: 14, fontWeight: 600, color: 'var(--text-main)', outline: 'none', background: 'var(--bg-card)' }} />
                     <div style={{ display: 'flex', gap: 8 }}>
-                      <select value={newHabit.type} onChange={e => setNewHabit({ ...newHabit, type: e.target.value })} style={{ flex: 1, border: '1px solid var(--border-med)', borderRadius: 12, padding: '10px 12px', fontSize: 13, background: 'var(--bg-card)', color: 'var(--text-main)', outline: 'none' }}>
-                        <option value="time">Time-based</option>
-                        <option value="check">Check-based</option>
+                      <select value={newHabit.type} onChange={e => setNewHabit({ ...newHabit, type: e.target.value })} style={{ flex: 1, border: '1px solid var(--border-med)', borderRadius: 12, padding: '10px 12px', fontSize: 13, background: 'var(--bg-card)', color: 'var(--text-main)', outline: 'none', cursor: 'pointer' }}>
+                        <option value="time">⏱️ Time-based</option>
+                        <option value="check">✅ Check-based</option>
+                        <option value="count">🔢 Count-based</option>
                       </select>
                       {newHabit.type === 'time' && (
                         <input type="number" min="1" value={newHabit.targetTime} onChange={e => setNewHabit({ ...newHabit, targetTime: e.target.value })} placeholder="Mins" style={{ width: 80, border: '1px solid var(--border-med)', borderRadius: 12, padding: '10px 12px', fontSize: 13, background: 'var(--bg-card)', color: 'var(--text-main)', outline: 'none' }} />
+                      )}
+                      {newHabit.type === 'count' && (
+                        <input type="number" min="1" value={newHabit.targetCount} onChange={e => setNewHabit({ ...newHabit, targetCount: e.target.value })} placeholder="Target (e.g. 50)" style={{ width: 100, border: '1px solid var(--border-med)', borderRadius: 12, padding: '10px 12px', fontSize: 13, background: 'var(--bg-card)', color: 'var(--text-main)', outline: 'none' }} />
                       )}
                     </div>
                     <div style={{ display: 'flex', gap: 8 }}>

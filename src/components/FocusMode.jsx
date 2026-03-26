@@ -89,7 +89,7 @@ export const FocusMode = () => {
   const totalSeconds = duration * 60;
   const elapsed = totalSeconds - time;
   const pct = (elapsed / totalSeconds) * 100;
-  const R = 115; const SIZE = 280; const CX = 140; const CY = 140;
+  const R = 100; const SIZE = 240; const CX = 120; const CY = 120;
   const CIRC = 2 * Math.PI * R;
   const dashOffset = CIRC - (CIRC * pct) / 100;
 
@@ -155,14 +155,14 @@ export const FocusMode = () => {
       <div style={{ position: 'relative', width: SIZE, height: SIZE }}>
         <svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`} style={{ display: 'block' }}>
           <circle cx={CX} cy={CY} r={R - 10} fill="var(--bg-app)" />
-          <circle cx={CX} cy={CY} r={R} fill="none" stroke="var(--border-med)" strokeWidth="10" transform={`rotate(-90 ${CX} ${CY})`} />
-          <circle cx={CX} cy={CY} r={R} fill="none" stroke={time === 0 ? '#22c55e' : 'var(--accent-blue)'} strokeWidth="10"
+          <circle cx={CX} cy={CY} r={R} fill="none" stroke="var(--border-med)" strokeWidth="8" transform={`rotate(-90 ${CX} ${CY})`} />
+          <circle cx={CX} cy={CY} r={R} fill="none" stroke={time === 0 ? '#22c55e' : 'var(--accent-blue)'} strokeWidth="8"
             strokeDasharray={`${CIRC}`} strokeDashoffset={`${dashOffset}`} strokeLinecap="round"
             transform={`rotate(-90 ${CX} ${CY})`}
             style={{ transition: isActive ? 'stroke-dashoffset 1s linear' : 'stroke-dashoffset 0.4s ease' }} />
         </svg>
         <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
-          <span style={{ fontSize: 56, fontWeight: 900, color: 'var(--text-main)', letterSpacing: '-3px', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
+          <span style={{ fontSize: 48, fontWeight: 900, color: 'var(--text-main)', letterSpacing: '-2px', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
             {String(Math.floor(time / 60)).padStart(2, '0')}:{String(time % 60).padStart(2, '0')}
           </span>
           <span style={{ fontSize: 10, fontWeight: 700, color: time === 0 ? '#22c55e' : (isActive ? 'var(--accent-blue)' : 'var(--text-muted)'), letterSpacing: '0.16em', textTransform: 'uppercase', marginTop: 8, transition: 'color 0.4s' }}>
@@ -189,16 +189,16 @@ export const FocusMode = () => {
       </div>
 
       {/* Stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, width: '100%', marginTop: 8 }}>
-        <div style={{ background: 'var(--bg-card)', borderRadius: 20, padding: '16px 18px', border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-sm)' }}>
-          <p style={{ margin: '0 0 4px', fontSize: 9, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Session Logged</p>
-          <p style={{ margin: 0, fontSize: 24, fontWeight: 900, color: 'var(--text-main)', letterSpacing: '-1px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, width: '100%', marginTop: 2 }}>
+        <div style={{ background: 'var(--bg-card)', borderRadius: 16, padding: '12px 14px', border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-sm)' }}>
+          <p style={{ margin: '0 0 3px', fontSize: 8, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Logged</p>
+          <p style={{ margin: 0, fontSize: 18, fontWeight: 900, color: 'var(--text-main)', letterSpacing: '-0.5px' }}>
             {String(Math.floor(elapsed / 60)).padStart(2, '0')}:{String(elapsed % 60).padStart(2, '0')}
           </p>
         </div>
-        <div style={{ background: 'var(--accent-blue)', borderRadius: 20, padding: '16px 18px', boxShadow: '0 8px 24px rgba(77,124,255,0.25)' }}>
-          <p style={{ margin: '0 0 4px', fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Daily Total</p>
-          <p style={{ margin: 0, fontSize: 24, fontWeight: 900, color: 'white', letterSpacing: '-1px' }}>
+        <div style={{ background: 'var(--accent-blue)', borderRadius: 16, padding: '12px 14px', boxShadow: '0 8px 24px rgba(77,124,255,0.25)' }}>
+          <p style={{ margin: '0 0 3px', fontSize: 8, fontWeight: 700, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Total</p>
+          <p style={{ margin: 0, fontSize: 18, fontWeight: 900, color: 'white', letterSpacing: '-0.5px' }}>
             {String(todayFocusHrs).padStart(2, '0')}h {String(todayFocusMins).padStart(2, '0')}m
           </p>
         </div>

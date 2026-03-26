@@ -40,7 +40,7 @@ const card = {
 const fab = {
   position: 'fixed',
   bottom: 110,
-  right: 'calc(50% - 220px)',
+  right: 'max(24px, calc(50% - 235px))',
   width: 56,
   height: 56,
   borderRadius: 18,
@@ -375,7 +375,7 @@ export const NotesPage = () => {
                       gap: 12,
                       opacity: item.completed ? 0.65 : 1,
                       transition: 'opacity 0.3s ease',
-                      border: `1px solid ${item.completed ? 'rgba(34,197,94,0.3)' : 'var(--border-light)'}`,
+                      border: `1px solid ${item.completed ? 'var(--border-med)' : 'var(--border-light)'}`,
                     }}
                   >
                     <button

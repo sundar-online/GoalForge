@@ -22,6 +22,8 @@ export async function fetchGoals(userId) {
     title: g.title,
     description: g.description || '',
     mode: g.mode || 'ALL',
+    minHabits: g.min_habits || 1,
+    tag: g.tag || 'General',
     deadline: g.deadline || null,
     progress: g.progress || 0,
     streak: g.streak || 0,
@@ -30,7 +32,12 @@ export async function fetchGoals(userId) {
     habits: (g.habits || []).map(h => ({
       id: h.id,
       title: h.title,
+      type: h.type || 'time',
       timeSpent: h.time_spent || 0,
+      targetTime: h.target_time || 15,
+      targetCount: h.target_count || 10,
+      currentCount: h.current_count || 0,
+      completed: h.completed || false,
     })),
   }));
 }
@@ -42,6 +49,8 @@ export async function upsertGoal(userId, goal) {
     title: goal.title,
     description: goal.description || '',
     mode: goal.mode || 'ALL',
+    min_habits: goal.minHabits || 1,
+    tag: goal.tag || 'General',
     deadline: goal.deadline || null,
     progress: goal.progress || 0,
     streak: goal.streak || 0,
@@ -64,7 +73,12 @@ export async function upsertHabit(userId, goalId, habit) {
     goal_id: goalId,
     user_id: userId,
     title: habit.title,
+    type: habit.type || 'time',
     time_spent: habit.timeSpent || 0,
+    target_time: habit.targetTime || 15,
+    target_count: habit.targetCount || 10,
+    current_count: habit.currentCount || 0,
+    completed: habit.completed || false,
     updated_at: new Date().toISOString(),
   }, { onConflict: 'id' });
   if (error) log('upsertHabit', error);
@@ -81,6 +95,22 @@ export async function updateHabitTime(habitId, timeSpent) {
     updated_at: new Date().toISOString(),
   }).eq('id', habitId);
   if (error) log('updateHabitTime', error);
+}
+
+export async function updateHabitCount(habitId, currentCount) {
+  const { error } = await supabase.from('habits').update({
+    current_count: currentCount,
+    updated_at: new Date().toISOString(),
+  }).eq('id', habitId);
+  if (error) log('updateHabitCount', error);
+}
+
+export async function updateHabitCheck(habitId, completed) {
+  const { error } = await supabase.from('habits').update({
+    completed,
+    updated_at: new Date().toISOString(),
+  }).eq('id', habitId);
+  if (error) log('updateHabitCheck', error);
 }
 
 // ── Tasks ──────────────────────────────────────────────
