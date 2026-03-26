@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAppContext } from '../context/AppContext';
 import { CalendarCheck, Plus, Clock, Trash2, Check, CalendarRange, Calendar } from 'lucide-react';
 
@@ -179,63 +180,84 @@ export const DailyTasks = () => {
 
       {/* Task List */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {todayTasks.map(task => {
-          const typeStr = task.type || 'daily';
-          const tDone = isTaskDone(task);
-          const pct = Math.min(100, Math.round(((task.timeSpent || 0) / (task.targetTime || 15)) * 100));
+        <AnimatePresence initial={false}>
+          {todayTasks
+            .slice() // Create a copy before sorting
+            .sort((a, b) => {
+              const aDone = isTaskDone(a);
+              const bDone = isTaskDone(b);
+              if (aDone === bDone) return 0; // Preserve original relative order
+              return aDone ? 1 : -1; // Move done tasks to the bottom
+            })
+            .map(task => {
+              const typeStr = task.type || 'daily';
+              const tDone = isTaskDone(task);
+              const pct = Math.min(100, Math.round(((task.timeSpent || 0) / (task.targetTime || 15)) * 100));
 
-          return (
-            <div key={task.id} style={{
-              background: 'var(--bg-card)', borderRadius: 18, padding: '14px 16px',
-              display: 'flex', flexDirection: 'column', gap: 10,
-              boxShadow: 'var(--shadow-sm)',
-              border: `1px solid ${tDone ? 'rgba(34,197,94,0.3)' : 'var(--border-light)'}`,
-              transition: 'border-color 0.3s',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div style={{ width: 26, height: 26, borderRadius: 8, background: tDone ? '#22c55e' : 'var(--bg-input)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.2s' }}>
-                  {tDone ? <Check size={14} color="#fff" strokeWidth={3} /> : <Clock size={14} color="var(--text-muted)" />}
-                </div>
+              return (
+                <motion.div 
+                  layout
+                  key={task.id} 
+                  initial={{ opacity: 0, scale: 0.98 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  transition={{ 
+                    layout: { type: "spring", stiffness: 350, damping: 25 },
+                    opacity: { duration: 0.2 }
+                  }}
+                  style={{
+                    background: 'var(--bg-card)', borderRadius: 18, padding: '14px 16px',
+                    display: 'flex', flexDirection: 'column', gap: 10,
+                    boxShadow: 'var(--shadow-sm)',
+                    border: `1px solid ${tDone ? 'rgba(34,197,94,0.3)' : 'var(--border-light)'}`,
+                    transition: 'border-color 0.3s',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{ width: 26, height: 26, borderRadius: 8, background: tDone ? '#22c55e' : 'var(--bg-input)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.2s' }}>
+                      {tDone ? <Check size={14} color="#fff" strokeWidth={3} /> : <Clock size={14} color="var(--text-muted)" />}
+                    </div>
 
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
-                    <span style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em', background: 'var(--bg-input)', color: 'var(--text-muted)', padding: '2px 6px', borderRadius: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
-                      {TYPE_ICONS[typeStr]} {TYPE_LABELS[typeStr]}
-                    </span>
-                    {typeStr === 'single' && <span style={{ fontSize: 9, color: 'var(--text-muted)' }}>{task.targetDate}</span>}
-                    {typeStr === 'range' && <span style={{ fontSize: 9, color: 'var(--text-muted)' }}>{task.startDate} to {task.endDate}</span>}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                        <span style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em', background: 'var(--bg-input)', color: 'var(--text-muted)', padding: '2px 6px', borderRadius: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                          {TYPE_ICONS[typeStr]} {TYPE_LABELS[typeStr]}
+                        </span>
+                        {typeStr === 'single' && <span style={{ fontSize: 9, color: 'var(--text-muted)' }}>{task.targetDate}</span>}
+                        {typeStr === 'range' && <span style={{ fontSize: 9, color: 'var(--text-muted)' }}>{task.startDate} to {task.endDate}</span>}
+                      </div>
+                      <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: tDone ? '#22c55e' : 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', transition: 'all 0.2s' }}>
+                        {task.title}
+                      </p>
+                      <p style={{ margin: '3px 0 0', fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+                        {task.timeSpent || 0}m / {task.targetTime}m target
+                      </p>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                      {!tDone && (
+                        <button onClick={() => setShowLog(task)}
+                          style={{ padding: '6px 12px', borderRadius: 10, background: 'var(--accent-blue)', border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700, color: '#fff' }}>
+                          + Log
+                        </button>
+                      )}
+                      <button onClick={() => deleteTask(task.id)}
+                        style={{ width: 30, height: 30, borderRadius: 9, background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', transition: 'all 0.2s' }}
+                        onMouseEnter={e => { e.currentTarget.style.color = '#ef4444'; e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.background = 'transparent'; }}>
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
                   </div>
-                  <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: tDone ? '#22c55e' : 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', transition: 'all 0.2s' }}>
-                    {task.title}
-                  </p>
-                  <p style={{ margin: '3px 0 0', fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
-                    {task.timeSpent || 0}m / {task.targetTime}m target
-                  </p>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-                  {!tDone && (
-                    <button onClick={() => setShowLog(task)}
-                      style={{ padding: '6px 12px', borderRadius: 10, background: 'var(--accent-blue)', border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700, color: '#fff' }}>
-                      + Log
-                    </button>
-                  )}
-                  <button onClick={() => deleteTask(task.id)}
-                    style={{ width: 30, height: 30, borderRadius: 9, background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', transition: 'all 0.2s' }}
-                    onMouseEnter={e => { e.currentTarget.style.color = '#ef4444'; e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)'; }}
-                    onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.background = 'transparent'; }}>
-                    <Trash2 size={15} />
-                  </button>
-                </div>
-              </div>
-              
-              {/* Task Progress Bar */}
-              <div style={{ background: tDone ? 'rgba(34,197,94,0.2)' : 'var(--border-med)', borderRadius: 999, height: 5, overflow: 'hidden', marginTop: 2 }}>
-                <div style={{ width: `${pct}%`, height: '100%', borderRadius: 999, background: tDone ? '#22c55e' : 'var(--accent-blue)', transition: 'width 0.5s ease' }} />
-              </div>
-            </div>
-          );
-        })}
+                  
+                  {/* Task Progress Bar */}
+                  <div style={{ background: tDone ? 'rgba(34,197,94,0.2)' : 'var(--border-med)', borderRadius: 999, height: 5, overflow: 'hidden', marginTop: 2 }}>
+                    <div style={{ width: `${pct}%`, height: '100%', borderRadius: 999, background: tDone ? '#22c55e' : 'var(--accent-blue)', transition: 'width 0.5s ease' }} />
+                  </div>
+                </motion.div>
+              );
+            })}
+        </AnimatePresence>
         {todayTasks.length === 0 && !isAdding && (
           <div style={{ textAlign: 'center', padding: '50px 0', color: 'var(--text-muted)' }}>
             <CalendarCheck size={44} strokeWidth={1.5} style={{ display: 'block', margin: '0 auto 12px' }} />

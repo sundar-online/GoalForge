@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAppContext } from '../context/AppContext';
 import {
   Plus, ArrowLeft, Trash2, CheckSquare, Square,
@@ -351,62 +352,77 @@ export const NotesPage = () => {
         {/* Checklist Items */}
         {isChecklist && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {activeNote.checklist.map((item, idx) => (
-              <div key={item.id} style={{
-                ...card,
-                cursor: 'default',
-                padding: '14px 16px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 12,
-                opacity: item.completed ? 0.65 : 1,
-                transition: 'all 0.3s ease',
-              }}>
-                <button
-                  onClick={() => handleToggleItem(item.id)}
-                  style={{
-                    width: 28, height: 28, borderRadius: 10,
-                    background: item.completed ? 'var(--accent-blue)' : 'var(--bg-input)',
-                    border: `2px solid ${item.completed ? 'var(--accent-blue)' : 'var(--border-med)'}`,
-                    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    transition: 'all 0.25s cubic-bezier(0.34,1.56,0.64,1)',
-                    flexShrink: 0,
-                    transform: item.completed ? 'scale(1)' : 'scale(1)',
-                  }}
-                >
-                  {item.completed && (
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="20 6 9 17 4 12" />
-                    </svg>
-                  )}
-                </button>
-                <input
-                  value={item.text}
-                  onChange={e => handleUpdateItemText(item.id, e.target.value)}
-                  style={{
-                    flex: 1,
-                    background: 'transparent',
-                    border: 'none',
-                    fontSize: 14,
-                    fontWeight: 600,
-                    color: 'var(--text-main)',
-                    outline: 'none',
-                    fontFamily: 'inherit',
-                    padding: 0,
-                    textDecoration: item.completed ? 'line-through' : 'none',
-                    transition: 'color 0.2s',
-                  }}
-                />
-                <button
-                  onClick={() => handleDeleteItem(item.id)}
-                  style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 4, color: 'var(--text-muted)', opacity: 0.5, transition: 'opacity 0.2s' }}
-                  onMouseEnter={e => e.currentTarget.style.opacity = 1}
-                  onMouseLeave={e => e.currentTarget.style.opacity = 0.5}
-                >
-                  <X size={15} />
-                </button>
-              </div>
-            ))}
+            <AnimatePresence initial={false}>
+              {[...activeNote.checklist]
+                .sort((a, b) => Number(a.completed) - Number(b.completed))
+                .map((item) => (
+                  <motion.div 
+                    layout
+                    key={item.id} 
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    transition={{ 
+                      layout: { type: "spring", stiffness: 350, damping: 25 },
+                      opacity: { duration: 0.2 }
+                    }}
+                    style={{
+                      ...card,
+                      cursor: 'default',
+                      padding: '14px 16px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 12,
+                      opacity: item.completed ? 0.65 : 1,
+                      transition: 'opacity 0.3s ease',
+                      border: `1px solid ${item.completed ? 'rgba(34,197,94,0.3)' : 'var(--border-light)'}`,
+                    }}
+                  >
+                    <button
+                      onClick={() => handleToggleItem(item.id)}
+                      style={{
+                        width: 28, height: 28, borderRadius: 10,
+                        background: item.completed ? 'var(--accent-blue)' : 'var(--bg-input)',
+                        border: `2px solid ${item.completed ? 'var(--accent-blue)' : 'var(--border-med)'}`,
+                        cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        transition: 'all 0.25s cubic-bezier(0.34,1.56,0.64,1)',
+                        flexShrink: 0,
+                      }}
+                    >
+                      {item.completed && (
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      )}
+                    </button>
+                    <input
+                      value={item.text}
+                      onChange={e => handleUpdateItemText(item.id, e.target.value)}
+                      style={{
+                        flex: 1,
+                        background: 'transparent',
+                        border: 'none',
+                        fontSize: 14,
+                        fontWeight: 600,
+                        color: 'var(--text-main)',
+                        outline: 'none',
+                        fontFamily: 'inherit',
+                        padding: 0,
+                        textDecoration: item.completed ? 'line-through' : 'none',
+                        transition: 'color 0.2s',
+                      }}
+                    />
+                    <button
+                      onClick={() => handleDeleteItem(item.id)}
+                      style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 4, color: 'var(--text-muted)', opacity: 0.5, transition: 'opacity 0.2s' }}
+                      onMouseEnter={e => e.currentTarget.style.opacity = 1}
+                      onMouseLeave={e => e.currentTarget.style.opacity = 0.5}
+                    >
+                      <X size={15} />
+                    </button>
+                  </motion.div>
+                ))}
+            </AnimatePresence>
 
             {/* Add New Item */}
             <div style={{ ...card, cursor: 'default', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12, borderStyle: 'dashed' }}>
