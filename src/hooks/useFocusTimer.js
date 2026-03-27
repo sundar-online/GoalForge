@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
+import { TODAY } from '../utils/dateUtils';
+
 
 export const useFocusTimer = () => {
     const { goals, tasks, focusTime, addFocusTimeToHabit, addFocusTime } = useAppContext();
@@ -15,11 +17,12 @@ export const useFocusTimer = () => {
     const accRef = useRef(0);
 
     const todayTasks = tasks.filter(t => {
-      const todayStr = new Date().toISOString().split('T')[0];
+      const todayStr = TODAY();
       const type = t.type || 'daily';
-      return type === 'daily' || 
-             (type === 'single' && t.targetDate === todayStr) || 
-             (type === 'range' && t.startDate <= todayStr && t.endDate >= todayStr);
+      if (type === 'daily') return true;
+      if (type === 'single') return (t.targetDate || t.date) === todayStr;
+      if (type === 'range') return t.startDate <= todayStr && t.endDate >= todayStr;
+      return false;
     });
 
     const isDailyTaskMode = selectedGoalId === 'DAILY_TASK';
@@ -57,11 +60,16 @@ export const useFocusTimer = () => {
             timerRef.current = setInterval(() => {
                 setTime(t => t - 1);
                 accRef.current += 1;
+                
+                // Always increment total focus time
+                addFocusTime(1); 
+                
+                // Every 60 seconds of continuous focus, sync to habit/task progress
                 if (accRef.current >= 60) {
                     accRef.current = 0;
-                    addFocusTimeToHabit(selectedGoalId || null, selectedHabitId || null, 60);
-                } else {
-                    addFocusTime(1);
+                    if (selectedGoalId && selectedHabitId) {
+                        addFocusTimeToHabit(selectedGoalId, selectedHabitId, 60);
+                    }
                 }
             }, 1000);
         } else {

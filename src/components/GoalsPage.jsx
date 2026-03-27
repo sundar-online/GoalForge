@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Target, Plus, ChevronDown, ChevronUp, Trash2, Clock, Check, Layers, Calendar, History } from 'lucide-react';
-import { isGoalDoneToday } from '../utils/calculationUtils';
+import { isGoalDoneToday, calculateGoalDailyProgress } from '../utils/calculationUtils';
 import { addDays } from '../utils/dateUtils';
+
 
 const TAG_COLORS = {
   Engineering: { bg: 'var(--accent-blue-light)', color: 'var(--accent-blue)' },
@@ -108,40 +109,67 @@ const HabitRow = ({ habit, goalId, logHabitTime, deleteHabit, toggleHabitCheck, 
   const current = isCount ? habit.currentCount : (habit.timeSpent || 0);
   const pct = Math.min(100, Math.round((current / (target || 1)) * 100));
 
+  const Icon = isCheck ? Check : (isCount ? Layers : Clock);
+
   return (
     <>
-      <div style={{ padding: '14px 16px', borderRadius: 14, background: done ? 'rgba(34,197,94,0.05)' : 'var(--bg-input)', border: `1px solid ${done ? 'rgba(34,197,94,0.2)' : 'var(--border-light)'}`, display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div style={{ 
+        padding: '14px 16px', 
+        borderRadius: 14, 
+        background: done ? 'rgba(34,197,94,0.05)' : 'var(--bg-input)', 
+        border: `1px solid ${done ? 'rgba(34,197,94,0.2)' : 'var(--border-light)'}`, 
+        display: 'flex', 
+        flexDirection: 'column', 
+        gap: 10,
+        opacity: done ? 0.8 : 1,
+        transition: 'all 0.3s'
+      }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1 }}>
             <button
                onClick={() => { if (isCheck) toggleHabitCheck(goalId, habit.id); }}
-               style={{ width: 32, height: 32, borderRadius: 10, background: done ? '#22c55e' : 'var(--bg-card)', border: 'none', cursor: isCheck ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+               style={{ 
+                 width: 32, 
+                 height: 32, 
+                 borderRadius: 10, 
+                 background: done ? '#22c55e' : 'var(--bg-card)', 
+                 border: `2px solid ${done ? '#22c55e' : 'var(--border-med)'}`, 
+                 cursor: isCheck ? 'pointer' : 'default', 
+                 display: 'flex', 
+                 alignItems: 'center', 
+                 justifyContent: 'center',
+                 transition: 'all 0.2s'
+               }}
             >
-              {done ? <Check size={16} color="#fff" strokeWidth={3} /> : <Clock size={16} color="var(--text-muted)" />}
+              {done ? <Check size={16} color="#fff" strokeWidth={3} /> : (isCheck ? null : <Icon size={16} color="var(--text-muted)" />)}
             </button>
             <div style={{ flex: 1, minWidth: 0 }}>
               <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: done ? '#22c55e' : 'var(--text-main)', textDecoration: done ? 'line-through' : 'none' }}>{habit.title}</p>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
-                <p style={{ margin: 0, fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>{current} / {target} {isCount ? 'units' : 'mins'}</p>
+                <p style={{ margin: 0, fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>
+                  {isCheck ? (done ? 'Completed' : 'Pending') : `${current} / ${target} ${isCount ? '' : 'mins'}`}
+                </p>
                 {habit.streak > 0 && <span style={{ fontSize: 10, fontWeight: 700, color: '#f97316' }}>🔥 {habit.streak}d</span>}
               </div>
             </div>
           </div>
-          <div style={{ display: 'flex', gap: 6 }}>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
             {isCount ? (
-              <div style={{ display: 'flex', background: 'var(--bg-card)', borderRadius: 10, border: '1px solid var(--border-light)' }}>
-                 <button onClick={() => updateHabitCount(goalId, habit.id, -1)} style={{ padding: '6px 10px', border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-main)', fontWeight: 700 }}>−</button>
-                 <button onClick={() => updateHabitCount(goalId, habit.id, 1)} style={{ padding: '6px 10px', border: 'none', borderLeft: '1px solid var(--border-light)', background: 'none', cursor: 'pointer', color: 'var(--accent-blue)', fontWeight: 700 }}>+</button>
+              <div style={{ display: 'flex', background: 'var(--bg-card)', borderRadius: 10, border: '1px solid var(--border-light)', overflow: 'hidden' }}>
+                 <button onClick={() => updateHabitCount(goalId, habit.id, -1)} style={{ padding: '6px 12px', border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-main)', fontWeight: 800 }}>−</button>
+                 <button onClick={() => updateHabitCount(goalId, habit.id, 1)} style={{ padding: '6px 12px', border: 'none', borderLeft: '1px solid var(--border-light)', background: 'none', cursor: 'pointer', color: 'var(--accent-blue)', fontWeight: 800 }}>+</button>
               </div>
-            ) : !done && !isCheck && (
+            ) : (!isCheck && !done) && (
               <button onClick={() => setShowLog(true)} style={{ padding: '6px 12px', borderRadius: 10, background: 'var(--accent-blue)', border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700, color: '#fff' }}>+ Log</button>
             )}
             <button onClick={() => deleteHabit(goalId, habit.id)} style={{ width: 32, height: 32, borderRadius: 10, background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}><Trash2 size={14} /></button>
           </div>
         </div>
-        <div style={{ background: done ? 'rgba(34,197,94,0.2)' : 'var(--border-med)', borderRadius: 999, height: 4, overflow: 'hidden' }}>
-          <div style={{ width: `${pct}%`, height: '100%', background: done ? '#22c55e' : 'var(--accent-blue)', transition: 'width 0.5s' }} />
-        </div>
+        {!isCheck && (
+          <div style={{ background: done ? 'rgba(34,197,94,0.2)' : 'var(--border-med)', borderRadius: 999, height: 4, overflow: 'hidden' }}>
+            <div style={{ width: `${pct}%`, height: '100%', background: done ? '#22c55e' : 'var(--accent-blue)', transition: 'width 0.5s' }} />
+          </div>
+        )}
       </div>
       {showLog && !isCheck && !isCount && <LogTimeModal habit={habit} goalId={goalId} onClose={() => setShowLog(false)} logHabitTime={logHabitTime} />}
     </>
@@ -154,7 +182,14 @@ export const GoalsPage = () => {
   const [showAddGoal, setShowAddGoal] = useState(false);
   const [showAddHabit, setShowAddHabit] = useState(null);
   const [extendingGoal, setExtendingGoal] = useState(null);
-  const [newGoal, setNewGoal] = useState({ title: '', tag: 'General', deadline: '', mode: 'ANY', minHabits: 1 });
+  const [newGoal, setNewGoal] = useState({ 
+    title: '', 
+    tag: 'General', 
+    deadline: '', 
+    mode: 'ANY', 
+    minHabits: 1, 
+    habits: [{ id: Date.now(), title: '', type: 'time', targetTime: 15, targetCount: 10 }]
+  });
   const [newHabit, setNewHabit] = useState({ title: '', type: 'time', targetTime: 15, targetCount: 10 });
 
   const doneGoals = goals.filter(g => g.progress === 100).length;
@@ -164,9 +199,44 @@ export const GoalsPage = () => {
   const submitGoal = (e) => {
     e.preventDefault();
     if (!newGoal.title.trim()) return;
-    addGoal({ ...newGoal, mode: newGoal.mode || 'ANY', minHabits: newGoal.mode === 'CUSTOM' ? parseInt(newGoal.minHabits, 10) : 1 });
-    setNewGoal({ title: '', tag: 'General', deadline: '', mode: 'ANY', minHabits: 1 });
+    if (newGoal.habits.length === 0) return alert('Add at least one daily habit!');
+    if (newGoal.habits.some(h => !h.title.trim())) return alert('Give all your habits a name!');
+
+    addGoal({ 
+      ...newGoal, 
+      mode: newGoal.mode || 'ANY', 
+      minHabits: newGoal.mode === 'CUSTOM' ? parseInt(newGoal.minHabits, 10) : 1 
+    });
+    setNewGoal({ 
+      title: '', 
+      tag: 'General', 
+      deadline: '', 
+      mode: 'ANY', 
+      minHabits: 1, 
+      habits: [{ id: Date.now(), title: '', type: 'time', targetTime: 15, targetCount: 10 }]
+    });
     setShowAddGoal(false);
+  };
+
+  const updateStagingHabit = (id, updates) => {
+    setNewGoal(prev => ({
+      ...prev,
+      habits: prev.habits.map(h => h.id === id ? { ...h, ...updates } : h)
+    }));
+  };
+
+  const addStagingHabit = () => {
+    setNewGoal(prev => ({
+      ...prev,
+      habits: [...prev.habits, { id: Date.now(), title: '', type: 'time', targetTime: 15, targetCount: 10 }]
+    }));
+  };
+
+  const removeStagingHabit = (id) => {
+    setNewGoal(prev => ({
+      ...prev,
+      habits: prev.habits.filter(h => h.id !== id)
+    }));
   };
 
   const submitHabit = (e, goalId) => {
@@ -211,26 +281,81 @@ export const GoalsPage = () => {
 
       {/* Add Goal Form */}
       {showAddGoal && (
-        <form onSubmit={submitGoal} style={{ background: 'var(--bg-card)', borderRadius: 20, padding: '20px', display: 'flex', flexDirection: 'column', gap: 14, border: '1px solid var(--border-light)' }}>
-          <input autoFocus required type="text" value={newGoal.title} onChange={e => setNewGoal({ ...newGoal, title: e.target.value })}
-            placeholder="Goal title..."
-            style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-main)', border: 'none', borderBottom: '2px solid var(--border-med)', padding: '6px 0 10px', outline: 'none', background: 'transparent' }} />
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <select value={newGoal.tag} onChange={e => setNewGoal({ ...newGoal, tag: e.target.value })} style={{ background: 'var(--bg-input)', border: 'none', borderRadius: 10, padding: '10px', fontSize: 13, color: 'var(--text-main)' }}>
-              {Object.keys(TAG_COLORS).map(t => <option key={t}>{t}</option>)}
-            </select>
-            <input type="date" value={newGoal.deadline} onChange={e => setNewGoal({ ...newGoal, deadline: e.target.value })} style={{ background: 'var(--bg-input)', border: 'none', borderRadius: 10, padding: '10px', fontSize: 13, color: 'var(--text-main)' }} />
+        <form onSubmit={submitGoal} style={{ background: 'var(--bg-card)', borderRadius: 28, padding: '24px', display: 'flex', flexDirection: 'column', gap: 20, border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-float)' }}>
+          <div>
+             <p style={{ margin: '0 0 8px', fontSize: 10, fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>Core Vision</p>
+             <input autoFocus required type="text" value={newGoal.title} onChange={e => setNewGoal({ ...newGoal, title: e.target.value })}
+               placeholder="What major milestone are we hitting?"
+               style={{ width: '100%', fontSize: 18, fontWeight: 800, color: 'var(--text-main)', border: 'none', background: 'var(--bg-input)', padding: '14px 18px', borderRadius: 16, outline: 'none' }} />
           </div>
-          <button type="submit" style={{ background: 'var(--accent-blue)', color: '#fff', border: 'none', borderRadius: 12, padding: '13px', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>Create Goal</button>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+            <div>
+              <p style={{ margin: '0 0 8px', fontSize: 10, fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>Category</p>
+              <select value={newGoal.tag} onChange={e => setNewGoal({ ...newGoal, tag: e.target.value })} style={{ width: '100%', background: 'var(--bg-input)', border: 'none', borderRadius: 14, padding: '12px 16px', fontSize: 14, fontWeight: 600, color: 'var(--text-main)', outline: 'none', appearance: 'none' }}>
+                {Object.keys(TAG_COLORS).map(t => <option key={t}>{t}</option>)}
+              </select>
+            </div>
+            <div>
+              <p style={{ margin: '0 0 8px', fontSize: 10, fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>Target Date</p>
+              <input type="date" value={newGoal.deadline} onChange={e => setNewGoal({ ...newGoal, deadline: e.target.value })} style={{ width: '100%', background: 'var(--bg-input)', border: 'none', borderRadius: 14, padding: '12px 16px', fontSize: 14, fontWeight: 600, color: 'var(--text-main)', outline: 'none' }} />
+            </div>
+          </div>
+
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+               <p style={{ margin: 0, fontSize: 10, fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>Daily Systems (Habits)</p>
+               <button type="button" onClick={addStagingHabit} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 10, border: 'none', background: 'var(--accent-blue-light)', color: 'var(--accent-blue)', fontWeight: 800, fontSize: 11, cursor: 'pointer' }}>
+                 <Plus size={14} /> Add System
+               </button>
+            </div>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {newGoal.habits.map((h, idx) => (
+                <div key={h.id} style={{ background: 'var(--bg-input)', borderRadius: 18, padding: '14px', position: 'relative' }}>
+                   <div style={{ display: 'flex', gap: 10, marginBottom: 10 }}>
+                      <input required type="text" value={h.title} onChange={e => updateStagingHabit(h.id, { title: e.target.value })} placeholder={`Habit #${idx + 1}...`} style={{ flex: 1, background: 'transparent', border: 'none', borderBottom: '1.5px solid var(--border-light)', padding: '6px 0', fontSize: 14, fontWeight: 700, color: 'var(--text-main)', outline: 'none' }} />
+                      <button type="button" onClick={() => removeStagingHabit(h.id)} style={{ padding: '6px', color: 'var(--text-muted)', cursor: 'pointer', border: 'none', background: 'transparent' }}><Trash2 size={16} /></button>
+                   </div>
+                   <div style={{ display: 'flex', gap: 10 }}>
+                      <select value={h.type} onChange={e => updateStagingHabit(h.id, { type: e.target.value })} style={{ flex: 1, background: 'var(--bg-card)', border: 'none', borderRadius: 10, padding: '8px 12px', fontSize: 12, fontWeight: 600, color: 'var(--text-main)' }}>
+                        <option value="time">⏱️ Time</option>
+                        <option value="check">✅ Check</option>
+                        <option value="count">🔢 Count</option>
+                      </select>
+                      {h.type !== 'check' && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--bg-card)', padding: '4px 10px', borderRadius: 10 }}>
+                           <input type="number" min="1" value={h.type === 'count' ? h.targetCount : h.targetTime} onChange={e => updateStagingHabit(h.id, { [h.type === 'count' ? 'targetCount' : 'targetTime']: e.target.value })} style={{ width: 50, background: 'transparent', border: 'none', fontSize: 13, fontWeight: 800, color: 'var(--accent-blue)', outline: 'none', textAlign: 'center' }} />
+                           <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)' }}>{h.type === 'count' ? 'units' : 'mins'}</span>
+                        </div>
+                      )}
+                   </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <button type="submit" style={{ background: 'var(--accent-blue)', color: '#fff', border: 'none', borderRadius: 16, padding: '16px', fontWeight: 800, fontSize: 15, cursor: 'pointer', boxShadow: '0 8px 25px rgba(77,124,255,0.3)', marginTop: 10 }}>
+            Forge Strategy
+          </button>
         </form>
       )}
 
       {/* Goal Cards */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        {goals.map(goal => {
+        {goals
+          .sort((a, b) => {
+            const aDone = isGoalDoneToday(a);
+            const bDone = isGoalDoneToday(b);
+            if (aDone !== bDone) return aDone ? 1 : -1;
+            return 0;
+          })
+          .map(goal => {
           const tc = TAG_COLORS[goal.tag] || TAG_COLORS.General;
           const isOpen = expandedGoal === goal.id;
-          const goalOffset = CIRC - (CIRC * (goal.progress || 0)) / 100;
+          const habitsTotal = goal.habits.length;
+          const dailyProgress = calculateGoalDailyProgress(goal);
+
           const doneToday = isGoalDoneToday(goal);
 
           return (
@@ -239,19 +364,27 @@ export const GoalsPage = () => {
                 <div style={{ position: 'relative', width: 68, height: 68, flexShrink: 0 }}>
                   <svg width="68" height="68" viewBox="0 0 68 68">
                     <circle cx="34" cy="34" r={R} fill="none" stroke="var(--border-light)" strokeWidth="6" />
-                    <circle cx="34" cy="34" r={R} fill="none" stroke={doneToday ? '#22c55e' : 'var(--accent-blue)'} strokeWidth="6" strokeDasharray={CIRC} strokeDashoffset={goalOffset} strokeLinecap="round" transform="rotate(-90 34 34)" style={{ transition: 'stroke-dashoffset 0.8s' }} />
+                    <circle cx="34" cy="34" r={R} fill="none" stroke="var(--accent-blue)" strokeWidth="6" strokeDasharray={CIRC} strokeDashoffset={CIRC - (CIRC * (goal.progress || 0)) / 100} strokeLinecap="round" transform="rotate(-90 34 34)" style={{ transition: 'stroke-dashoffset 0.8s' }} />
                   </svg>
-                  <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <span style={{ fontSize: 13, fontWeight: 900, color: 'var(--text-main)' }}>{goal.progress || 0}%</span>
+                  <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                    <span style={{ fontSize: 13, fontWeight: 900, color: 'var(--text-main)', lineHeight: 1 }}>{goal.progress || 0}%</span>
+                    <span style={{ fontSize: 7, fontWeight: 800, color: 'var(--text-muted)' }}>MASTERY</span>
                   </div>
                 </div>
 
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
                     <span style={{ fontSize: 9, fontWeight: 800, color: tc.color, background: tc.bg, padding: '2px 8px', borderRadius: 999 }}>{goal.tag}</span>
-                    {goal.missedDays > 0 && <span style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b' }}>⚠️ {goal.missedDays} missed</span>}
+                    <span style={{ fontSize: 9, fontWeight: 800, color: 'var(--accent-blue)', background: 'var(--accent-blue-light)', padding: '2px 8px', borderRadius: 999 }}>
+                      Today: {dailyProgress}%
+                    </span>
                   </div>
                   <p style={{ margin: 0, fontSize: 16, fontWeight: 800, color: 'var(--text-main)' }}>{goal.title}</p>
+                  
+                  {/* Small Daily Progress Bar */}
+                  <div style={{ background: 'var(--bg-input)', height: 4, borderRadius: 99, marginTop: 6, width: '60%', overflow: 'hidden' }}>
+                    <div style={{ width: `${dailyProgress}%`, height: '100%', background: dailyProgress === 100 ? '#22c55e' : 'var(--accent-blue)', transition: 'width 0.4s' }} />
+                  </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
                     <button onClick={(e) => { e.stopPropagation(); setExtendingGoal(goal); }} style={{ background: 'var(--bg-input)', border: 'none', borderRadius: 6, padding: '3px 8px', fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
                       <Calendar size={12} /> {goal.deadline || 'No deadline'}
@@ -268,7 +401,14 @@ export const GoalsPage = () => {
 
               {isOpen && (
                 <div style={{ borderTop: '1px solid var(--border-light)', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {goal.habits.map(h => <HabitRow key={h.id} habit={h} goalId={goal.id} logHabitTime={logHabitTime} deleteHabit={deleteHabit} toggleHabitCheck={toggleHabitCheck} updateHabitCount={updateHabitCount} />)}
+                  {goal.habits
+                    .sort((a, b) => {
+                      const aDone = a.type === 'check' ? a.completed : (a.type === 'count' ? (a.currentCount >= (a.targetCount || 10)) : (a.timeSpent >= (a.targetTime || 15)));
+                      const bDone = b.type === 'check' ? b.completed : (b.type === 'count' ? (b.currentCount >= (b.targetCount || 10)) : (b.timeSpent >= (b.targetTime || 15)));
+                      if (aDone !== bDone) return aDone ? 1 : -1;
+                      return 0;
+                    })
+                    .map(h => <HabitRow key={h.id} habit={h} goalId={goal.id} logHabitTime={logHabitTime} deleteHabit={deleteHabit} toggleHabitCheck={toggleHabitCheck} updateHabitCount={updateHabitCount} />)}
                   {showAddHabit === goal.id ? (
                     <form onSubmit={e => submitHabit(e, goal.id)} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                       <input autoFocus required type="text" value={newHabit.title} onChange={e => setNewHabit({ ...newHabit, title: e.target.value })} placeholder="New habit name..." style={{ border: 'none', borderBottom: '2px solid var(--accent-blue)', background: 'transparent', padding: '10px 0', fontSize: 14, fontWeight: 600, color: 'var(--text-main)', outline: 'none' }} />

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
+import { calculateGoalDailyProgress } from '../utils/calculationUtils';
 import { useAuth } from '../context/AuthContext';
 import { AlertTriangle, AlertCircle, TrendingUp, TrendingDown, CheckCircle2, Clock, Zap, LogOut, Moon, Sun, Sparkles, Trophy, ChevronRight } from 'lucide-react';
 import { WeeklyHeatmap } from './WeeklyHeatmap';
@@ -205,32 +206,36 @@ export const Dashboard = ({ setView }) => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {goals.slice(0, 2).map(goal => {
             const habitsTotal = goal.habits.length;
+            const dailyProgress = calculateGoalDailyProgress(goal);
             const habitsDone = goal.habits.filter(h => {
               if (h.type === 'check') return h.completed;
               if (h.type === 'count') return (h.currentCount || 0) >= (h.targetCount || 10);
               return (h.timeSpent || 0) >= (h.targetTime || 15);
             }).length;
+
             return (
               <div key={goal.id} style={{ background: 'var(--bg-card)', borderRadius: 22, padding: '20px', boxShadow: 'var(--shadow-sm)', border: '1px solid var(--border-light)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <p style={{ margin: 0, fontWeight: 800, fontSize: 16, color: 'var(--text-main)' }}>{goal.title}</p>
-                      {/* Show best streak for goal */}
-                    {Math.max(0, ...goal.habits.map(h => h.streak || 0)) >= 3 && 
-                      <span style={{ fontSize: 10, fontWeight: 800, color: '#f97316' }}>
-                        🔥 {Math.max(...goal.habits.map(h => h.streak || 0))}d
-                      </span>
-                    }
+                      {Math.max(0, ...goal.habits.map(h => h.streak || 0)) >= 3 && 
+                        <span style={{ fontSize: 10, fontWeight: 800, color: '#f97316' }}>
+                          🔥 {Math.max(...goal.habits.map(h => h.streak || 0))}d
+                        </span>
+                      }
                     </div>
                     <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>
                       {habitsDone}/{habitsTotal} daily habits
                     </p>
                   </div>
-                  <span style={{ fontWeight: 900, fontSize: 18, color: 'var(--accent-blue)' }}>{goal.progress}%</span>
+                  <div style={{ textAlign: 'right' }}>
+                    <span style={{ fontWeight: 900, fontSize: 18, color: dailyProgress === 100 ? '#22c55e' : 'var(--accent-blue)' }}>{dailyProgress}%</span>
+                    <p style={{ margin: 0, fontSize: 8, fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Mastery: {goal.progress || 0}%</p>
+                  </div>
                 </div>
                 <div style={{ background: 'var(--bg-input)', borderRadius: 999, height: 8, overflow: 'hidden' }}>
-                  <div style={{ width: `${goal.progress}%`, height: '100%', borderRadius: 999, background: 'var(--accent-blue)', transition: 'width 1s cubic-bezier(0.34, 1.56, 0.64, 1)' }} />
+                  <div style={{ width: `${dailyProgress}%`, height: '100%', borderRadius: 999, background: dailyProgress === 100 ? '#22c55e' : 'var(--accent-blue)', transition: 'width 1s cubic-bezier(0.34, 1.56, 0.64, 1)' }} />
                 </div>
               </div>
             );

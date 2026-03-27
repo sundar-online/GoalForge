@@ -121,7 +121,7 @@ export const Goals = () => {
       )}
 
       {/* Goal Cards */}
-      {goals.map(goal => {
+      {goals.sort((a, b) => (a.progress === 100 ? 1 : 0) - (b.progress === 100 ? 1 : 0)).map(goal => {
         const tc = tagColor(goal.tag || 'General');
         const goalOffset = CIRC - (CIRC * goal.progress) / 100;
         return (

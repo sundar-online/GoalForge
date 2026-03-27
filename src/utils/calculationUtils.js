@@ -13,9 +13,24 @@ export const isGoalDoneToday = (goal) => {
   return doneHabitsCount === goal.habits.length;
 };
 
+export const calculateGoalDailyProgress = (goal) => {
+  if (!goal.habits || goal.habits.length === 0) return 0;
+  const habitsDone = goal.habits.filter(h => {
+    if (h.type === 'check') return h.completed;
+    if (h.type === 'count') return (h.currentCount || 0) >= (h.targetCount || 10);
+    return (h.timeSpent || 0) >= (h.targetTime || 15);
+  }).length;
+  
+  if (goal.mode === 'ANY') return habitsDone > 0 ? 100 : 0;
+  const target = goal.mode === 'CUSTOM' ? (goal.minHabits || 1) : goal.habits.length;
+  return Math.min(100, Math.round((habitsDone / target) * 100));
+};
+
+
 export const isTaskDone = (t) => {
-  if (t.completionType === 'check') return t.completed;
-  return (t.timeSpent || 0) >= (t.targetTime || 15);
+  if (t.type === 'check') return t.completed;
+  if (t.type === 'count') return (t.currentCount || 0) >= (t.targetCount || 10);
+  return (t.timeSpent || 0) >= (t.targetTime || 30);
 };
 
 export const calculateAccuracy = (tasks, goals) => {

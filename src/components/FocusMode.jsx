@@ -66,13 +66,19 @@ export const FocusMode = () => {
       timerRef.current = setInterval(() => {
         setTime(t => t - 1);
         accRef.current += 1;
+        
+        // Always increment total focus time
+        addFocusTime(1); 
+        
+        // Every 60 seconds of continuous focus, sync to habit/task progress
         if (accRef.current >= 60) {
           accRef.current = 0;
-          addFocusTimeToHabit(selectedGoalId || null, selectedHabitId || null, 60);
-        } else {
-          addFocusTime(1);
+          if (selectedGoalId && selectedHabitId) {
+             addFocusTimeToHabit(selectedGoalId, selectedHabitId, 60);
+          }
         }
       }, 1000);
+
     } else {
       clearInterval(timerRef.current);
       if (time === 0 && isActive) {
@@ -148,15 +154,25 @@ export const FocusMode = () => {
               disabled={isActive}
               style={{ width: '100%', background: 'var(--bg-card)', border: '1px solid var(--border-light)', borderRadius: 14, padding: '10px 36px 10px 16px', fontSize: 13, fontWeight: 600, color: 'var(--text-main)', boxShadow: 'var(--shadow-sm)', appearance: 'none', cursor: isActive ? 'not-allowed' : 'pointer', outline: 'none', opacity: isActive ? 0.6 : 1 }}>
               <option value="">— Select Routine/Habit —</option>
-              {activeList.map(h => {
-                const target = (isDailyTaskMode ? h.targetTime : h.targetTime) || 15;
-                const progress = h.timeSpent || 0;
-                return (
-                  <option key={h.id} value={h.id}>
-                    {h.title} ({progress}m/{target}m)
-                  </option>
-                );
-              })}
+              {activeList
+                .sort((a, b) => {
+                  const aDone = a.type === 'check' ? a.completed : (a.type === 'count' ? (a.currentCount >= (a.targetCount || 10)) : (a.timeSpent >= (a.targetTime || 15)));
+                  const bDone = b.type === 'check' ? b.completed : (b.type === 'count' ? (b.currentCount >= (b.targetCount || 10)) : (b.timeSpent >= (b.targetTime || 15)));
+                  if (aDone !== bDone) return aDone ? 1 : -1;
+                  return 0;
+                })
+                .map(h => {
+                  const isCount = h.type === 'count';
+                  const isCheck = h.type === 'check';
+                  const target = isCount ? (h.targetCount || 10) : (h.targetTime || 15);
+                  const progress = isCount ? (h.currentCount || 0) : (h.timeSpent || 0);
+                  const unit = isCount ? '' : 'm';
+                  return (
+                    <option key={h.id} value={h.id}>
+                      {h.title} {isCheck ? (h.completed ? '(Done)' : '') : `(${progress}${unit}/${target}${unit})`}
+                    </option>
+                  );
+                })}
             </select>
             <ChevronDown size={14} color="var(--text-muted)" style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
           </div>

@@ -29,3 +29,12 @@ export const getDaysLeft = (dateStr) => {
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   return Math.max(0, diffDays);
 };
+
+export const diffDays = (d1, d2) => {
+  if (!d1 || !d2) return 1;
+  const t1 = new Date(d1).getTime();
+  const t2 = new Date(d2).getTime();
+  const diff = Math.abs(t2 - t1);
+  return Math.max(1, Math.round(diff / (1000 * 60 * 60 * 24)) + 1);
+};
+
