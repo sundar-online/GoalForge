@@ -2,8 +2,6 @@ import { supabase } from './supabase';
 
 // ═══════════════════════════════════════════════════════
 // Supabase Database Helper — GoalForge
-// All write operations are fire-and-forget with error logging.
-// Read operations are awaited on initial load.
 // ═══════════════════════════════════════════════════════
 
 const log = (msg, err) => console.error(`[SupabaseDB] ${msg}`, err?.message || err);
@@ -16,7 +14,6 @@ export async function fetchGoals(userId) {
     .eq('user_id', userId)
     .order('created_at', { ascending: false });
   if (error) { log('fetchGoals', error); return null; }
-  // Map DB rows → app shape
   return (data || []).map(g => ({
     id: g.id,
     title: g.title,
@@ -29,6 +26,7 @@ export async function fetchGoals(userId) {
     streak: g.streak || 0,
     missedDays: g.missed_days || 0,
     createdAt: g.created_at,
+    extensions: g.extensions || [],
     habits: (g.habits || []).map(h => ({
       id: h.id,
       title: h.title,
@@ -55,6 +53,7 @@ export async function upsertGoal(userId, goal) {
     progress: goal.progress || 0,
     streak: goal.streak || 0,
     missed_days: goal.missedDays || 0,
+    extensions: goal.extensions || [],
     created_at: goal.createdAt,
     updated_at: new Date().toISOString(),
   }, { onConflict: 'id' });
@@ -89,47 +88,29 @@ export async function deleteHabitDb(habitId) {
   if (error) log('deleteHabit', error);
 }
 
-export async function updateHabitTime(habitId, timeSpent) {
-  const { error } = await supabase.from('habits').update({
-    time_spent: timeSpent,
-    updated_at: new Date().toISOString(),
-  }).eq('id', habitId);
-  if (error) log('updateHabitTime', error);
-}
-
-export async function updateHabitCount(habitId, currentCount) {
-  const { error } = await supabase.from('habits').update({
-    current_count: currentCount,
-    updated_at: new Date().toISOString(),
-  }).eq('id', habitId);
-  if (error) log('updateHabitCount', error);
-}
-
-export async function updateHabitCheck(habitId, completed) {
-  const { error } = await supabase.from('habits').update({
-    completed,
-    updated_at: new Date().toISOString(),
-  }).eq('id', habitId);
-  if (error) log('updateHabitCheck', error);
-}
+export async function updateHabitTime(habitId, timeSpent) { await supabase.from('habits').update({ time_spent: timeSpent }).eq('id', habitId); }
+export async function updateHabitCount(habitId, currentCount) { await supabase.from('habits').update({ current_count: currentCount }).eq('id', habitId); }
+export async function updateHabitCheck(habitId, completed) { await supabase.from('habits').update({ completed }).eq('id', habitId); }
 
 // ── Tasks ──────────────────────────────────────────────
 export async function fetchTasks(userId) {
-  const { data, error } = await supabase
-    .from('tasks')
-    .select('*')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false });
+  const { data, error } = await supabase.from('tasks').select('*').eq('user_id', userId).order('created_at', { ascending: false });
   if (error) { log('fetchTasks', error); return null; }
   return (data || []).map(t => ({
     id: t.id,
     title: t.title,
     type: t.type || 'daily',
+    completionType: t.completion_type || 'time',
     targetTime: t.target_time || 15,
     timeSpent: t.time_spent || 0,
+    completed: t.completed || false,
     targetDate: t.target_date || null,
     startDate: t.start_date || null,
     endDate: t.end_date || null,
+    currentStreak: t.current_streak || 0,
+    missedDays: t.missed_days || 0,
+    lastCompletedDate: t.last_completed_date || null,
+    priority: t.priority || 'Medium',
   }));
 }
 
@@ -139,76 +120,68 @@ export async function upsertTask(userId, task) {
     user_id: userId,
     title: task.title,
     type: task.type || 'daily',
+    completion_type: task.completionType || 'time',
     target_time: task.targetTime || 15,
     time_spent: task.timeSpent || 0,
+    completed: task.completed || false,
     target_date: task.targetDate || null,
     start_date: task.startDate || null,
     end_date: task.endDate || null,
+    current_streak: task.currentStreak || 0,
+    missed_days: task.missedDays || 0,
+    last_completed_date: task.lastCompletedDate || null,
+    priority: task.priority || 'Medium',
     updated_at: new Date().toISOString(),
   }, { onConflict: 'id' });
   if (error) log('upsertTask', error);
 }
 
-export async function deleteTaskDb(taskId) {
-  const { error } = await supabase.from('tasks').delete().eq('id', taskId);
-  if (error) log('deleteTask', error);
-}
+export async function deleteTaskDb(taskId) { await supabase.from('tasks').delete().eq('id', taskId); }
 
 // ── Focus History ──────────────────────────────────────
 export async function fetchFocusHistory(userId) {
-  const { data, error } = await supabase
-    .from('focus_history')
-    .select('*')
-    .eq('user_id', userId);
-  if (error) { log('fetchFocusHistory', error); return null; }
+  const { data, error } = await supabase.from('focus_history').select('*').eq('user_id', userId);
+  if (error) return null;
   const history = {};
-  (data || []).forEach(row => { history[row.date] = row.seconds; });
+  (data || []).forEach(row => history[row.date] = row.seconds);
   return history;
 }
 
-export async function upsertFocusHistory(userId, date, seconds) {
-  const { error } = await supabase.from('focus_history').upsert({
-    user_id: userId,
-    date,
-    seconds,
-  }, { onConflict: 'user_id,date' });
-  if (error) log('upsertFocusHistory', error);
-}
+export async function upsertFocusHistory(userId, date, seconds) { await supabase.from('focus_history').upsert({ user_id: userId, date, seconds }, { onConflict: 'user_id,date' }); }
 
 // ── Task Logs ──────────────────────────────────────────
 export async function fetchTaskLogs(userId) {
-  const { data, error } = await supabase
-    .from('task_logs')
-    .select('*')
-    .eq('user_id', userId);
-  if (error) { log('fetchTaskLogs', error); return null; }
+  const { data, error } = await supabase.from('task_logs').select('*').eq('user_id', userId).order('date', { ascending: false });
+  if (error) return null;
   const logs = {};
   (data || []).forEach(row => {
-    if (!logs[row.date]) logs[row.date] = {};
-    logs[row.date][row.item_id] = row.time_spent;
+    logs[row.date] = {
+      date: row.date,
+      total_tasks: row.total_tasks || 0,
+      completed_tasks: row.completed_tasks || 0,
+      time_spent: row.time_spent || 0,
+      auto_completed: row.auto_completed || false
+    };
   });
   return logs;
 }
 
-export async function upsertTaskLog(userId, date, itemId, timeSpent) {
-  const { error } = await supabase.from('task_logs').upsert({
+export async function upsertTaskLog(userId, summary) {
+  await supabase.from('task_logs').upsert({
     user_id: userId,
-    date,
-    item_id: itemId,
-    time_spent: timeSpent,
-  }, { onConflict: 'user_id,date,item_id' });
-  if (error) log('upsertTaskLog', error);
+    date: summary.date,
+    total_tasks: summary.total_tasks,
+    completed_tasks: summary.completed_tasks,
+    time_spent: summary.time_spent,
+    auto_completed: summary.auto_completed || false,
+    updated_at: new Date().toISOString(),
+  }, { onConflict: 'user_id,date' });
 }
 
 // ── User Settings ──────────────────────────────────────
 export async function fetchUserSettings(userId) {
-  const { data, error } = await supabase
-    .from('user_settings')
-    .select('*')
-    .eq('user_id', userId)
-    .single();
-  if (error && error.code !== 'PGRST116') { log('fetchUserSettings', error); return null; }
-  if (!data) return null;
+  const { data, error } = await supabase.from('user_settings').select('*').eq('user_id', userId).single();
+  if (error) return null;
   return {
     theme: data.theme || 'dark',
     focusTimeToday: data.focus_time_today || 0,
@@ -217,12 +190,11 @@ export async function fetchUserSettings(userId) {
 }
 
 export async function upsertUserSettings(userId, settings) {
-  const { error } = await supabase.from('user_settings').upsert({
+  await supabase.from('user_settings').upsert({
     user_id: userId,
     theme: settings.theme,
     focus_time_today: settings.focusTimeToday ?? 0,
     last_reset: settings.lastReset,
     updated_at: new Date().toISOString(),
   }, { onConflict: 'user_id' });
-  if (error) log('upsertUserSettings', error);
 }

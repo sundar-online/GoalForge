@@ -1,21 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAppContext } from '../context/AppContext';
-import { Play, Pause, RotateCcw, ChevronDown, Check } from 'lucide-react';
+import { Play, Pause, RotateCcw, Target, Coffee, Zap, Volume2, VolumeX, CheckCircle } from 'lucide-react';
 
 export const FocusMode = () => {
-  const { goals, todayTasks, focusTime, addFocusTimeToHabit, addFocusTime } = useAppContext();
-  
-  const [duration, setDuration] = useState(25); // Minutes
-  const [time, setTime] = useState(25 * 60);
+  const { tasks, goals, addFocusTimeToHabit } = useAppContext();
+  const [timeLeft, setTimeLeft] = useState(25 * 60);
   const [isActive, setIsActive] = useState(false);
-  
-  const [selectedGoalId, setSelectedGoalId] = useState('');
-  const [selectedHabitId, setSelectedHabitId] = useState('');
-  
-  const timerRef = useRef(null);
-  const accRef = useRef(0);
-
-  const isDailyTaskMode = selectedGoalId === 'DAILY_TASK';
   const selectedGoal = isDailyTaskMode ? null : goals.find(g => g.id === selectedGoalId);
   const activeList = isDailyTaskMode ? todayTasks : (selectedGoal?.habits || []);
   const selectedItem = activeList.find(h => h.id === selectedHabitId);

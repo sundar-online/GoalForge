@@ -1,58 +1,43 @@
 import React from 'react';
+import { useHeatmap } from '../hooks/useHeatmap';
 
-export const WeeklyHeatmap = ({ focusHistory, taskLogs }) => {
-  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  const today = new Date();
-  
-  const getIntensity = (dateStr) => {
-    if (!focusHistory || !taskLogs) return 'var(--bg-input)';
-    const focus = (focusHistory[dateStr] || 0) / 3600; // hours
-    const tasks = taskLogs[dateStr] ? Object.values(taskLogs[dateStr]).length : 0;
-    const score = focus * 2 + tasks;
-    if (score === 0) return 'var(--bg-input)';
-    if (score < 2) return 'rgba(34, 197, 94, 0.2)';
-    if (score < 5) return 'rgba(34, 197, 94, 0.5)';
-    return 'rgba(34, 197, 94, 0.8)';
-  };
-
-  const last7Days = [...Array(7)].map((_, i) => {
-    const d = new Date();
-    d.setDate(today.getDate() - (6 - i));
-    const key = d.toISOString().split('T')[0];
-    return {
-      day: days[d.getDay()],
-      key,
-      active: key === today.toISOString().split('T')[0]
-    };
-  });
+export const WeeklyHeatmap = ({ taskLogs }) => {
+  const { heatmapCells } = useHeatmap(taskLogs);
 
   return (
     <div style={{ background: 'var(--bg-card)', borderRadius: 22, padding: '20px', border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-sm)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Consistency Heatmap</span>
-        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-          <div style={{ width: 8, height: 8, borderRadius: 2, background: 'var(--bg-input)' }} />
-          <div style={{ width: 8, height: 8, borderRadius: 2, background: 'rgba(34, 197, 94, 0.8)' }} />
-          <span style={{ fontSize: 10, color: 'var(--text-muted)', marginLeft: 4 }}>Intensity</span>
+        <div>
+          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Consistency Heatmap</span>
+          <p style={{ margin: '2px 0 0', fontSize: 10, color: 'var(--text-muted)' }}>Real daily activity tracking</p>
+        </div>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 2 }}>
+            <div style={{ width: 8, height: 8, borderRadius: 2, background: 'var(--bg-input)' }} title="0% Completed" />
+            <div style={{ width: 8, height: 8, borderRadius: 2, background: '#faba2c' }} title="Low (>0%)" />
+            <div style={{ width: 8, height: 8, borderRadius: 2, background: 'var(--accent-blue)' }} title="Med (≥50%)" />
+            <div style={{ width: 8, height: 8, borderRadius: 2, background: '#22c55e' }} title="High (100%)" />
+          </div>
         </div>
       </div>
       
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 10 }}>
-        {last7Days.map((d, i) => (
-          <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-            <div style={{ 
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(10, 1fr)', gap: 6 }}>
+        {heatmapCells.map((cell, i) => (
+          <div key={i} title={`${cell.key} - ${cell.completionRate}%`} 
+            style={{ 
               width: '100%', 
               aspectRatio: '1/1', 
-              borderRadius: 8, 
-              background: getIntensity(d.key),
-              border: d.active ? '2px solid var(--accent-blue)' : 'none',
-              transition: 'all 0.3s ease'
+              borderRadius: 4, 
+              background: cell.intensity,
+              border: cell.active ? '1px solid var(--accent-blue)' : 'none',
+              transition: 'all 0.3s ease',
+              cursor: 'help'
             }} />
-            <span style={{ fontSize: 10, fontWeight: d.active ? 800 : 500, color: d.active ? 'var(--accent-blue)' : 'var(--text-muted)' }}>
-              {d.day}
-            </span>
-          </div>
         ))}
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 10 }}>
+        <span style={{ fontSize: 9, color: 'var(--text-muted)', fontWeight: 600 }}>30 days ago</span>
+        <span style={{ fontSize: 9, color: 'var(--text-muted)', fontWeight: 600 }}>Today</span>
       </div>
     </div>
   );
