@@ -162,7 +162,7 @@ const HabitRow = ({ habit, goalId, logHabitTime, deleteHabit, toggleHabitCheck, 
             ) : (!isCheck && !done) && (
               <button onClick={() => setShowLog(true)} style={{ padding: '6px 12px', borderRadius: 10, background: 'var(--accent-blue)', border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700, color: '#fff' }}>+ Log</button>
             )}
-            <button onClick={() => deleteHabit(goalId, habit.id)} style={{ width: 32, height: 32, borderRadius: 10, background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}><Trash2 size={14} /></button>
+            <button onClick={() => deleteHabit(goalId, habit.id)} style={{ width: 32, height: 32, borderRadius: 10, background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Trash2 size={14} /></button>
           </div>
         </div>
         {!isCheck && (
@@ -260,8 +260,8 @@ export const GoalsPage = () => {
           <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)' }}>Build habits to drive goal progress.</p>
         </div>
         <button onClick={() => setShowAddGoal(!showAddGoal)}
-          style={{ width: 40, height: 40, borderRadius: 12, background: showAddGoal ? 'rgba(239, 68, 68, 0.1)' : 'var(--bg-card)', border: '1px solid var(--border-light)', cursor: 'pointer' }}>
-          <Plus size={20} color={showAddGoal ? '#ef4444' : 'var(--text-main)'} style={{ transform: showAddGoal ? 'rotate(45deg)' : 'none', transition: 'transform 0.3s' }} />
+          style={{ width: 40, height: 40, borderRadius: 12, background: showAddGoal ? 'rgba(239, 68, 68, 0.1)' : 'var(--bg-card)', border: '1px solid var(--border-light)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.3s' }}>
+          <Plus size={20} color={showAddGoal ? '#ef4444' : 'var(--text-main)'} style={{ transform: showAddGoal ? 'rotate(45deg)' : 'none', transition: 'transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)' }} />
         </button>
       </div>
 
@@ -315,7 +315,7 @@ export const GoalsPage = () => {
                 <div key={h.id} style={{ background: 'var(--bg-input)', borderRadius: 18, padding: '14px', position: 'relative' }}>
                    <div style={{ display: 'flex', gap: 10, marginBottom: 10 }}>
                       <input required type="text" value={h.title} onChange={e => updateStagingHabit(h.id, { title: e.target.value })} placeholder={`Habit #${idx + 1}...`} style={{ flex: 1, background: 'transparent', border: 'none', borderBottom: '1.5px solid var(--border-light)', padding: '6px 0', fontSize: 14, fontWeight: 700, color: 'var(--text-main)', outline: 'none' }} />
-                      <button type="button" onClick={() => removeStagingHabit(h.id)} style={{ padding: '6px', color: 'var(--text-muted)', cursor: 'pointer', border: 'none', background: 'transparent' }}><Trash2 size={16} /></button>
+                      <button type="button" onClick={() => removeStagingHabit(h.id)} style={{ padding: '6px', color: 'var(--text-muted)', cursor: 'pointer', border: 'none', background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Trash2 size={16} /></button>
                    </div>
                    <div style={{ display: 'flex', gap: 10 }}>
                       <select value={h.type} onChange={e => updateStagingHabit(h.id, { type: e.target.value })} style={{ flex: 1, background: 'var(--bg-card)', border: 'none', borderRadius: 10, padding: '8px 12px', fontSize: 12, fontWeight: 600, color: 'var(--text-main)' }}>
@@ -394,7 +394,7 @@ export const GoalsPage = () => {
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <button onClick={e => { e.stopPropagation(); deleteGoal(goal.id); }} style={{ width: 32, height: 32, borderRadius: 10, background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}><Trash2 size={16} /></button>
+                  <button onClick={e => { e.stopPropagation(); deleteGoal(goal.id); }} style={{ width: 32, height: 32, borderRadius: 10, background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Trash2 size={16} /></button>
                   {isOpen ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
                 </div>
               </div>

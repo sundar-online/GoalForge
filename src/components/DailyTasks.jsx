@@ -218,7 +218,7 @@ export const DailyTasks = () => {
                         ) : (isTime && !tDone) && (
                           <button onClick={() => setShowLog(task)} style={{ padding: '7px 14px', borderRadius: 10, background: 'var(--accent-blue)', border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 800, color: '#fff' }}>+ Log</button>
                         )}
-                        <button onClick={() => deleteTask(task.id)} style={{ width: 34, height: 34, borderRadius: 10, background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}><Trash2 size={18} /></button>
+                        <button onClick={() => deleteTask(task.id)} style={{ width: 34, height: 34, borderRadius: 10, background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Trash2 size={18} /></button>
                       </div>
                     </div>
                     

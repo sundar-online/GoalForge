@@ -8,88 +8,125 @@ import {
   calculateAccuracy, 
   calculateDisciplineScore, 
   getUserLevel, 
-  getInsights 
+  getInsights,
+  calculateWeeklyReport,
+  getSmartAlerts
 } from '../utils/calculationUtils';
+import { diffDays as calcDiffDays } from '../utils/dateUtils';
+
 
 const AppContext = createContext();
+
+const STORAGE_KEYS = {
+  GOALS: 'goalforge_goals',
+  TASKS: 'goalforge_tasks',
+  LOGS: 'goalforge_logs',
+  SETTINGS: 'goalforge_settings',
+  NOTES: 'goalforge_notes'
+};
+
+const safeParse = (key, fallback) => {
+  try {
+    const item = localStorage.getItem(key);
+    return item ? JSON.parse(item) : fallback;
+  } catch (e) {
+    console.error(`[LocalStorage] Error parsing ${key}:`, e);
+    return fallback;
+  }
+};
 
 // ── Provider ──────────────────────────────────────────────
 export const AppProvider = ({ children }) => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
+  const [syncError, setSyncError] = useState(null);
 
   // Initial local state
-  const [goals, setGoals] = useState(() => JSON.parse(localStorage.getItem('gf_goals_v3') || '[]'));
-  const [tasks, setTasks] = useState(() => JSON.parse(localStorage.getItem('gf_tasks_v3') || '[]'));
-  const [focusTime, setFocusTime] = useState(() => JSON.parse(localStorage.getItem('gf_focusTime_v3') || '0'));
-  const [focusHistory, setFocusHistory] = useState(() => JSON.parse(localStorage.getItem('gf_focusHistory_v3') || '{}'));
-  const [taskLogs, setTaskLogs] = useState(() => JSON.parse(localStorage.getItem('gf_taskLogs_v3') || '{}'));
-  const [theme, setTheme] = useState(() => localStorage.getItem('gf_theme_v3') || 'dark');
-  const [notes, setNotes] = useState(() => JSON.parse(localStorage.getItem('gf_notes_v3') || '[]'));
+  const [goals, setGoals] = useState(() => safeParse(STORAGE_KEYS.GOALS, []));
+  const [tasks, setTasks] = useState(() => safeParse(STORAGE_KEYS.TASKS, []));
+  const [taskLogs, setTaskLogs] = useState(() => safeParse(STORAGE_KEYS.LOGS, {}));
+  const [notes, setNotes] = useState(() => safeParse(STORAGE_KEYS.NOTES, []));
+  
+  // Settings - composite state
+  const [settings, setSettings] = useState(() => safeParse(STORAGE_KEYS.SETTINGS, {
+    theme: 'dark',
+    focusTimeToday: 0,
+    lastActiveDate: '',
+    focusHistory: {}
+  }));
+
+  const theme = settings.theme || 'dark';
+  const focusTime = settings.focusTimeToday || 0;
+  const focusHistory = settings.focusHistory || {};
 
   // ── Supabase Initial Load ────────────────────────────────
-  useEffect(() => {
-    async function loadData() {
-      if (!user) { setLoading(false); return; }
-      try {
-        const [g, t, f, l, s] = await Promise.all([
-          db.fetchGoals(user.id),
-          db.fetchTasks(user.id),
-          db.fetchFocusHistory(user.id),
-          db.fetchTaskLogs(user.id),
-          db.fetchUserSettings(user.id)
-        ]);
-        if (g) setGoals(g);
-        if (t) setTasks(t);
-        if (f) setFocusHistory(f);
-        if (l) setTaskLogs(l);
-        if (s) {
-          setTheme(s.theme || 'dark');
-          setFocusTime(s.focusTimeToday || 0);
-        }
-      } catch (err) {
-        console.error('[Supabase Sync] Load failed:', err);
-      } finally {
-        setLoading(false);
+  // -- Local Persistence Effects --
+  useEffect(() => { localStorage.setItem(STORAGE_KEYS.GOALS, JSON.stringify(goals)); }, [goals]);
+  useEffect(() => { localStorage.setItem(STORAGE_KEYS.TASKS, JSON.stringify(tasks)); }, [tasks]);
+  useEffect(() => { localStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify(taskLogs)); }, [taskLogs]);
+  useEffect(() => { localStorage.setItem(STORAGE_KEYS.NOTES, JSON.stringify(notes)); }, [notes]);
+  useEffect(() => { 
+    localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
+    document.documentElement.setAttribute('data-theme', settings.theme || 'dark');
+  }, [settings]);
+
+  // Secondary Supabase Load (Optional / Background)
+  const syncFromCloud = async () => {
+    if (!user) { setLoading(false); return; }
+    try {
+      setSyncError(null);
+      const [g, t, f, l, s] = await Promise.all([
+        db.fetchGoals(user.id),
+        db.fetchTasks(user.id),
+        db.fetchFocusHistory(user.id),
+        db.fetchTaskLogs(user.id),
+        db.fetchUserSettings(user.id)
+      ]);
+      // Only merge if local is empty or we prioritize cloud
+      if (g && goals.length === 0) setGoals(g);
+      if (t && tasks.length === 0) setTasks(t);
+      if (l && Object.keys(taskLogs).length === 0) setTaskLogs(l);
+      if (s || f) {
+        setSettings(prev => ({
+          ...prev,
+          theme: s?.theme || prev.theme,
+          focusTimeToday: s?.focusTimeToday || prev.focusTimeToday,
+          focusHistory: f || prev.focusHistory
+        }));
       }
+    } catch (err) {
+      setSyncError('Cloud sync interrupted. Your data is safe locally.');
+      console.warn('[Supabase] Offline mode or sync failed.');
+    } finally {
+      setLoading(false);
     }
-    loadData();
-  }, [user]);
-
-  // ── Persistence Effects (Local) ──────────────────────────
-  useEffect(() => { localStorage.setItem('gf_goals_v3', JSON.stringify(goals)); }, [goals]);
-  useEffect(() => { localStorage.setItem('gf_tasks_v3', JSON.stringify(tasks)); }, [tasks]);
-  useEffect(() => { localStorage.setItem('gf_focusTime_v3', JSON.stringify(focusTime)); }, [focusTime]);
-  useEffect(() => { localStorage.setItem('gf_focusHistory_v3', JSON.stringify(focusHistory)); }, [focusHistory]);
-  useEffect(() => { localStorage.setItem('gf_taskLogs_v3', JSON.stringify(taskLogs)); }, [taskLogs]);
-  useEffect(() => { localStorage.setItem('gf_notes_v3', JSON.stringify(notes)); }, [notes]);
-  useEffect(() => {
-    localStorage.setItem('gf_theme_v3', theme);
-    document.documentElement.setAttribute('data-theme', theme);
-  }, [theme]);
-
-  const toggleTheme = () => {
-    const newTheme = theme === 'light' ? 'dark' : 'light';
-    setTheme(newTheme);
-    if (user) db.upsertUserSettings(user.id, { theme: newTheme, focusTimeToday: focusTime, lastReset: TODAY() });
   };
 
-  // ── Daily Reset & Streak Logic (Rule 2, 3, 4, 5) ─────────────────
   useEffect(() => {
-    if (loading || !user) return;
+    syncFromCloud();
+  }, [user]);
+
+  const toggleTheme = () => {
+    const newTheme = settings.theme === 'light' ? 'dark' : 'light';
+    setSettings(prev => ({ ...prev, theme: newTheme }));
+    if (user) db.upsertUserSettings(user.id, { theme: newTheme, focusTimeToday: focusTime, lastReset: settings.lastActiveDate });
+  };
+
+  useEffect(() => {
+
+    if (loading) return;
 
     const todayStr = TODAY();
     const yesterdayStr = addDays(todayStr, -1);
-    const lastGlobalReset = localStorage.getItem('gf_lastReset_v3');
+    const lastActive = settings.lastActiveDate || yesterdayStr;
 
-    if (lastGlobalReset === todayStr) return; // Already reset for today
+    if (lastActive === todayStr) return; // Already reset for today
 
     setGoals(prev => {
       const updatedGoals = prev.map(goal => {
-        const lastActive = goal.lastActiveDate || yesterdayStr;
-        if (lastActive === todayStr) return goal;
-
-        const daysDiff = Math.floor((new Date(todayStr) - new Date(lastActive)) / (1000 * 60 * 60 * 24));
+        // Goal specific last active or global
+        const gLastActive = goal.lastActiveDate || lastActive;
+        const daysDiff = Math.floor((new Date(todayStr) - new Date(gLastActive)) / (1000 * 60 * 60 * 24));
 
         const updatedHabits = goal.habits.map(h => {
           let updatedH = { ...h };
@@ -97,17 +134,15 @@ export const AppProvider = ({ children }) => {
             (updatedH.type === 'time' && (updatedH.timeSpent || 0) >= (updatedH.targetTime || 15)) ||
             (updatedH.type === 'count' && (updatedH.currentCount || 0) >= (updatedH.targetCount || 10));
 
-          // 1. Process the "lastActive" day performance
           if (wasLogicallyDoneOnLastActive) {
-            if (updatedH.lastCompletedDate === addDays(lastActive, -1)) updatedH.streak += 1;
-            else if (updatedH.lastCompletedDate !== lastActive) updatedH.streak = 1;
-            updatedH.lastCompletedDate = lastActive;
+            if (updatedH.lastCompletedDate === addDays(gLastActive, -1)) updatedH.streak += 1;
+            else if (updatedH.lastCompletedDate !== gLastActive) updatedH.streak = 1;
+            updatedH.lastCompletedDate = gLastActive;
             updatedH.missedDays = 0;
           } else {
             updatedH.missedDays += 1;
           }
 
-          // 2. Catch up on any gaps (skipped days between lastActive and Today)
           if (daysDiff > 1) {
             for (let i = 1; i < daysDiff; i++) {
                updatedH.missedDays += 1;
@@ -117,7 +152,6 @@ export const AppProvider = ({ children }) => {
 
           if (updatedH.missedDays >= 3) { updatedH.streak = 0; updatedH.missedDays = 0; }
 
-          // Rule 2: Reset for today
           updatedH.timeSpent = 0;
           updatedH.completed = false;
           updatedH.currentCount = 0;
@@ -125,9 +159,8 @@ export const AppProvider = ({ children }) => {
         });
 
         const wasGoalDoneOnLastActiveDay = habitsAfterProcess => {
-          const doneHabitsCount = habitsAfterProcess.filter(hr => hr.lastCompletedDate === lastActive).length;
-          const isDone = (goal.mode === 'ANY' && doneHabitsCount > 0) || (goal.mode === 'CUSTOM' && doneHabitsCount >= (goal.minHabits || 1)) || (goal.mode === 'ALL' && doneHabitsCount === habitsAfterProcess.length);
-          return isDone;
+          const doneHabitsCount = habitsAfterProcess.filter(hr => hr.lastCompletedDate === gLastActive).length;
+          return (goal.mode === 'ANY' && doneHabitsCount > 0) || (goal.mode === 'CUSTOM' && doneHabitsCount >= (goal.minHabits || 1)) || (goal.mode === 'ALL' && doneHabitsCount === habitsAfterProcess.length);
         };
 
         let newDaysCompleted = goal.daysCompleted || 0;
@@ -135,7 +168,7 @@ export const AppProvider = ({ children }) => {
           newDaysCompleted += 1;
         }
 
-        const totalDays = diffDays(goal.startDate || goal.createdAt || todayStr, goal.deadline || addDays(todayStr, 30));
+        const totalDays = calcDiffDays(goal.startDate || goal.createdAt || todayStr, goal.deadline || addDays(todayStr, 30));
         const updatedGoal = { 
           ...goal, 
           habits: updatedHabits, 
@@ -145,27 +178,22 @@ export const AppProvider = ({ children }) => {
         };
 
         if (user) db.upsertGoal(user.id, updatedGoal);
-        updatedHabits.forEach(h => db.upsertHabit(user.id, goal.id, h));
-
         return updatedGoal;
       });
       return updatedGoals;
     });
 
-    // Reset Focus Time & Daily Tasks
     setTasks(prev => prev.map(t => {
-      const isDaily = (t.schedule_type || t.type) === 'daily';
-      if (isDaily) {
-         // Apply same streak logic to tasks
+      if ((t.schedule_type || t.type) === 'daily') {
          const wasDone = isTaskDone(t);
          let newStreak = t.currentStreak || 0;
          let newMissed = t.missedDays || 0;
          let lastComp = t.lastCompletedDate;
 
          if (wasDone) {
-           if (lastComp === addDays(lastGlobalReset || todayStr, -1)) newStreak += 1;
-           else if (lastComp !== lastGlobalReset) newStreak = 1;
-           lastComp = lastGlobalReset || todayStr;
+           if (lastComp === addDays(lastActive, -1)) newStreak += 1;
+           else if (lastComp !== lastActive) newStreak = 1;
+           lastComp = lastActive;
            newMissed = 0;
          } else {
            newMissed += 1;
@@ -177,11 +205,10 @@ export const AppProvider = ({ children }) => {
       return t;
     }));
 
-    setFocusTime(0);
-    localStorage.setItem('gf_lastReset_v3', todayStr);
+    setSettings(prev => ({ ...prev, focusTimeToday: 0, lastActiveDate: todayStr }));
     if (user) db.upsertUserSettings(user.id, { theme, focusTimeToday: 0, lastReset: todayStr });
     
-  }, [loading, user]);
+  }, [loading, user, settings.lastActiveDate]);
 
 
   // ── Automatic Daily Summary Sync ─────────────────────────
@@ -249,12 +276,16 @@ export const AppProvider = ({ children }) => {
   const disciplineScore = calculateDisciplineScore(accuracy, avgStreak, focusTime);
   const userLevel = getUserLevel(disciplineScore);
 
+  const weeklyReport = useMemo(() => calculateWeeklyReport(taskLogs), [taskLogs]);
+
+  const smartAlerts = useMemo(() => 
+    getSmartAlerts(accuracy, goals, tasks, weeklyReport), 
+    [accuracy, goals, tasks, weeklyReport]
+  );
+  
   const alerts = useMemo(() => {
-    const arr = [];
-    goals.forEach(g => { if ((g.missedDays || 0) >= 2) arr.push({ type: 'warning', message: `Goal "${g.title}" — 2 missed days!` }); });
-    tasks.forEach(t => { if (t.type === 'daily' && (t.missedDays || 0) >= 2) arr.push({ type: 'warning', message: `Task "${t.title}" — 2 missed days!` }); });
-    return arr;
-  }, [goals, tasks]);
+    return [...smartAlerts];
+  }, [smartAlerts]);
 
   // ── Actions ──────────────────────────────────────────────
   const addGoal = (goal) => {
@@ -566,10 +597,10 @@ export const AppProvider = ({ children }) => {
   };
 
   const addFocusTime = (seconds) => {
-    setFocusTime(prev => {
-      const next = prev + seconds;
-      return next;
-    });
+    setSettings(prev => ({
+      ...prev,
+      focusTimeToday: (prev.focusTimeToday || 0) + seconds
+    }));
   };
 
   const addFocusTimeToHabit = (goalId, habitId, seconds) => {
@@ -585,10 +616,14 @@ export const AppProvider = ({ children }) => {
   useEffect(() => {
     if (!user || loading) return;
     const timer = setTimeout(() => {
-      db.upsertUserSettings(user.id, { theme, focusTimeToday: focusTime, lastReset: TODAY() });
-    }, 10000); // Wait for 10s of inactivity to sync
+      db.upsertUserSettings(user.id, { 
+        theme: settings.theme, 
+        focusTimeToday: settings.focusTimeToday, 
+        lastReset: settings.lastActiveDate 
+      });
+    }, 15000); 
     return () => clearTimeout(timer);
-  }, [focusTime, theme, user]);
+  }, [settings.focusTimeToday, settings.theme, user]);
 
   const addNote = note => { const now = new Date().toISOString(); const newN = { ...note, id: Date.now().toString(), created_at: now, updated_at: now }; setNotes(prev => [newN, ...prev]); return newN; };
   const updateNote = (id, updates) => setNotes(prev => prev.map(n => n.id === id ? { ...n, ...updates } : n));
@@ -600,9 +635,9 @@ export const AppProvider = ({ children }) => {
     tasks, addTask, updateTask, deleteTask, logTaskTime, toggleTaskComplete, updateTaskCount,
     focusTime, focusHistory, addFocusTime, addFocusTimeToHabit,
     theme, toggleTheme,
-    accuracy, alerts, disciplineScore, userLevel, insights: getInsights(accuracy, avgStreak, focusTime),
+    accuracy, alerts, weeklyReport, disciplineScore, userLevel, insights: getInsights(accuracy, avgStreak, focusTime),
     notes, addNote, updateNote, deleteNote,
-    loading, taskLogs,
+    loading, taskLogs, syncError, retrySync: syncFromCloud,
     totalItems, completedItems, todayTasks, allHabits
   };
 
