@@ -1,12 +1,32 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAppContext } from '../context/AppContext';
-import { Play, Pause, RotateCcw, Target, Coffee, Zap, Volume2, VolumeX, CheckCircle } from 'lucide-react';
+import { Play, Pause, RotateCcw, Target, Coffee, Zap, Volume2, VolumeX, CheckCircle, ChevronDown, Check } from 'lucide-react';
+import { TODAY } from '../utils/dateUtils';
 
 export const FocusMode = () => {
-  const { tasks, goals, addFocusTimeToHabit } = useAppContext();
-  const [timeLeft, setTimeLeft] = useState(25 * 60);
+  const { tasks, goals, addFocusTime, addFocusTimeToHabit, focusTime } = useAppContext();
+  
+  // -- State Hooks --
+  const [duration, setDuration] = useState(25);
+  const [time, setTime] = useState(25 * 60);
   const [isActive, setIsActive] = useState(false);
+  const [selectedGoalId, setSelectedGoalId] = useState('');
+  const [selectedHabitId, setSelectedHabitId] = useState('');
+  
+  const timerRef = useRef(null);
+  const accRef = useRef(0);
+
+  const todayStr = TODAY();
+  const todayTasks = tasks.filter(t => {
+    const type = t.type || 'daily';
+    if (type === 'daily') return true;
+    if (type === 'single') return t.targetDate === todayStr || t.date === todayStr;
+    if (type === 'range') return t.startDate <= todayStr && t.endDate >= todayStr;
+    return false;
+  });
+
+  const isDailyTaskMode = selectedGoalId === 'DAILY_TASK';
   const selectedGoal = isDailyTaskMode ? null : goals.find(g => g.id === selectedGoalId);
   const activeList = isDailyTaskMode ? todayTasks : (selectedGoal?.habits || []);
   const selectedItem = activeList.find(h => h.id === selectedHabitId);
@@ -26,13 +46,18 @@ export const FocusMode = () => {
 
   const playTone = (freq, dur = 0.3) => {
     try {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      const osc = ctx.createOscillator(); const g = ctx.createGain();
-      osc.connect(g); g.connect(ctx.destination);
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContext) return;
+      const ctx = new AudioContext();
+      const osc = ctx.createOscillator(); 
+      const g = ctx.createGain();
+      osc.connect(g); 
+      g.connect(ctx.destination);
       osc.frequency.value = freq;
       g.gain.setValueAtTime(0.07, ctx.currentTime);
       g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
-      osc.start(); osc.stop(ctx.currentTime + dur);
+      osc.start(); 
+      osc.stop(ctx.currentTime + dur);
     } catch (e) {}
   };
 
@@ -59,7 +84,7 @@ export const FocusMode = () => {
   }, [isActive, time, selectedGoalId, selectedHabitId]);
 
   const toggle = () => { 
-    if (time === 0) return; // Prevent playing when done
+    if (time === 0) return;
     playTone(isActive ? 330 : 528); 
     setIsActive(v => !v); 
   };
@@ -123,9 +148,15 @@ export const FocusMode = () => {
               disabled={isActive}
               style={{ width: '100%', background: 'var(--bg-card)', border: '1px solid var(--border-light)', borderRadius: 14, padding: '10px 36px 10px 16px', fontSize: 13, fontWeight: 600, color: 'var(--text-main)', boxShadow: 'var(--shadow-sm)', appearance: 'none', cursor: isActive ? 'not-allowed' : 'pointer', outline: 'none', opacity: isActive ? 0.6 : 1 }}>
               <option value="">— Select Routine/Habit —</option>
-              {activeList.map(h => (
-                <option key={h.id} value={h.id}>{h.title} ({h.timeSpent || 0}m/{(isDailyTaskMode ? h.targetTime : 15) || 15}m)</option>
-              ))}
+              {activeList.map(h => {
+                const target = (isDailyTaskMode ? h.targetTime : h.targetTime) || 15;
+                const progress = h.timeSpent || 0;
+                return (
+                  <option key={h.id} value={h.id}>
+                    {h.title} ({progress}m/{target}m)
+                  </option>
+                );
+              })}
             </select>
             <ChevronDown size={14} color="var(--text-muted)" style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
           </div>
@@ -165,15 +196,11 @@ export const FocusMode = () => {
       {/* Controls */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 28, marginTop: -10 }}>
         <button onClick={reset}
-          style={{ width: 50, height: 50, borderRadius: 16, background: 'var(--bg-input)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.2s', color: 'var(--text-muted)' }}
-          onMouseEnter={e => e.currentTarget.style.background = 'var(--border-med)'}
-          onMouseLeave={e => e.currentTarget.style.background = 'var(--bg-input)'}>
+          style={{ width: 50, height: 50, borderRadius: 16, background: 'var(--bg-input)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.2s', color: 'var(--text-muted)' }}>
           <RotateCcw size={20} strokeWidth={2.5} />
         </button>
         <button onClick={toggle}
-          style={{ width: 76, height: 76, borderRadius: '50%', background: time === 0 ? '#22c55e' : 'var(--accent-blue)', border: 'none', cursor: time === 0 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: isActive ? '0 8px 28px rgba(77,124,255,0.45)' : '0 6px 20px rgba(77,124,255,0.3)', transition: 'all 0.25s cubic-bezier(0.34,1.56,0.64,1)', opacity: time === 0 ? 0.7 : 1 }}
-          onMouseEnter={e => time > 0 && (e.currentTarget.style.transform = 'translateY(-3px) scale(1.06)')}
-          onMouseLeave={e => time > 0 && (e.currentTarget.style.transform = 'none')}>
+          style={{ width: 76, height: 76, borderRadius: '50%', background: time === 0 ? '#22c55e' : 'var(--accent-blue)', border: 'none', cursor: time === 0 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: isActive ? '0 8px 28px rgba(77,124,255,0.45)' : '0 6px 20px rgba(77,124,255,0.3)', transition: 'all 0.25s cubic-bezier(0.34,1.56,0.64,1)', opacity: time === 0 ? 0.7 : 1 }}>
           {time === 0 ? <Check size={30} color="white" strokeWidth={3} /> : (isActive ? <Pause size={30} fill="white" color="white" /> : <Play size={30} fill="white" color="white" style={{ marginLeft: 4 }} />)}
         </button>
         <div style={{ width: 50, height: 50 }} />

@@ -74,64 +74,112 @@ export const AppProvider = ({ children }) => {
     if (user) db.upsertUserSettings(user.id, { theme: newTheme, focusTimeToday: focusTime, lastReset: TODAY() });
   };
 
-  // ── Daily Reset & Streak Protection ───────────────────────
+  // ── Daily Reset & Streak Logic (Rule 2, 3, 4, 5) ─────────────────
   useEffect(() => {
-    const lastReset = localStorage.getItem('gf_lastReset_v3');
+    if (loading || !user) return;
+
     const todayStr = TODAY();
-    if (lastReset && lastReset !== todayStr) {
-      const yday = lastReset;
-      
-      const sessionFocus = focusTime;
-      setFocusHistory(prev => ({ ...prev, [yday]: sessionFocus }));
-      if (user) db.upsertFocusHistory(user.id, yday, sessionFocus);
-      setFocusTime(0);
+    const yesterdayStr = addDays(todayStr, -1);
+    const lastGlobalReset = localStorage.getItem('gf_lastReset_v3');
 
-      const daysDiff = Math.floor((new Date(todayStr) - new Date(yday)) / (1000 * 60 * 60 * 24));
+    if (lastGlobalReset === todayStr) return; // Already reset for today
 
-      setGoals(prev => prev.map(goal => {
-        const wasDone = isGoalDoneToday(goal);
-        let newStreak = goal.streak || 0;
-        let newMissed = goal.missedDays || 0;
-        let newProgress = goal.progress || 0;
-        let newDeadline = goal.deadline;
+    setGoals(prev => {
+      const updatedGoals = prev.map(goal => {
+        const lastActive = goal.lastActiveDate || yesterdayStr;
+        if (lastActive === todayStr) return goal;
 
-        if (goal.habits.length > 0) {
-          if (wasDone) {
-            newStreak += 1;
-            newMissed = 0;
-            newProgress = Math.min(100, newProgress + 2);
+        const daysDiff = Math.floor((new Date(todayStr) - new Date(lastActive)) / (1000 * 60 * 60 * 24));
+
+        const updatedHabits = goal.habits.map(h => {
+          let updatedH = { ...h };
+          const wasLogicallyDoneOnLastActive = updatedH.completed || (updatedH.type === 'time' && updatedH.timeSpent >= updatedH.targetTime);
+
+          // 1. Process the "lastActive" day performance
+          if (wasLogicallyDoneOnLastActive) {
+            if (updatedH.lastCompletedDate === addDays(lastActive, -1)) updatedH.streak += 1;
+            else if (updatedH.lastCompletedDate !== lastActive) updatedH.streak = 1;
+            updatedH.lastCompletedDate = lastActive;
+            updatedH.missedDays = 0;
           } else {
-            newMissed += 1;
-            if (newMissed >= 3) { newStreak = 0; newMissed = 0; if (newDeadline) newDeadline = addDays(newDeadline, 3); }
+            updatedH.missedDays += 1;
           }
+
+          // 2. Catch up on any gaps (skipped days between lastActive and Today)
           if (daysDiff > 1) {
-             for (let i = 1; i < daysDiff; i++) { newMissed += 1; if (newMissed >= 3) { newStreak = 0; newMissed = 0; } }
+            for (let i = 1; i < daysDiff; i++) {
+               updatedH.missedDays += 1;
+               if (updatedH.missedDays >= 3) { updatedH.streak = 0; updatedH.missedDays = 0; }
+            }
           }
+
+          if (updatedH.missedDays >= 3) { updatedH.streak = 0; updatedH.missedDays = 0; }
+
+          // Rule 2: Reset for today
+          updatedH.timeSpent = 0;
+          updatedH.completed = false;
+          updatedH.currentCount = 0;
+          return updatedH;
+        });
+
+        // Rule 5: Progress Calculation (Cumulative)
+        const wasGoalDoneOnLastActiveDay = habitsAfterProcess => {
+          const doneHabitsCount = habitsAfterProcess.filter(hr => hr.lastCompletedDate === lastActive).length;
+          if (goal.mode === 'ANY') return doneHabitsCount > 0;
+          if (goal.mode === 'CUSTOM') return doneHabitsCount >= (goal.minHabits || 1);
+          return doneHabitsCount === habitsAfterProcess.length;
+        };
+
+        let newProgress = goal.progress || 0;
+        if (wasGoalDoneOnLastActiveDay(updatedHabits)) {
+          newProgress = Math.min(100, newProgress + 5);
         }
-        const updatedHabits = goal.habits.map(h => ({ ...h, timeSpent: 0, completed: false, currentCount: 0 }));
-        const updatedGoal = { ...goal, habits: updatedHabits, streak: newStreak, missedDays: newMissed, progress: newProgress, deadline: newDeadline };
-        if (user) { db.upsertGoal(user.id, updatedGoal); updatedHabits.forEach(h => db.upsertHabit(user.id, goal.id, h)); }
+
+        const updatedGoal = { 
+          ...goal, 
+          habits: updatedHabits, 
+          progress: newProgress,
+          lastActiveDate: todayStr 
+        };
+
+        if (user) db.upsertGoal(user.id, updatedGoal);
+        updatedHabits.forEach(h => db.upsertHabit(user.id, goal.id, h));
+
         return updatedGoal;
-      }));
+      });
+      return updatedGoals;
+    });
 
-      setTasks(prev => prev.map(t => {
-        if (t.type === 'daily') {
-           const wasDone = isTaskDone(t);
-           let newStreak = t.currentStreak || 0;
-           let newMissed = t.missedDays || 0;
-           if (!wasDone) { newMissed += 1; if (newMissed >= 3) { newStreak = 0; newMissed = 0; } }
-           if (daysDiff > 1) { for (let i = 1; i < daysDiff; i++) { newMissed += 1; if (newMissed >= 3) { newStreak = 0; newMissed = 0; } } }
-           const resetTask = { ...t, timeSpent: 0, completed: false, currentStreak: newStreak, missedDays: newMissed };
-           if (user) db.upsertTask(user.id, resetTask);
-           return resetTask;
-        }
-        return t;
-      }));
+    // Reset Focus Time & Daily Tasks
+    setTasks(prev => prev.map(t => {
+      if (t.type === 'daily') {
+         // Apply same streak logic to tasks
+         const wasDone = t.completed || (t.completionType === 'time' && t.timeSpent >= t.targetTime);
+         let newStreak = t.currentStreak || 0;
+         let newMissed = t.missedDays || 0;
+         let lastComp = t.lastCompletedDate;
 
-      localStorage.setItem('gf_lastReset_v3', todayStr);
-      if (user) db.upsertUserSettings(user.id, { theme, focusTimeToday: 0, lastReset: todayStr });
-    }
-  }, [user, theme, tasks, goals, focusTime]);
+         if (wasDone) {
+           if (lastComp === addDays(lastGlobalReset || todayStr, -1)) newStreak += 1;
+           else if (lastComp !== lastGlobalReset) newStreak = 1;
+           lastComp = lastGlobalReset || todayStr;
+           newMissed = 0;
+         } else {
+           newMissed += 1;
+         }
+
+         if (newMissed >= 3) { newStreak = 0; newMissed = 0; }
+         return { ...t, timeSpent: 0, completed: false, currentStreak: newStreak, missedDays: newMissed, lastCompletedDate: lastComp };
+      }
+      return t;
+    }));
+
+    setFocusTime(0);
+    localStorage.setItem('gf_lastReset_v3', todayStr);
+    if (user) db.upsertUserSettings(user.id, { theme, focusTimeToday: 0, lastReset: todayStr });
+    
+  }, [loading, user]);
+
 
   // ── Automatic Daily Summary Sync ─────────────────────────
   useEffect(() => {
@@ -169,8 +217,32 @@ export const AppProvider = ({ children }) => {
   }, [tasks, goals, loading, user]);
 
   // ── Computed Metrics ─────────────────────────────────────
-  const accuracy = useMemo(() => calculateAccuracy(tasks, goals), [tasks, goals]);
-  const avgStreak = goals.length === 0 ? 0 : goals.reduce((s, g) => s + (g.streak || 0), 0) / goals.length;
+  const todayStr = TODAY();
+  const todayTasks = useMemo(() => tasks.filter(t => {
+    const type = t.type || 'daily';
+    if (type === 'daily') return true;
+    if (type === 'single') return t.targetDate === todayStr || t.date === todayStr;
+    if (type === 'range') return t.startDate <= todayStr && t.endDate >= todayStr;
+    return false;
+  }), [tasks, todayStr]);
+
+  const allHabits = useMemo(() => goals.flatMap(g => g.habits || []), [goals]);
+  const completedHabits = useMemo(() => allHabits.filter(h => {
+    if (h.type === 'check') return h.completed;
+    if (h.type === 'count') return (h.currentCount || 0) >= (h.targetCount || 10);
+    return (h.timeSpent || 0) >= (h.targetTime || 15);
+  }), [allHabits]);
+
+  const completedTasks = useMemo(() => todayTasks.filter(isTaskDone), [todayTasks]);
+  const totalItems = todayTasks.length + allHabits.length;
+  const completedItems = completedHabits.length + completedTasks.length;
+
+  const accuracy = useMemo(() => totalItems === 0 ? 100 : Math.round((completedItems / totalItems) * 100), [totalItems, completedItems]);
+  const avgStreak = goals.length === 0 ? 0 : goals.reduce((acc, goal) => {
+    const bestHabitStreak = goal.habits.length === 0 ? 0 : Math.max(...goal.habits.map(h => h.streak || 0));
+    return acc + bestHabitStreak;
+  }, 0) / goals.length;
+
   const disciplineScore = calculateDisciplineScore(accuracy, avgStreak, focusTime);
   const userLevel = getUserLevel(disciplineScore);
 
@@ -183,7 +255,16 @@ export const AppProvider = ({ children }) => {
 
   // ── Actions ──────────────────────────────────────────────
   const addGoal = (goal) => {
-    const newG = { ...goal, id: Date.now().toString(), progress: 0, streak: 0, missedDays: 0, createdAt: TODAY(), habits: [] };
+    const newG = { 
+      ...goal, 
+      id: Date.now().toString(), 
+      progress: 0, 
+      streak: 0, 
+      missedDays: 0, 
+      createdAt: TODAY(), 
+      lastActiveDate: TODAY(),
+      habits: [] 
+    };
     setGoals(prev => [newG, ...prev]);
     if (user) db.upsertGoal(user.id, newG);
   };
@@ -214,9 +295,22 @@ export const AppProvider = ({ children }) => {
   const deleteGoal = id => { setGoals(prev => prev.filter(g => g.id !== id)); if (user) db.deleteGoalDb(id); };
 
   const addHabit = (goalId, habit) => {
-    const newH = { ...habit, id: Date.now().toString(), timeSpent: 0, currentCount: 0, completed: false };
+    const newH = { 
+      ...habit, 
+      id: Date.now().toString(), 
+      timeSpent: 0, 
+      currentCount: 0, 
+      completed: false,
+      streak: 0,
+      lastCompletedDate: null,
+      missedDays: 0
+    };
     setGoals(prev => prev.map(g => {
-      if (g.id === goalId) { if (user) db.upsertHabit(user.id, goalId, newH); return { ...g, habits: [...g.habits, newH] }; }
+      if (g.id === goalId) { 
+        const updatedG = { ...g, habits: [...g.habits, newH] };
+        if (user) db.upsertHabit(user.id, goalId, newH); 
+        return updatedG; 
+      }
       return g;
     }));
   };
@@ -231,8 +325,26 @@ export const AppProvider = ({ children }) => {
   const logHabitTime = (goalId, habitId, minutes) => {
     setGoals(prev => prev.map(goal => {
       if (goal.id !== goalId) return goal;
+      const today = TODAY();
+      const yesterday = addDays(today, -1);
+      
       const updatedHabits = goal.habits.map(h => {
-        if (h.id === habitId) { const newTime = (h.timeSpent || 0) + minutes; if (user) db.updateHabitTime(habitId, newTime); return { ...h, timeSpent: newTime }; }
+        if (h.id === habitId) {
+          const newTime = (h.timeSpent || 0) + minutes;
+          let updatedH = { ...h, timeSpent: newTime };
+          
+          // Rule 3: Check if just completed
+          if (newTime >= (h.targetTime || 15) && !h.completed) {
+            updatedH.completed = true;
+            if (h.lastCompletedDate === yesterday) updatedH.streak += 1;
+            else if (h.lastCompletedDate !== today) updatedH.streak = 1;
+            updatedH.lastCompletedDate = today;
+            updatedH.missedDays = 0;
+          }
+          
+          if (user) db.upsertHabit(user.id, goalId, updatedH);
+          return updatedH;
+        }
         return h;
       });
       return { ...goal, habits: updatedHabits };
@@ -242,11 +354,39 @@ export const AppProvider = ({ children }) => {
   const toggleHabitCheck = (goalId, habitId) => {
     setGoals(prev => prev.map(goal => {
       if (goal.id !== goalId) return goal;
+      const today = TODAY();
+      const yesterday = addDays(today, -1);
+
       const updatedHabits = goal.habits.map(h => {
         if (h.id === habitId) {
-          if (h.type === 'check') { const val = !h.completed; if (user) db.updateHabitCheck(habitId, val); return { ...h, completed: val }; }
-          else if (h.type === 'count') { const target = h.targetCount || 10; const isDone = (h.currentCount || 0) >= target; const newVal = isDone ? 0 : target; if (user) db.updateHabitCount(habitId, newVal); return { ...h, currentCount: newVal }; }
-          else { const target = h.targetTime || 15; const isDone = (h.timeSpent || 0) >= target; const newVal = isDone ? 0 : target; if (user) db.updateHabitTime(habitId, newVal); return { ...h, timeSpent: newVal }; }
+          let updatedH = { ...h };
+          let isDone = false;
+
+          if (h.type === 'check') {
+            updatedH.completed = !h.completed;
+            isDone = updatedH.completed;
+          } else if (h.type === 'count') {
+            const target = h.targetCount || 10;
+            updatedH.currentCount = (h.currentCount >= target) ? 0 : target;
+            updatedH.completed = updatedH.currentCount >= target;
+            isDone = updatedH.completed;
+          } else {
+            const target = h.targetTime || 15;
+            updatedH.timeSpent = (h.timeSpent >= target) ? 0 : target;
+            updatedH.completed = updatedH.timeSpent >= target;
+            isDone = updatedH.completed;
+          }
+
+          // Rule 3: Streak Logic
+          if (isDone && h.lastCompletedDate !== today) {
+            if (h.lastCompletedDate === yesterday) updatedH.streak += 1;
+            else updatedH.streak = 1;
+            updatedH.lastCompletedDate = today;
+            updatedH.missedDays = 0;
+          }
+
+          if (user) db.upsertHabit(user.id, goalId, updatedH);
+          return updatedH;
         }
         return h;
       });
@@ -257,8 +397,25 @@ export const AppProvider = ({ children }) => {
   const updateHabitCount = (goalId, habitId, delta) => {
     setGoals(prev => prev.map(goal => {
       if (goal.id !== goalId) return goal;
+      const today = TODAY();
+      const yesterday = addDays(today, -1);
+
       const updatedHabits = goal.habits.map(h => {
-        if (h.id === habitId) { const newCount = Math.max(0, (h.currentCount || 0) + delta); if (user) db.updateHabitCount(habitId, newCount); return { ...h, currentCount: newCount }; }
+        if (h.id === habitId) {
+          const newCount = Math.max(0, (h.currentCount || 0) + delta);
+          let updatedH = { ...h, currentCount: newCount };
+          
+          if (newCount >= (h.targetCount || 10) && !h.completed) {
+            updatedH.completed = true;
+            if (h.lastCompletedDate === yesterday) updatedH.streak += 1;
+            else if (h.lastCompletedDate !== today) updatedH.streak = 1;
+            updatedH.lastCompletedDate = today;
+            updatedH.missedDays = 0;
+          }
+          
+          if (user) db.upsertHabit(user.id, goalId, updatedH);
+          return updatedH;
+        }
         return h;
       });
       return { ...goal, habits: updatedHabits };
@@ -347,7 +504,8 @@ export const AppProvider = ({ children }) => {
     theme, toggleTheme,
     accuracy, alerts, disciplineScore, userLevel, insights: getInsights(accuracy, avgStreak, focusTime),
     notes, addNote, updateNote, deleteNote,
-    loading, taskLogs
+    loading, taskLogs,
+    totalItems, completedItems, todayTasks, allHabits
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

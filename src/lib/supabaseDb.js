@@ -25,6 +25,7 @@ export async function fetchGoals(userId) {
     progress: g.progress || 0,
     streak: g.streak || 0,
     missedDays: g.missed_days || 0,
+    lastActiveDate: g.last_active_date || null,
     createdAt: g.created_at,
     extensions: g.extensions || [],
     habits: (g.habits || []).map(h => ({
@@ -36,6 +37,9 @@ export async function fetchGoals(userId) {
       targetCount: h.target_count || 10,
       currentCount: h.current_count || 0,
       completed: h.completed || false,
+      streak: h.streak || 0,
+      lastCompletedDate: h.last_completed_date || null,
+      missedDays: h.missed_days || 0,
     })),
   }));
 }
@@ -53,6 +57,7 @@ export async function upsertGoal(userId, goal) {
     progress: goal.progress || 0,
     streak: goal.streak || 0,
     missed_days: goal.missedDays || 0,
+    last_active_date: goal.lastActiveDate || null,
     extensions: goal.extensions || [],
     created_at: goal.createdAt,
     updated_at: new Date().toISOString(),
@@ -78,6 +83,9 @@ export async function upsertHabit(userId, goalId, habit) {
     target_count: habit.targetCount || 10,
     current_count: habit.currentCount || 0,
     completed: habit.completed || false,
+    streak: habit.streak || 0,
+    last_completed_date: habit.lastCompletedDate || null,
+    missed_days: habit.missedDays || 0,
     updated_at: new Date().toISOString(),
   }, { onConflict: 'id' });
   if (error) log('upsertHabit', error);

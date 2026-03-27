@@ -30,7 +30,12 @@ export const Dashboard = ({ setView }) => {
   const accColor = accuracy >= 80 ? '#22c55e' : accuracy >= 50 ? 'var(--accent-blue)' : '#f97316';
 
   const topStreaks = goals
-    .map(g => ({ name: g.title, tag: g.tag, streak: g.streak || 0, missed: g.missedDays || 0 }))
+    .map(g => ({ 
+      name: g.title, 
+      tag: g.tag, 
+      streak: g.habits.length === 0 ? 0 : Math.max(...g.habits.map(h => h.streak || 0)), 
+      missed: g.missedDays || 0 
+    }))
     .filter(g => g.streak > 0 || g.missed > 0)
     .sort((a, b) => b.streak - a.streak).slice(0, 3);
 
@@ -202,6 +207,7 @@ export const Dashboard = ({ setView }) => {
             const habitsTotal = goal.habits.length;
             const habitsDone = goal.habits.filter(h => {
               if (h.type === 'check') return h.completed;
+              if (h.type === 'count') return (h.currentCount || 0) >= (h.targetCount || 10);
               return (h.timeSpent || 0) >= (h.targetTime || 15);
             }).length;
             return (
@@ -210,7 +216,12 @@ export const Dashboard = ({ setView }) => {
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <p style={{ margin: 0, fontWeight: 800, fontSize: 16, color: 'var(--text-main)' }}>{goal.title}</p>
-                      {goal.streak >= 3 && <span style={{ fontSize: 10, fontWeight: 800, color: '#f97316' }}>🔥 {goal.streak}d</span>}
+                      {/* Show best streak for goal */}
+                    {Math.max(0, ...goal.habits.map(h => h.streak || 0)) >= 3 && 
+                      <span style={{ fontSize: 10, fontWeight: 800, color: '#f97316' }}>
+                        🔥 {Math.max(...goal.habits.map(h => h.streak || 0))}d
+                      </span>
+                    }
                     </div>
                     <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>
                       {habitsDone}/{habitsTotal} daily habits

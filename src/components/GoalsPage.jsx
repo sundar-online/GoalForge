@@ -121,7 +121,10 @@ const HabitRow = ({ habit, goalId, logHabitTime, deleteHabit, toggleHabitCheck, 
             </button>
             <div style={{ flex: 1, minWidth: 0 }}>
               <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: done ? '#22c55e' : 'var(--text-main)', textDecoration: done ? 'line-through' : 'none' }}>{habit.title}</p>
-              <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>{current} / {target} {isCount ? 'units' : 'mins'}</p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                <p style={{ margin: 0, fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>{current} / {target} {isCount ? 'units' : 'mins'}</p>
+                {habit.streak > 0 && <span style={{ fontSize: 10, fontWeight: 700, color: '#f97316' }}>🔥 {habit.streak}d</span>}
+              </div>
             </div>
           </div>
           <div style={{ display: 'flex', gap: 6 }}>
@@ -246,7 +249,6 @@ export const GoalsPage = () => {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
                     <span style={{ fontSize: 9, fontWeight: 800, color: tc.color, background: tc.bg, padding: '2px 8px', borderRadius: 999 }}>{goal.tag}</span>
-                    {goal.streak > 0 && <span style={{ fontSize: 10, fontWeight: 700, color: '#f97316' }}>🔥 {goal.streak}d</span>}
                     {goal.missedDays > 0 && <span style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b' }}>⚠️ {goal.missedDays} missed</span>}
                   </div>
                   <p style={{ margin: 0, fontSize: 16, fontWeight: 800, color: 'var(--text-main)' }}>{goal.title}</p>
