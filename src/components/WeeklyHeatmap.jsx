@@ -1,8 +1,8 @@
 import React from 'react';
 import { useHeatmap } from '../hooks/useHeatmap';
 
-export const WeeklyHeatmap = ({ taskLogs }) => {
-  const { heatmapCells } = useHeatmap(taskLogs);
+export const WeeklyHeatmap = ({ taskLogs, accuracy }) => {
+  const { heatmapCells } = useHeatmap(taskLogs, accuracy);
 
   return (
     <div style={{ background: 'var(--bg-card)', borderRadius: 22, padding: '20px', border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-sm)' }}>

@@ -31,7 +31,12 @@ export const Dashboard = ({ setView }) => {
 
   const R = 52; const CIRC = 2 * Math.PI * R;
   const accOffset = CIRC - (CIRC * accuracy) / 100;
-  const accColor = accuracy >= 80 ? '#22c55e' : accuracy >= 50 ? 'var(--accent-blue)' : '#f97316';
+  // Rule-Based Branding (Matches Dashboard Strategic Wins)
+  let accColor;
+  if (accuracy >= 100) accColor = '#22c55e'; // Vibrant Green (Goal Rule Satisfied)
+  else if (accuracy >= 50) accColor = 'var(--accent-blue)'; // Brand Blue (50%+)
+  else if (accuracy > 0) accColor = '#faba2c';    // Vibrant Gold (>0%)
+  else accColor = 'var(--bg-input)';
 
   const topStreaks = goals
     .map(g => ({ 
@@ -240,17 +245,17 @@ export const Dashboard = ({ setView }) => {
           <WeeklyReportCard report={weeklyReport} />
 
           {/* Heatmap */}
-          <WeeklyHeatmap focusHistory={focusHistory} taskLogs={taskLogs} />
+          <WeeklyHeatmap focusHistory={focusHistory} taskLogs={taskLogs} accuracy={accuracy} />
 
           {/* Task Stats Row */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
             {[
-              { label: 'Units', val: totalItems, icon: <Zap size={14} color="var(--accent-blue)" /> },
-              { label: 'Done', val: completedItems, icon: <CheckCircle2 size={14} color="#22c55e" /> },
-              { label: 'Peak', val: Math.max(totalItems, completedItems), icon: <Clock size={14} color="#f97316" /> },
+              { label: 'Units', val: totalItems, icon: <Zap size={18} color="var(--accent-blue)" /> },
+              { label: 'Done', val: completedItems, icon: <CheckCircle2 size={18} color="#22c55e" /> },
+              { label: 'Peak', val: Math.max(totalItems, completedItems), icon: <Clock size={18} color="#f97316" /> },
             ].map((s, i) => (
-              <div key={i} style={{ background: 'var(--bg-card)', borderRadius: 20, padding: '16px 12px', boxShadow: 'var(--shadow-sm)', border: '1px solid var(--border-light)', textAlign: 'center' }}>
-                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>{s.icon}</div>
+              <div key={i} style={{ background: 'var(--bg-card)', borderRadius: 20, padding: '20px 12px', boxShadow: 'var(--shadow-sm)', border: '1px solid var(--border-light)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
+                <div style={{ marginBottom: 8 }}>{s.icon}</div>
                 <p style={{ margin: 0, fontSize: 28, fontWeight: 950, color: 'var(--text-main)', letterSpacing: '-1px' }}>{s.val}</p>
                 <p style={{ margin: '2px 0 0', fontSize: 9, fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{s.label}</p>
               </div>
@@ -274,7 +279,10 @@ export const Dashboard = ({ setView }) => {
                   return (h.timeSpent || 0) >= (h.targetTime || 15);
                 }).length;
                 
-                const habitAccuracy = Math.round((habitsDone / (habitsTotal || 1)) * 100);
+                // Rule-Based Accuracy (Goal Win = 100%)
+                const targetReq = goal.mode === 'ANY' ? 1 : (goal.mode === 'CUSTOM' ? (goal.minHabits || 1) : habitsTotal);
+                const habitAccuracy = Math.min(100, Math.round((habitsDone / (targetReq || 1)) * 100));
+                
                 const ruleLabel = goal.mode === 'ANY' ? 'Any Rule' : goal.mode === 'CUSTOM' ? `Min ${goal.minHabits} Rule` : 'All Habits Rule';
 
                 return (
@@ -284,14 +292,14 @@ export const Dashboard = ({ setView }) => {
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                           <p style={{ margin: 0, fontWeight: 950, fontSize: 16, color: 'var(--text-main)', letterSpacing: '-0.4px' }}>{goal.title}</p>
                           {achieved && (
-                            <span style={{ fontSize: 9, fontWeight: 900, background: '#dcfce7', color: '#166534', padding: '2px 8px', borderRadius: 999, display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <span style={{ fontSize: 9, fontWeight: 900, background: '#dcfce7', color: '#166534', padding: '2px 8px', borderRadius: 999 }}>
                               Achieved ✔
                             </span>
                           )}
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                           <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)' }}>{ruleLabel}</span>
-                          <span style={{ fontSize: 10, fontWeight: 800, color: 'var(--accent-blue)', background: 'var(--accent-blue-light)', padding: '2px 8px', borderRadius: 6 }}>
+                          <span style={{ fontSize: 10, fontWeight: 800, color: 'var(--accent-blue)', background: 'var(--bg-input)', padding: '2px 8px', borderRadius: 6 }}>
                              Grit: {habitsDone}/{habitsTotal} Done
                           </span>
                         </div>
@@ -308,7 +316,7 @@ export const Dashboard = ({ setView }) => {
                     
                     {achieved && habitsDone < habitsTotal && (
                        <p style={{ margin: '8px 0 0', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                         🎯 Strategy met, but finish all habits for 100% record.
+                         ⚡ Strategy met! Extra effort today will build even stronger discipline.
                        </p>
                     )}
 

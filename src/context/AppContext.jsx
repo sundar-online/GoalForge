@@ -223,23 +223,20 @@ export const AppProvider = ({ children }) => {
       return false;
     });
     const allHabits = goals.flatMap(g => g.habits || []);
+    const goalsDone = goals.filter(isGoalDoneToday).length;
     const taskDone = todayTasks.filter(isTaskDone).length;
-    const habitsDone = allHabits.filter(h => {
-      if (h.type === 'check') return h.completed;
-      if (h.type === 'count') return (h.currentCount || 0) >= (h.targetCount || 10);
-      return (h.timeSpent || 0) >= (h.targetTime || 15);
-    }).length;
     
     const summary = {
       date: today,
-      total_tasks: todayTasks.length + allHabits.length,
-      completed_tasks: taskDone + habitsDone,
+      total_tasks: goals.length + todayTasks.length,
+      completed_tasks: goalsDone + taskDone,
       time_spent: todayTasks.reduce((acc, t) => acc + (t.timeSpent || 0), 0) + allHabits.reduce((acc, h) => acc + (h.timeSpent || 0), 0),
       auto_completed: true
     };
     
     setTaskLogs(prev => {
       const current = prev[today];
+      // Force update if total or completed units have changed due to logic updates or user action
       if (current && current.total_tasks === summary.total_tasks && current.completed_tasks === summary.completed_tasks && current.time_spent === summary.time_spent) return prev;
       return { ...prev, [today]: summary };
     });
@@ -257,16 +254,11 @@ export const AppProvider = ({ children }) => {
   }), [tasks, todayStr]);
 
   const allHabits = useMemo(() => goals.flatMap(g => g.habits || []), [goals]);
-  const completedHabits = useMemo(() => allHabits.filter(h => {
-    if (h.type === 'check') return h.completed;
-    if (h.type === 'count') return (h.currentCount || 0) >= (h.targetCount || 10);
-    return (h.timeSpent || 0) >= (h.targetTime || 15);
-  }), [allHabits]);
+  const goalsDone = useMemo(() => goals.filter(g => isGoalDoneToday(g)).length, [goals]);
+  const tasksDone = useMemo(() => todayTasks.filter(t => isTaskDone(t)).length, [todayTasks]);
 
-  const completedTasks = useMemo(() => todayTasks.filter(isTaskDone), [todayTasks]);
-  const totalItems = todayTasks.length + allHabits.length;
-  const completedItems = completedHabits.length + completedTasks.length;
-
+  const totalItems = goals.length + todayTasks.length;
+  const completedItems = goalsDone + tasksDone;
   const accuracy = useMemo(() => totalItems === 0 ? 100 : Math.round((completedItems / totalItems) * 100), [totalItems, completedItems]);
   const avgStreak = goals.length === 0 ? 0 : goals.reduce((acc, goal) => {
     const bestHabitStreak = goal.habits.length === 0 ? 0 : Math.max(...goal.habits.map(h => h.streak || 0));
@@ -330,6 +322,8 @@ export const AppProvider = ({ children }) => {
       return g;
     }));
   };
+
+
 
   const extendGoalDeadline = (id, newDeadline) => {
     setGoals(prev => prev.map(g => {

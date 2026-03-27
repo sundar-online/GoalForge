@@ -2,13 +2,15 @@ export const getIntensity = (dateStr, taskLogs) => {
   const summary = taskLogs?.[dateStr];
   if (!summary || !summary.total_tasks) return 'var(--bg-input)';
   
-  const acc = (summary.completed_tasks || 0) / summary.total_tasks;
+  const total = summary.total_tasks || 1;
+  const completed = summary.completed_tasks || 0;
+  const acc = completed / total;
   
-  // Accuracy-based Color Logic (Premium)
-  if (acc >= 1.0) return '#22c55e'; // Vibrant Green (100%)
+  // Rule-Based Success Coloring (Matches Strategic Dashboard)
+  if (acc >= 0.99) return '#22c55e'; // Vibrant Green (Goal Rule Satisfied)
   if (acc >= 0.5) return 'var(--accent-blue)'; // Brand Blue (50%+)
   if (acc > 0) return '#faba2c';    // Vibrant Gold (>0%)
-  return 'var(--bg-input)';         // Neutral (0%)
+  return 'var(--bg-input)';
 };
 
 export const generateHeatmapData = (daysCount = 30) => {

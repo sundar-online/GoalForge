@@ -43,17 +43,14 @@ export const calculateAccuracy = (tasks, goals) => {
     return false;
   });
 
-  const allHabits = goals.flatMap(g => g.habits || []);
-  const completedHabitsCount = allHabits.filter(h => {
-    if (h.type === 'check') return h.completed;
-    if (h.type === 'count') return (h.currentCount || 0) >= (h.targetCount || 10);
-    return (h.timeSpent || 0) >= (h.targetTime || 15);
-  }).length;
-
-  const completedTasksCount = todayTasks.filter(isTaskDone).length;
-  const totalItems = todayTasks.length + allHabits.length;
-  const completedItems = completedHabitsCount + completedTasksCount;
-  return totalItems === 0 ? 100 : Math.round((completedItems / totalItems) * 100);
+  const goalsDone = goals.filter(isGoalDoneToday).length;
+  const tasksDone = todayTasks.filter(isTaskDone).length;
+  
+  const totalUnits = goals.length + todayTasks.length;
+  if (totalUnits === 0) return 100;
+  
+  const completedUnits = goalsDone + tasksDone;
+  return Math.round((completedUnits / totalUnits) * 100);
 };
 
 export const calculateDisciplineScore = (accuracy, avgStreak, focusTime) => {
