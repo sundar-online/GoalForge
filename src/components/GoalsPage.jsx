@@ -233,10 +233,14 @@ export const GoalsPage = () => {
   };
 
   const removeStagingHabit = (id) => {
-    setNewGoal(prev => ({
-      ...prev,
-      habits: prev.habits.filter(h => h.id !== id)
-    }));
+    setNewGoal(prev => {
+      const remaining = prev.habits.filter(h => h.id !== id);
+      return {
+        ...prev,
+        habits: remaining,
+        minHabits: Math.max(1, Math.min(prev.minHabits, remaining.length))
+      };
+    });
   };
 
   const submitHabit = (e, goalId) => {
@@ -300,6 +304,35 @@ export const GoalsPage = () => {
               <p style={{ margin: '0 0 8px', fontSize: 10, fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>Target Date</p>
               <input type="date" value={newGoal.deadline} onChange={e => setNewGoal({ ...newGoal, deadline: e.target.value })} style={{ width: '100%', background: 'var(--bg-input)', border: 'none', borderRadius: 14, padding: '12px 16px', fontSize: 14, fontWeight: 600, color: 'var(--text-main)', outline: 'none' }} />
             </div>
+          </div>
+
+          <div style={{ background: 'var(--bg-input)', borderRadius: 20, padding: '18px' }}>
+            <p style={{ margin: '0 0 12px', fontSize: 10, fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>Forge Logic (Strategy)</p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+              {['ALL', 'ANY', 'CUSTOM'].map(m => (
+                <button key={m} type="button" onClick={() => setNewGoal({ ...newGoal, mode: m })}
+                  style={{ padding: '12px 0', borderRadius: 14, border: '2px solid', borderColor: newGoal.mode === m ? 'var(--accent-blue)' : 'var(--bg-card)', background: newGoal.mode === m ? 'var(--accent-blue-light)' : 'var(--bg-card)', color: newGoal.mode === m ? 'var(--accent-blue)' : 'var(--text-main)', fontWeight: 700, fontSize: 12, cursor: 'pointer', transition: 'all 0.2s shadow 0.2s', boxShadow: newGoal.mode === m ? '0 4px 12px rgba(77,124,255,0.2)' : 'none' }}>
+                  {m === 'ALL' ? 'Complete All' : m === 'ANY' ? 'Any One' : 'Min Required'}
+                </button>
+              ))}
+            </div>
+            {newGoal.mode === 'CUSTOM' && (
+              <div style={{ marginTop: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bg-card)', padding: '10px 14px', borderRadius: 12, border: '1px solid var(--border-light)' }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-main)' }}>Minimum habits needed:</span>
+                <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-input)', borderRadius: 10, border: '1px solid var(--border-light)', overflow: 'hidden' }}>
+                    <button type="button" onClick={() => setNewGoal(prev => ({ ...prev, minHabits: Math.max(1, parseInt(prev.minHabits) - 1) }))}
+                      style={{ padding: '8px 14px', border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-main)', fontWeight: 800 }}>−</button>
+                    <span style={{ minWidth: 28, textAlign: 'center', fontSize: 15, fontWeight: 950, color: 'var(--accent-blue)' }}>{newGoal.minHabits}</span>
+                    <button type="button" onClick={() => setNewGoal(prev => ({ ...prev, minHabits: Math.min(prev.habits.length, parseInt(prev.minHabits) + 1) }))}
+                      style={{ padding: '8px 14px', border: 'none', background: 'none', cursor: 'pointer', color: 'var(--accent-blue)', fontWeight: 800, borderLeft: '1px solid var(--border-light)' }}>+</button>
+                </div>
+              </div>
+            )}
+            <p style={{ margin: '14px 0 0', fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>
+              {newGoal.mode === 'ALL' ? '🔥 The goal is done only when EVERY habit is finished.' : 
+               newGoal.mode === 'ANY' ? '⚡ Completing ANY one habit counts as a full day of progress.' : 
+               `🎯 You must finish at least ${newGoal.minHabits} habit${newGoal.minHabits > 1 ? 's' : ''} daily.`}
+            </p>
           </div>
 
           <div>

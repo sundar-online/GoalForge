@@ -264,38 +264,57 @@ export const Dashboard = ({ setView }) => {
               <button onClick={() => setView('goals')} style={{ fontSize: 12, fontWeight: 800, color: 'var(--accent-blue)', background: 'none', border: 'none', cursor: 'pointer' }}>View All</button>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {goals.slice(0, 2).map(goal => {
+              {goals.slice(0, 3).map(goal => {
                 const habitsTotal = goal.habits.length;
                 const dailyProgress = calculateGoalDailyProgress(goal);
+                const achieved = dailyProgress === 100;
                 const habitsDone = goal.habits.filter(h => {
                   if (h.type === 'check') return h.completed;
                   if (h.type === 'count') return (h.currentCount || 0) >= (h.targetCount || 10);
                   return (h.timeSpent || 0) >= (h.targetTime || 15);
                 }).length;
+                
+                const habitAccuracy = Math.round((habitsDone / (habitsTotal || 1)) * 100);
+                const ruleLabel = goal.mode === 'ANY' ? 'Any Rule' : goal.mode === 'CUSTOM' ? `Min ${goal.minHabits} Rule` : 'All Habits Rule';
 
                 return (
-                  <div key={goal.id} style={{ background: 'var(--bg-card)', borderRadius: 22, padding: '20px', boxShadow: 'var(--shadow-sm)', border: '1px solid var(--border-light)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
-                      <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <p style={{ margin: 0, fontWeight: 800, fontSize: 16, color: 'var(--text-main)' }}>{goal.title}</p>
-                          {Math.max(0, ...goal.habits.map(h => h.streak || 0)) >= 3 && 
-                            <span style={{ fontSize: 10, fontWeight: 800, color: '#f97316' }}>
-                              🔥 {Math.max(...goal.habits.map(h => h.streak || 0))}d
+                  <div key={goal.id} style={{ background: 'var(--bg-card)', borderRadius: 24, padding: '20px', boxShadow: 'var(--shadow-sm)', border: `2px solid ${achieved ? 'rgba(34,197,94,0.3)' : 'var(--border-light)'}`, transition: 'all 0.3s' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                          <p style={{ margin: 0, fontWeight: 950, fontSize: 16, color: 'var(--text-main)', letterSpacing: '-0.4px' }}>{goal.title}</p>
+                          {achieved && (
+                            <span style={{ fontSize: 9, fontWeight: 900, background: '#dcfce7', color: '#166534', padding: '2px 8px', borderRadius: 999, display: 'flex', alignItems: 'center', gap: 4 }}>
+                              Achieved ✔
                             </span>
-                          }
+                          )}
                         </div>
-                        <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>
-                          {habitsDone}/{habitsTotal} daily habits
-                        </p>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)' }}>{ruleLabel}</span>
+                          <span style={{ fontSize: 10, fontWeight: 800, color: 'var(--accent-blue)', background: 'var(--accent-blue-light)', padding: '2px 8px', borderRadius: 6 }}>
+                             Grit: {habitsDone}/{habitsTotal} Done
+                          </span>
+                        </div>
                       </div>
-                      <div style={{ textAlign: 'right' }}>
-                        <span style={{ fontWeight: 900, fontSize: 18, color: dailyProgress === 100 ? '#22c55e' : 'var(--accent-blue)' }}>{dailyProgress}%</span>
-                        <p style={{ margin: 0, fontSize: 8, fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Mastery: {goal.progress || 0}%</p>
+                      <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+                         <span style={{ fontSize: 22, fontWeight: 950, color: achieved ? '#22c55e' : 'var(--accent-blue)', letterSpacing: '-1.5px', lineHeight: 1 }}>{habitAccuracy}%</span>
+                         <p style={{ margin: 0, fontSize: 9, fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Habit Consistency</p>
                       </div>
                     </div>
-                    <div style={{ background: 'var(--bg-input)', borderRadius: 999, height: 8, overflow: 'hidden' }}>
-                      <div style={{ width: `${dailyProgress}%`, height: '100%', borderRadius: 999, background: dailyProgress === 100 ? '#22c55e' : 'var(--accent-blue)', transition: 'width 1s cubic-bezier(0.34, 1.56, 0.64, 1)' }} />
+
+                    <div style={{ background: 'var(--bg-input)', borderRadius: 999, height: 6, overflow: 'hidden', marginBottom: 6 }}>
+                      <div style={{ width: `${achieved ? 100 : dailyProgress}%`, height: '100%', borderRadius: 999, background: achieved ? '#22c55e' : 'var(--accent-blue)', transition: 'width 1.2s cubic-bezier(0.34, 1.56, 0.64, 1)' }} />
+                    </div>
+                    
+                    {achieved && habitsDone < habitsTotal && (
+                       <p style={{ margin: '8px 0 0', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                         🎯 Strategy met, but finish all habits for 100% record.
+                       </p>
+                    )}
+
+                    <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                       <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Overall Mastery Progress</span>
+                       <span style={{ fontSize: 13, fontWeight: 950, color: 'var(--text-main)' }}>{goal.progress || 0}%</span>
                     </div>
                   </div>
                 );
