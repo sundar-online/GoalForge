@@ -57,8 +57,8 @@ const LogTaskTimeModal = ({ task, onClose, logTaskTime }) => {
 export const DailyTasks = () => {
   const defaultTask = { 
     title: '', 
-    type: 'check', 
-    schedule_type: 'daily',
+    type: 'daily', 
+    completionType: 'check',
     targetTime: 30, 
     targetCount: 10,
     priority: 'Medium', 
@@ -74,7 +74,7 @@ export const DailyTasks = () => {
 
   const todayStr = TODAY();
   const todayTasks = tasks.filter(t => {
-    const sType = t.schedule_type || t.type || 'daily';
+    const sType = t.type || 'daily';
     if (sType === 'daily') return true;
     if (sType === 'single') return (t.targetDate || t.date) === todayStr;
     if (sType === 'range') return t.startDate <= todayStr && t.endDate >= todayStr;
@@ -132,24 +132,24 @@ export const DailyTasks = () => {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div>
               <p style={{ margin: '0 0 6px', fontSize: 9, fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Schedule</p>
-              <select value={newTask.schedule_type} onChange={e => setNewTask({ ...newTask, schedule_type: e.target.value })} style={{ width: '100%', background: 'var(--bg-input)', border: 'none', borderRadius: 12, padding: '10px 14px', fontSize: 13, fontWeight: 600, color: 'var(--text-main)', outline: 'none' }}>
+              <select value={newTask.type} onChange={e => setNewTask({ ...newTask, type: e.target.value })} style={{ width: '100%', background: 'var(--bg-input)', border: 'none', borderRadius: 12, padding: '10px 14px', fontSize: 13, fontWeight: 600, color: 'var(--text-main)', outline: 'none' }}>
                 {Object.keys(SCHEDULE_LABELS).map(k => <option key={k} value={k}>{SCHEDULE_LABELS[k]}</option>)}
               </select>
             </div>
             <div>
               <p style={{ margin: '0 0 6px', fontSize: 9, fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Tracking Mode</p>
-              <select value={newTask.type} onChange={e => setNewTask({ ...newTask, type: e.target.value })} style={{ width: '100%', background: 'var(--bg-input)', border: 'none', borderRadius: 12, padding: '10px 14px', fontSize: 13, fontWeight: 600, color: 'var(--text-main)', outline: 'none' }}>
+              <select value={newTask.completionType} onChange={e => setNewTask({ ...newTask, completionType: e.target.value })} style={{ width: '100%', background: 'var(--bg-input)', border: 'none', borderRadius: 12, padding: '10px 14px', fontSize: 13, fontWeight: 600, color: 'var(--text-main)', outline: 'none' }}>
                 {Object.keys(TYPE_LABELS).map(k => <option key={k} value={k}>{TYPE_LABELS[k]}</option>)}
               </select>
             </div>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            {newTask.schedule_type === 'single' && (
+            {newTask.type === 'single' && (
               <div><p style={{ margin: '0 0 6px', fontSize: 9, fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Date</p>
               <input type="date" required value={newTask.targetDate} onChange={e => setNewTask({ ...newTask, targetDate: e.target.value })} style={{ width: '100%', background: 'var(--bg-input)', border: 'none', borderRadius: 12, padding: '10px', fontSize: 13, color: 'var(--text-main)' }} /></div>
             )}
-            {newTask.schedule_type === 'range' && (
+            {newTask.type === 'range' && (
               <>
                 <div><p style={{ margin: '0 0 4px', fontSize: 9, fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Start</p>
                 <input type="date" required value={newTask.startDate} onChange={e => setNewTask({ ...newTask, startDate: e.target.value })} style={{ width: '100%', background: 'var(--bg-input)', border: 'none', borderRadius: 12, padding: '10px', fontSize: 13, color: 'var(--text-main)' }} /></div>
@@ -157,11 +157,11 @@ export const DailyTasks = () => {
                 <input type="date" required value={newTask.endDate} onChange={e => setNewTask({ ...newTask, endDate: e.target.value })} style={{ width: '100%', background: 'var(--bg-input)', border: 'none', borderRadius: 12, padding: '10px', fontSize: 13, color: 'var(--text-main)' }} /></div>
               </>
             )}
-            {newTask.type === 'time' && (
+            {newTask.completionType === 'time' && (
               <div><p style={{ margin: '0 0 4px', fontSize: 9, fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Goal (min)</p>
               <input type="number" required value={newTask.targetTime} onChange={e => setNewTask({ ...newTask, targetTime: e.target.value })} style={{ width: '100%', background: 'var(--bg-input)', border: 'none', borderRadius: 12, padding: '10px', fontSize: 13, color: 'var(--text-main)' }} /></div>
             )}
-            {newTask.type === 'count' && (
+            {newTask.completionType === 'count' && (
               <div><p style={{ margin: '0 0 4px', fontSize: 9, fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Target Units</p>
               <input type="number" required value={newTask.targetCount} onChange={e => setNewTask({ ...newTask, targetCount: e.target.value })} style={{ width: '100%', background: 'var(--bg-input)', border: 'none', borderRadius: 12, padding: '10px', fontSize: 13, color: 'var(--text-main)' }} /></div>
             )}
@@ -177,14 +177,15 @@ export const DailyTasks = () => {
             .slice().sort((a,b) => isTaskDone(a) - isTaskDone(b))
               .map(task => {
                 const tDone = isTaskDone(task);
-                const isTime = task.type === 'time';
-                const isCount = task.type === 'count';
-                const isCheck = task.type === 'check';
+                const cType = task.completionType || task.type || 'check';
+                const isTime = cType === 'time';
+                const isCount = cType === 'count';
+                const isCheck = cType === 'check';
 
                 const target = isCount ? (task.targetCount || 10) : (task.targetTime || 30);
                 const current = isCount ? (task.currentCount || 0) : (task.timeSpent || 0);
                 const pct = isCheck ? 0 : Math.min(100, Math.round((current / (target || 1)) * 100));
-                const sType = task.schedule_type || task.type || 'daily';
+                const sType = task.type || 'daily';
 
                 return (
                   <motion.div layout key={task.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }}

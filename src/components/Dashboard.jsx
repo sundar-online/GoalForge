@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { calculateGoalDailyProgress } from '../utils/calculationUtils';
+import { calculateGoalDailyProgress, isHabitDoneToday } from '../utils/calculationUtils';
 import { useAuth } from '../context/AuthContext';
 import { AlertTriangle, AlertCircle, TrendingUp, TrendingDown, CheckCircle2, Clock, Zap, LogOut, Moon, Sun, Sparkles, Trophy, ChevronRight } from 'lucide-react';
 import { WeeklyHeatmap } from './WeeklyHeatmap';
@@ -273,11 +273,7 @@ export const Dashboard = ({ setView }) => {
                 const habitsTotal = goal.habits.length;
                 const dailyProgress = calculateGoalDailyProgress(goal);
                 const achieved = dailyProgress === 100;
-                const habitsDone = goal.habits.filter(h => {
-                  if (h.type === 'check') return h.completed;
-                  if (h.type === 'count') return (h.currentCount || 0) >= (h.targetCount || 10);
-                  return (h.timeSpent || 0) >= (h.targetTime || 15);
-                }).length;
+                const habitsDone = goal.habits.filter(isHabitDoneToday).length;
                 
                 // Rule-Based Accuracy (Goal Win = 100%)
                 const targetReq = goal.mode === 'ANY' ? 1 : (goal.mode === 'CUSTOM' ? (goal.minHabits || 1) : habitsTotal);

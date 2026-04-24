@@ -91,6 +91,7 @@ export const AppProvider = ({ children }) => {
           ...prev,
           theme: s?.theme || prev.theme,
           focusTimeToday: s?.focusTimeToday || prev.focusTimeToday,
+          lastActiveDate: s?.lastReset || prev.lastActiveDate,
           focusHistory: f || prev.focusHistory
         }));
       }
@@ -155,6 +156,9 @@ export const AppProvider = ({ children }) => {
           updatedH.timeSpent = 0;
           updatedH.completed = false;
           updatedH.currentCount = 0;
+          
+          // CRITICAL: Persist each habit reset to Supabase
+          if (user) db.upsertHabit(user.id, goal.id, updatedH);
           return updatedH;
         });
 
@@ -199,8 +203,18 @@ export const AppProvider = ({ children }) => {
            newMissed += 1;
          }
 
+         // Multi-day missed logic (same logic as habits)
+         if (daysDiff > 1) {
+            for (let i = 1; i < daysDiff; i++) {
+               newMissed += 1;
+               if (newMissed >= 3) { newStreak = 0; newMissed = 0; }
+            }
+         }
+
          if (newMissed >= 3) { newStreak = 0; newMissed = 0; }
-         return { ...t, timeSpent: 0, currentCount: 0, completed: false, currentStreak: newStreak, missedDays: newMissed, lastCompletedDate: lastComp };
+         const updatedT = { ...t, timeSpent: 0, currentCount: 0, completed: false, currentStreak: newStreak, missedDays: newMissed, lastCompletedDate: lastComp };
+         if (user) db.upsertTask(user.id, updatedT);
+         return updatedT;
       }
       return t;
     }));
@@ -209,6 +223,18 @@ export const AppProvider = ({ children }) => {
     if (user) db.upsertUserSettings(user.id, { theme, focusTimeToday: 0, lastReset: todayStr });
     
   }, [loading, user, settings.lastActiveDate]);
+
+  // Periodic date check (every minute) - Triggers reset effect by force-updating lastActiveDate if needed
+  useEffect(() => {
+    const itv = setInterval(() => {
+      const liveToday = TODAY();
+      if (settings.lastActiveDate && settings.lastActiveDate !== liveToday) {
+         // Reset lastActiveDate locally to trigger the reset useEffect
+         setSettings(prev => ({ ...prev, lastActiveDate: prev.lastActiveDate }));
+      }
+    }, 60000);
+    return () => clearInterval(itv);
+  }, [settings.lastActiveDate]);
 
 
   // ── Automatic Daily Summary Sync ─────────────────────────
@@ -508,11 +534,12 @@ export const AppProvider = ({ children }) => {
       if (t.id === taskId) {
         let isDone = false;
         let updated = { ...t };
+        const cType = t.completionType || t.type || 'check';
         
-        if (t.type === 'check') {
+        if (cType === 'check') {
           updated.completed = !t.completed;
           isDone = updated.completed;
-        } else if (t.type === 'count') {
+        } else if (cType === 'count') {
           const target = t.targetCount || 10;
           updated.currentCount = (t.currentCount >= target) ? 0 : target;
           updated.completed = updated.currentCount >= target;
@@ -572,8 +599,10 @@ export const AppProvider = ({ children }) => {
       if (t.id === id) {
         const newTime = (t.timeSpent || 0) + mins;
         let updated = { ...t, timeSpent: newTime };
+        const isDaily = (t.schedule_type || t.type) === 'daily';
+        
         if (newTime >= (t.targetTime || 15)) {
-          if (!updated.completed && t.type === 'daily') {
+          if (!updated.completed && isDaily) {
             const todayStr = TODAY();
             const yesterdayStr = addDays(todayStr, -1);
             let newStreak = t.currentStreak || 0;

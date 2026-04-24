@@ -1,12 +1,16 @@
 import { TODAY } from './dateUtils';
 
+export const isHabitDoneToday = (h) => {
+  const today = TODAY();
+  if (h.lastCompletedDate !== today) return false;
+  if (h.type === 'check') return h.completed;
+  if (h.type === 'count') return (h.currentCount || 0) >= (h.targetCount || 10);
+  return (h.timeSpent || 0) >= (h.targetTime || 15);
+};
+
 export const isGoalDoneToday = (goal) => {
   if (!goal.habits || goal.habits.length === 0) return false;
-  const doneHabitsCount = goal.habits.filter(h => {
-    if (h.type === 'check') return h.completed;
-    if (h.type === 'count') return (h.currentCount || 0) >= (h.targetCount || 10);
-    return (h.timeSpent || 0) >= (h.targetTime || 15);
-  }).length;
+  const doneHabitsCount = goal.habits.filter(isHabitDoneToday).length;
   
   if (goal.mode === 'ANY') return doneHabitsCount > 0;
   if (goal.mode === 'CUSTOM') return doneHabitsCount >= (goal.minHabits || 1);
@@ -15,11 +19,7 @@ export const isGoalDoneToday = (goal) => {
 
 export const calculateGoalDailyProgress = (goal) => {
   if (!goal.habits || goal.habits.length === 0) return 0;
-  const habitsDone = goal.habits.filter(h => {
-    if (h.type === 'check') return h.completed;
-    if (h.type === 'count') return (h.currentCount || 0) >= (h.targetCount || 10);
-    return (h.timeSpent || 0) >= (h.targetTime || 15);
-  }).length;
+  const habitsDone = goal.habits.filter(isHabitDoneToday).length;
   
   if (goal.mode === 'ANY') return habitsDone > 0 ? 100 : 0;
   const target = goal.mode === 'CUSTOM' ? (goal.minHabits || 1) : goal.habits.length;
@@ -28,8 +28,13 @@ export const calculateGoalDailyProgress = (goal) => {
 
 
 export const isTaskDone = (t) => {
-  if (t.type === 'check') return t.completed;
-  if (t.type === 'count') return (t.currentCount || 0) >= (t.targetCount || 10);
+  const today = TODAY();
+  // Ensure the task was actually completed TODAY (especially relevant for daily tasks)
+  if (t.type === 'daily' && t.lastCompletedDate !== today) return false;
+  
+  const cType = t.completionType || t.type || 'check';
+  if (cType === 'check') return t.completed;
+  if (cType === 'count') return (t.currentCount || 0) >= (t.targetCount || 10);
   return (t.timeSpent || 0) >= (t.targetTime || 30);
 };
 
@@ -38,7 +43,7 @@ export const calculateAccuracy = (tasks, goals) => {
   const todayTasks = tasks.filter(t => {
     const type = t.type || 'daily';
     if (type === 'daily') return true;
-    if (type === 'single') return t.targetDate === todayDate;
+    if (type === 'single') return t.targetDate === todayDate || t.date === todayDate;
     if (type === 'range') return t.startDate <= todayDate && t.endDate >= todayDate;
     return false;
   });

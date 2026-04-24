@@ -156,14 +156,17 @@ export const FocusMode = () => {
               <option value="">— Select Routine/Habit —</option>
               {activeList
                 .sort((a, b) => {
-                  const aDone = a.type === 'check' ? a.completed : (a.type === 'count' ? (a.currentCount >= (a.targetCount || 10)) : (a.timeSpent >= (a.targetTime || 15)));
-                  const bDone = b.type === 'check' ? b.completed : (b.type === 'count' ? (b.currentCount >= (b.targetCount || 10)) : (b.timeSpent >= (b.targetTime || 15)));
+                  const cType = a.completionType || a.type || 'check';
+                  const dType = b.completionType || b.type || 'check';
+                  const aDone = cType === 'check' ? a.completed : (cType === 'count' ? (a.currentCount >= (a.targetCount || 10)) : (a.timeSpent >= (a.targetTime || 15)));
+                  const bDone = dType === 'check' ? b.completed : (dType === 'count' ? (b.currentCount >= (b.targetCount || 10)) : (b.timeSpent >= (b.targetTime || 15)));
                   if (aDone !== bDone) return aDone ? 1 : -1;
                   return 0;
                 })
                 .map(h => {
-                  const isCount = h.type === 'count';
-                  const isCheck = h.type === 'check';
+                  const cType = h.completionType || h.type || 'check';
+                  const isCount = cType === 'count';
+                  const isCheck = cType === 'check';
                   const target = isCount ? (h.targetCount || 10) : (h.targetTime || 15);
                   const progress = isCount ? (h.currentCount || 0) : (h.timeSpent || 0);
                   const unit = isCount ? '' : 'm';
