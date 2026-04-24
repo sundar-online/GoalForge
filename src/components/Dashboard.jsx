@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { calculateGoalDailyProgress, isHabitDoneToday } from '../utils/calculationUtils';
 import { useAuth } from '../context/AuthContext';
-import { AlertTriangle, AlertCircle, TrendingUp, TrendingDown, CheckCircle2, Clock, Zap, LogOut, Moon, Sun, Sparkles, Trophy, ChevronRight } from 'lucide-react';
+import { AlertTriangle, AlertCircle, TrendingUp, TrendingDown, CheckCircle2, Clock, Zap, LogOut, Moon, Sun, Sparkles, Trophy, ChevronRight, Target } from 'lucide-react';
 import { WeeklyHeatmap } from './WeeklyHeatmap';
 import { WeeklyReportCard } from './WeeklyReportCard';
 import { SkeletonLoader } from './SkeletonLoader';
@@ -31,11 +31,11 @@ export const Dashboard = ({ setView }) => {
 
   const R = 52; const CIRC = 2 * Math.PI * R;
   const accOffset = CIRC - (CIRC * accuracy) / 100;
-  // Rule-Based Branding (Matches Dashboard Strategic Wins)
+  
   let accColor;
-  if (accuracy >= 100) accColor = '#22c55e'; // Vibrant Green (Goal Rule Satisfied)
-  else if (accuracy >= 50) accColor = 'var(--accent-blue)'; // Brand Blue (50%+)
-  else if (accuracy > 0) accColor = '#faba2c';    // Vibrant Gold (>0%)
+  if (accuracy >= 100) accColor = '#22c55e';
+  else if (accuracy >= 50) accColor = 'var(--accent-blue)';
+  else if (accuracy > 0) accColor = '#faba2c';
   else accColor = 'var(--bg-input)';
 
   const topStreaks = goals
@@ -51,64 +51,64 @@ export const Dashboard = ({ setView }) => {
   const QUOTES = ['"Focus is the art of knowing what to ignore."', '"Small daily improvements lead to stunning results."', '"Discipline is choosing between what you want now and what you want most."', '"The only way to predict the future is to create it."'];
   const quote = QUOTES[new Date().getDay() % QUOTES.length];
 
+  if (loading) {
+    return (
+      <div className="flex flex-col gap-6">
+        <SkeletonLoader height={180} />
+        <SkeletonLoader height={60} />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <SkeletonLoader height={180} />
+          <SkeletonLoader height={180} />
+        </div>
+        <SkeletonLoader height={140} />
+        <div className="grid grid-cols-3 gap-6">
+          <SkeletonLoader height={100} />
+          <SkeletonLoader height={100} />
+          <SkeletonLoader height={100} />
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20, paddingBottom: 100 }}>
+    <div className="flex flex-col gap-6 lg:gap-8 max-w-full">
       {/* Sync Error Banner */}
       {syncError && (
-        <div style={{
-          background: 'rgba(239, 68, 68, 0.1)',
-          border: '1px solid rgba(239, 68, 68, 0.2)',
-          padding: '12px 16px',
-          borderRadius: 16,
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <AlertCircle size={16} color="#ef4444" />
-            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-main)' }}>{syncError}</span>
+        <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-2xl flex justify-between items-center animate-in fade-in slide-in-from-top-4">
+          <div className="flex items-center gap-3">
+            <AlertCircle size={18} className="text-red-500" />
+            <span className="text-sm font-bold text-text-main">{syncError}</span>
           </div>
-          <button onClick={retrySync} style={{
-            background: 'var(--accent-blue)',
-            border: 'none',
-            padding: '6px 14px',
-            borderRadius: 10,
-            fontSize: 11,
-            fontWeight: 800,
-            color: 'white',
-            cursor: 'pointer'
-          }}>Retry</button>
+          <button onClick={retrySync} className="bg-accent-blue hover:bg-accent-blue/90 px-4 py-2 rounded-xl text-xs font-black text-white transition-all active:scale-95 shadow-md shadow-accent-blue/20">
+            Retry
+          </button>
         </div>
       )}
+
       {/* Header */}
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <h1 style={{ margin: 0, fontSize: 26, fontWeight: 900, color: 'var(--text-main)', letterSpacing: '-0.8px', lineHeight: 1.1 }}>
-            {displayName} 👋
+      <header className="flex justify-between items-center">
+        <div className="space-y-1">
+          <h1 className="text-2xl md:text-3xl font-black text-text-main tracking-tight leading-tight">
+            Hey, {displayName} 👋
           </h1>
-          <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-muted)', fontStyle: 'italic' }}>{quote}</p>
+          <p className="text-sm text-text-muted font-medium italic opacity-80">{quote}</p>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button onClick={toggleTheme}
-            style={{ width: 42, height: 42, borderRadius: 14, background: 'var(--bg-card)', border: '1px solid var(--border-light)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-main)', transition: 'background 0.2s' }}>
-            {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
+        <div className="flex items-center gap-3">
+          <button onClick={toggleTheme} className="w-11 h-11 rounded-xl bg-bg-card border border-border-light flex items-center justify-center text-text-main hover:bg-bg-input transition-all active:scale-90 shadow-sm">
+            {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
           </button>
-          <div style={{ position: 'relative' }}>
-            <button onClick={() => setShowSignOut(!showSignOut)}
-              style={{ width: 42, height: 42, borderRadius: 14, background: 'var(--bg-dark-elem)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 800, color: 'var(--text-inverted)', flexShrink: 0 }}>
+          <div className="relative">
+            <button onClick={() => setShowSignOut(!showSignOut)} className="w-11 h-11 rounded-xl bg-bg-dark-elem flex items-center justify-center text-text-inverted font-black text-lg hover:opacity-90 transition-all active:scale-90 shadow-md">
               {initial}
             </button>
             {showSignOut && (
-              <div style={{ position: 'absolute', top: 50, right: 0, background: 'var(--bg-card)', borderRadius: 16, boxShadow: 'var(--shadow-float)', padding: '8px', minWidth: 180, zIndex: 50, border: '1px solid var(--border-light)' }}>
-                <div style={{ padding: '10px 14px 8px', borderBottom: '1px solid var(--border-light)', marginBottom: 4 }}>
-                  <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: 'var(--text-main)' }}>{displayName}</p>
-                  <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--text-muted)' }}>{user?.email}</p>
+              <div className="absolute top-14 right-0 bg-bg-card border border-border-light p-2 rounded-2xl shadow-float min-w-[200px] z-50 animate-in fade-in zoom-in-95">
+                <div className="px-4 py-3 border-b border-border-light mb-1">
+                  <p className="text-xs font-black text-text-main">{displayName}</p>
+                  <p className="text-[10px] font-bold text-text-muted truncate">{user?.email}</p>
                 </div>
-                <button onClick={signOut}
-                  style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 10, background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 700, color: '#ef4444' }}
-                  onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-input)'}
-                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                  <LogOut size={15} /> Sign Out
+                <button onClick={signOut} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-500 hover:bg-red-500/10 transition-colors font-bold text-sm">
+                  <LogOut size={16} /> Sign Out
                 </button>
               </div>
             )}
@@ -116,247 +116,250 @@ export const Dashboard = ({ setView }) => {
         </div>
       </header>
 
-      {loading ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-          <SkeletonLoader height={180} />
-          <SkeletonLoader height={60} />
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-            <SkeletonLoader height={180} />
-            <SkeletonLoader height={180} />
-          </div>
-          <SkeletonLoader height={140} />
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
-            <SkeletonLoader height={100} />
-            <SkeletonLoader height={100} />
-            <SkeletonLoader height={100} />
-          </div>
-        </div>
-      ) : (
-        <>
+      {/* Main Dashboard Layout Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
+        
+        {/* Left/Main Column */}
+        <div className="lg:col-span-8 flex flex-col gap-6 lg:gap-8">
+          
           {/* Discipline Hero Card */}
-          <section style={{ 
-            background: 'linear-gradient(135deg, var(--bg-dark-elem) 0%, #1e1e1e 100%)', 
-            borderRadius: 28, 
-            padding: '24px', 
-            boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
-            color: 'white',
-            position: 'relative',
-            overflow: 'hidden'
-          }}>
-            <div style={{ position: 'absolute', top: -20, right: -20, opacity: 0.1 }}>
-              <Trophy size={160} color="white" />
+          <section className="bg-linear-to-br from-bg-dark-elem to-[#1e1e1e] rounded-[32px] p-6 md:p-8 shadow-2xl relative overflow-hidden group">
+            <div className="absolute -top-10 -right-10 opacity-10 group-hover:scale-110 group-hover:rotate-12 transition-transform duration-700">
+              <Trophy size={200} className="text-white" />
             </div>
-            <div style={{ position: 'relative', zIndex: 1 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+            <div className="relative z-10">
+              <div className="flex justify-between items-center mb-6">
                 <div>
-                  <p style={{ margin: 0, fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: '0.15em' }}>Current Rank</p>
-                  <h2 style={{ margin: '4px 0 0', fontSize: 32, fontWeight: 900, letterSpacing: '-1px' }}>{userLevel}</h2>
+                  <p className="text-[10px] font-black text-white/60 uppercase tracking-[0.15em] mb-1">Current Rank</p>
+                  <h2 className="text-3xl md:text-4xl font-black text-white tracking-tighter">{userLevel}</h2>
                 </div>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: 40, fontWeight: 900, lineHeight: 1 }}>{disciplineScore}</div>
-                  <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>DISCIPLINE SCORE</p>
+                <div className="text-right">
+                  <div className="text-4xl md:text-5xl font-black text-white leading-none tracking-tighter">{disciplineScore}</div>
+                  <p className="text-[10px] font-black text-white/50 uppercase tracking-widest mt-1">Discipline Score</p>
                 </div>
               </div>
-              <div style={{ background: 'rgba(255,255,255,0.1)', height: 8, borderRadius: 999, overflow: 'hidden' }}>
-                <div style={{ width: `${disciplineScore}%`, height: '100%', background: 'var(--accent-blue)', transition: 'width 1.5s cubic-bezier(0.34, 1.56, 0.64, 1)' }} />
+              <div className="h-2.5 bg-white/10 rounded-full overflow-hidden mb-6">
+                <div 
+                  className="h-full bg-accent-blue rounded-full transition-all duration-[1.5s] ease-out shadow-[0_0_15px_rgba(77,124,255,0.5)]"
+                  style={{ width: `${disciplineScore}%` }}
+                />
               </div>
               {insights.length > 0 && (
-                <div style={{ marginTop: 20, display: 'flex', alignItems: 'center', gap: 10, background: 'rgba(255,255,255,0.05)', padding: '12px 16px', borderRadius: 16 }}>
-                  <Sparkles size={16} color="var(--accent-blue)" style={{ flexShrink: 0 }} />
-                  <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.9)' }}>{insights[0]}</p>
+                <div className="flex items-center gap-3 bg-white/5 p-4 rounded-2xl border border-white/10 backdrop-blur-md">
+                  <Sparkles size={18} className="text-accent-blue shrink-0 animate-pulse" />
+                  <p className="text-sm font-semibold text-white/90 leading-snug">{insights[0]}</p>
                 </div>
               )}
             </div>
           </section>
 
-          {/* Alert Banners */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {alerts.map((alert, i) => {
-              const colors = {
-                danger: { bg: 'rgba(239, 68, 68, 0.1)', border: 'rgba(239, 68, 68, 0.2)', text: '#ef4444' },
-                warning: { bg: 'rgba(245, 158, 11, 0.1)', border: 'rgba(245, 158, 11, 0.2)', text: '#f59e0b' },
-                success: { bg: 'rgba(34, 197, 94, 0.1)', border: 'rgba(34, 197, 94, 0.2)', text: '#22c55e' },
-                info: { bg: 'rgba(59, 130, 246, 0.1)', border: 'rgba(59, 130, 246, 0.2)', text: 'var(--accent-blue)' }
-              };
-              const c = colors[alert.type] || colors.info;
-              return (
-                <div key={i} style={{
-                  display: 'flex', alignItems: 'center', gap: 12,
-                  padding: '14px 16px', borderRadius: 18,
-                  background: c.bg, border: `1px solid ${c.border}`,
-                }}>
-                  {alert.type === 'danger' && <AlertCircle size={18} color={c.text} style={{ flexShrink: 0 }} />}
-                  {alert.type === 'warning' && <AlertTriangle size={18} color={c.text} style={{ flexShrink: 0 }} />}
-                  {(alert.type === 'success' || alert.type === 'info') && <Sparkles size={18} color={c.text} style={{ flexShrink: 0 }} />}
-                  <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: 'var(--text-main)', lineHeight: 1.4 }}>
-                    {alert.message}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
+          {/* Alert Banners (Stacked) */}
+          {alerts.length > 0 && (
+            <div className="flex flex-col gap-3">
+              {alerts.map((alert, i) => {
+                const colors = {
+                  danger: "bg-red-500/10 border-red-500/20 text-red-500",
+                  warning: "bg-amber-500/10 border-amber-500/20 text-amber-500",
+                  success: "bg-emerald-500/10 border-emerald-500/20 text-emerald-500",
+                  info: "bg-accent-blue/10 border-accent-blue/20 text-accent-blue"
+                };
+                const colorClass = colors[alert.type] || colors.info;
+                return (
+                  <div key={i} className={`${colorClass} flex items-center gap-4 px-5 py-4 rounded-2xl border transition-all hover:scale-[1.01]`}>
+                    {alert.type === 'danger' && <AlertCircle size={20} className="shrink-0" />}
+                    {alert.type === 'warning' && <AlertTriangle size={20} className="shrink-0" />}
+                    {(alert.type === 'success' || alert.type === 'info') && <Sparkles size={20} className="shrink-0" />}
+                    <p className="text-sm font-bold text-text-main leading-relaxed">{alert.message}</p>
+                  </div>
+                );
+              })}
+            </div>
+          )}
 
-          {/* Accuracy + Focus Row */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-            <div style={{ background: 'var(--bg-card)', borderRadius: 24, padding: '24px 16px', boxShadow: 'var(--shadow-sm)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, border: '1px solid var(--border-light)' }}>
-              <p style={{ margin: 0, fontSize: 10, fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.12em' }}>Today's Accuracy</p>
-              <div style={{ position: 'relative', width: 124, height: 124 }}>
-                <svg width="124" height="124" viewBox="0 0 124 124" style={{ display: 'block' }}>
-                  <circle cx="62" cy="62" r={R} fill="none" stroke="var(--bg-input)" strokeWidth="10" transform="rotate(-90 62 62)" />
-                  <circle cx="62" cy="62" r={R} fill="none" stroke={accColor} strokeWidth="10"
+          {/* Accuracy + Focus Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Accuracy Card */}
+            <div className="bg-bg-card rounded-3xl p-8 shadow-sm border border-border-light flex flex-col items-center gap-5 hover:shadow-md transition-shadow">
+              <p className="text-[10px] font-black text-text-muted uppercase tracking-[0.15em]">Today's Accuracy</p>
+              <div className="relative w-36 h-36">
+                <svg className="w-full h-full -rotate-90" viewBox="0 0 124 124">
+                  <circle cx="62" cy="62" r={R} fill="none" className="stroke-bg-input" strokeWidth="10" />
+                  <circle 
+                    cx="62" cy="62" r={R} fill="none" stroke={accColor} strokeWidth="10"
                     strokeDasharray={CIRC} strokeDashoffset={accOffset} strokeLinecap="round"
-                    transform="rotate(-90 62 62)" style={{ transition: 'stroke-dashoffset 1s ease, stroke 0.5s ease' }} />
+                    className="transition-all duration-1000 ease-out"
+                  />
                 </svg>
-                <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
-                  <span style={{ fontSize: 32, fontWeight: 950, color: 'var(--text-main)', letterSpacing: '-1px', lineHeight: 1 }}>{accuracy}%</span>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="text-4xl font-black text-text-main tracking-tighter">{accuracy}%</span>
                 </div>
               </div>
-              <p style={{ margin: 0, fontSize: 12, fontWeight: 800, color: accColor }}>
-                {accuracy >= 80 ? 'Elite Performance' : accuracy >= 50 ? 'Steady Progress' : 'Recovery Needed'}
-              </p>
+              <div className="px-4 py-1.5 rounded-full bg-bg-input border border-border-light">
+                <p className="text-xs font-black" style={{ color: accColor }}>
+                  {accuracy >= 80 ? 'Elite Performance' : accuracy >= 50 ? 'Steady Progress' : 'Recovery Needed'}
+                </p>
+              </div>
             </div>
 
-            <div style={{ background: 'var(--bg-dark-elem)', borderRadius: 24, padding: '24px 16px', boxShadow: 'var(--shadow-float)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-              <p style={{ margin: 0, fontSize: 10, fontWeight: 800, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.12em' }}>Deep Work</p>
-              <div>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: 3 }}>
-                  <span style={{ fontSize: 42, fontWeight: 950, color: 'var(--text-inverted)', letterSpacing: '-2px', lineHeight: 1 }}>
+            {/* Deep Work Card */}
+            <div className="bg-bg-dark-elem rounded-3xl p-8 shadow-xl flex flex-col justify-between group hover:scale-[1.02] transition-transform">
+              <p className="text-[10px] font-black text-white/40 uppercase tracking-[0.15em]">Deep Work</p>
+              <div className="my-6">
+                <div className="flex items-baseline gap-2">
+                  <span className="text-6xl font-black text-text-inverted tracking-tighter leading-none">
                     {String(focusHrs).padStart(2, '0')}:{String(focusMins).padStart(2, '0')}
                   </span>
-                  <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', fontWeight: 800 }}>hrs</span>
+                  <span className="text-sm text-white/40 font-black uppercase tracking-widest">hrs</span>
                 </div>
                 {focusDelta !== null && (
-                  <p style={{ margin: '8px 0 0', fontSize: 11, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 4, color: focusDelta >= 0 ? '#4ade80' : '#f87171' }}>
-                    {focusDelta >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
-                    {focusDelta >= 0 ? '+' : ''}{focusDelta}% vs yday
-                  </p>
+                  <div className={`mt-4 flex items-center gap-2 text-sm font-black ${focusDelta >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                    {focusDelta >= 0 ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
+                    <span>{focusDelta >= 0 ? '+' : ''}{focusDelta}% vs yday</span>
+                  </div>
                 )}
               </div>
-              <button onClick={() => setView('focus')}
-                style={{ background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: 12, padding: '10px 14px', color: 'var(--text-inverted)', fontSize: 12, fontWeight: 800, cursor: 'pointer', textAlign: 'left', transition: 'all 0.2s', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-                onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
-                onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}>
-                Start Session <ChevronRight size={14} />
+              <button 
+                onClick={() => setView('focus')}
+                className="w-full bg-white/10 hover:bg-white/20 px-5 py-3.5 rounded-2xl text-text-inverted text-sm font-black transition-all flex justify-between items-center group-hover:bg-accent-blue group-hover:shadow-lg group-hover:shadow-accent-blue/30"
+              >
+                Start Session <ChevronRight size={18} className="group-hover:translate-x-1 transition-transform" />
               </button>
             </div>
           </div>
 
-          {/* Weekly Report Analytics */}
-          <WeeklyReportCard report={weeklyReport} />
-
-          {/* Heatmap */}
-          <WeeklyHeatmap focusHistory={focusHistory} taskLogs={taskLogs} accuracy={accuracy} />
-
-          {/* Task Stats Row */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
-            {[
-              { label: 'Units', val: totalItems, icon: <Zap size={18} color="var(--accent-blue)" /> },
-              { label: 'Done', val: completedItems, icon: <CheckCircle2 size={18} color="#22c55e" /> },
-              { label: 'Peak', val: Math.max(totalItems, completedItems), icon: <Clock size={18} color="#f97316" /> },
-            ].map((s, i) => (
-              <div key={i} style={{ background: 'var(--bg-card)', borderRadius: 20, padding: '20px 12px', boxShadow: 'var(--shadow-sm)', border: '1px solid var(--border-light)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
-                <div style={{ marginBottom: 8 }}>{s.icon}</div>
-                <p style={{ margin: 0, fontSize: 28, fontWeight: 950, color: 'var(--text-main)', letterSpacing: '-1px' }}>{s.val}</p>
-                <p style={{ margin: '2px 0 0', fontSize: 9, fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{s.label}</p>
+          {/* Goal Progress List */}
+          <section className="space-y-5">
+            <div className="flex justify-between items-end px-2">
+              <div className="space-y-1">
+                <h3 className="text-[10px] font-black text-text-muted uppercase tracking-[0.15em]">Active Goals</h3>
+                <p className="text-xl font-black text-text-main tracking-tight">Main Targets</p>
               </div>
-            ))}
-          </div>
-
-          {/* Goal Progress Snapshot */}
-          <section>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-              <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.12em' }}>Active Goals</span>
-              <button onClick={() => setView('goals')} style={{ fontSize: 12, fontWeight: 800, color: 'var(--accent-blue)', background: 'none', border: 'none', cursor: 'pointer' }}>View All</button>
+              <button onClick={() => setView('goals')} className="text-xs font-black text-accent-blue hover:underline underline-offset-4">View All Systems</button>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {goals.slice(0, 3).map(goal => {
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6">
+              {goals.slice(0, 4).map(goal => {
                 const habitsTotal = goal.habits.length;
                 const dailyProgress = calculateGoalDailyProgress(goal);
                 const achieved = dailyProgress === 100;
                 const habitsDone = goal.habits.filter(isHabitDoneToday).length;
-                
-                // Rule-Based Accuracy (Goal Win = 100%)
                 const targetReq = goal.mode === 'ANY' ? 1 : (goal.mode === 'CUSTOM' ? (goal.minHabits || 1) : habitsTotal);
                 const habitAccuracy = Math.min(100, Math.round((habitsDone / (targetReq || 1)) * 100));
-                
                 const ruleLabel = goal.mode === 'ANY' ? 'Any Rule' : goal.mode === 'CUSTOM' ? `Min ${goal.minHabits} Rule` : 'All Habits Rule';
 
                 return (
-                  <div key={goal.id} style={{ background: 'var(--bg-card)', borderRadius: 24, padding: '20px', boxShadow: 'var(--shadow-sm)', border: `2px solid ${achieved ? 'rgba(34,197,94,0.3)' : 'var(--border-light)'}`, transition: 'all 0.3s' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                          <p style={{ margin: 0, fontWeight: 950, fontSize: 16, color: 'var(--text-main)', letterSpacing: '-0.4px' }}>{goal.title}</p>
-                          {achieved && (
-                            <span style={{ fontSize: 9, fontWeight: 900, background: '#dcfce7', color: '#166534', padding: '2px 8px', borderRadius: 999 }}>
-                              Achieved ✔
-                            </span>
-                          )}
+                  <div key={goal.id} className={`bg-bg-card rounded-[28px] p-6 shadow-sm border-2 transition-all hover:shadow-md ${achieved ? 'border-emerald-500/30' : 'border-border-light hover:border-accent-blue/30'}`}>
+                    <div className="flex justify-between items-start mb-5">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <p className="font-black text-lg text-text-main tracking-tight truncate max-w-[140px]">{goal.title}</p>
+                          {achieved && <span className="bg-emerald-100 text-emerald-700 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest">Done</span>}
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                          <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)' }}>{ruleLabel}</span>
-                          <span style={{ fontSize: 10, fontWeight: 800, color: 'var(--accent-blue)', background: 'var(--bg-input)', padding: '2px 8px', borderRadius: 6 }}>
-                             Grit: {habitsDone}/{habitsTotal} Done
-                          </span>
+                        <div className="flex flex-wrap gap-2">
+                          <span className="text-[9px] font-bold text-text-muted bg-bg-input px-2 py-0.5 rounded-md uppercase tracking-widest">{ruleLabel}</span>
                         </div>
                       </div>
-                      <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
-                         <span style={{ fontSize: 22, fontWeight: 950, color: achieved ? '#22c55e' : 'var(--accent-blue)', letterSpacing: '-1.5px', lineHeight: 1 }}>{habitAccuracy}%</span>
-                         <p style={{ margin: 0, fontSize: 9, fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Habit Consistency</p>
+                      <div className="text-right">
+                        <span className={`text-2xl font-black leading-none tracking-tighter ${achieved ? 'text-emerald-500' : 'text-accent-blue'}`}>{habitAccuracy}%</span>
+                        <p className="text-[8px] font-black text-text-muted uppercase tracking-widest mt-0.5">Grit Score</p>
                       </div>
                     </div>
 
-                    <div style={{ background: 'var(--bg-input)', borderRadius: 999, height: 6, overflow: 'hidden', marginBottom: 6 }}>
-                      <div style={{ width: `${achieved ? 100 : dailyProgress}%`, height: '100%', borderRadius: 999, background: achieved ? '#22c55e' : 'var(--accent-blue)', transition: 'width 1.2s cubic-bezier(0.34, 1.56, 0.64, 1)' }} />
+                    <div className="h-2 bg-bg-input rounded-full overflow-hidden mb-4">
+                      <div 
+                        className={`h-full rounded-full transition-all duration-700 ${achieved ? 'bg-emerald-500' : 'bg-accent-blue'}`}
+                        style={{ width: `${achieved ? 100 : dailyProgress}%` }}
+                      />
                     </div>
                     
-                    {achieved && habitsDone < habitsTotal && (
-                       <p style={{ margin: '8px 0 0', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                         ⚡ Strategy met! Extra effort today will build even stronger discipline.
-                       </p>
-                    )}
-
-                    <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                       <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Overall Mastery Progress</span>
-                       <span style={{ fontSize: 13, fontWeight: 950, color: 'var(--text-main)' }}>{goal.progress || 0}%</span>
+                    <div className="flex justify-between items-center pt-4 border-t border-border-light">
+                      <span className="text-[9px] font-black text-text-muted uppercase tracking-widest">Mastery</span>
+                      <span className="text-sm font-black text-text-main tracking-tighter">{goal.progress || 0}%</span>
                     </div>
                   </div>
                 );
               })}
               {goals.length === 0 && (
-                 <div onClick={() => setView('goals')} style={{ padding: '40px', textAlign: 'center', border: '2px dashed var(--border-light)', borderRadius: 22, color: 'var(--text-muted)', cursor: 'pointer' }}>
-                   <p style={{ margin: 0, fontWeight: 700 }}>No goals defined.</p>
-                   <p style={{ margin: '4px 0 0', fontSize: 12 }}>Forge your first one today.</p>
-                 </div>
+                <div onClick={() => setView('goals')} className="col-span-full py-16 text-center border-2 border-dashed border-border-med rounded-[32px] cursor-pointer hover:bg-bg-input transition-colors space-y-3">
+                  <div className="w-12 h-12 rounded-2xl bg-bg-input flex items-center justify-center mx-auto mb-2">
+                    <Target className="text-text-muted" size={24} />
+                  </div>
+                  <p className="font-black text-text-main">No systems defined</p>
+                  <p className="text-sm text-text-muted font-bold">Forge your first goal to start tracking.</p>
+                </div>
               )}
             </div>
           </section>
+        </div>
 
-          {/* Streak Leaders */}
+        {/* Right Column / Sidebar Dashboard Content */}
+        <div className="lg:col-span-4 flex flex-col gap-6 lg:gap-8">
+          
+          {/* Weekly Performance Widget */}
+          <WeeklyReportCard report={weeklyReport} />
+
+          {/* Consistency Heatmap Widget */}
+          <WeeklyHeatmap focusHistory={focusHistory} taskLogs={taskLogs} accuracy={accuracy} />
+
+          {/* Task Stats Widget */}
+          <div className="grid grid-cols-3 lg:grid-cols-1 gap-4">
+            {[
+              { label: 'Total Units', val: totalItems, icon: <Zap size={18} className="text-accent-blue" />, color: "text-accent-blue" },
+              { label: 'Completed', val: completedItems, icon: <CheckCircle2 size={18} className="text-emerald-500" />, color: "text-emerald-500" },
+              { label: 'Max Peak', val: Math.max(totalItems, completedItems), icon: <Clock size={18} className="text-orange-500" />, color: "text-orange-500" },
+            ].map((s, i) => (
+              <div key={i} className="bg-bg-card rounded-3xl p-5 shadow-sm border border-border-light flex flex-col lg:flex-row items-center lg:items-center justify-between gap-2 lg:gap-4 hover:shadow-md transition-shadow">
+                <div className="w-10 h-10 rounded-xl bg-bg-input flex items-center justify-center shrink-0">
+                  {s.icon}
+                </div>
+                <div className="text-center lg:text-right">
+                  <p className="text-2xl font-black text-text-main tracking-tighter leading-none">{s.val}</p>
+                  <p className="text-[9px] font-black text-text-muted uppercase tracking-widest mt-1">{s.label}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Streak Leaders Widget */}
           {topStreaks.length > 0 && (
-            <section style={{ marginTop: 10 }}>
-              <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.12em', display: 'block', marginBottom: 14 }}>Streak Power</span>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <section className="bg-bg-card rounded-[32px] p-6 shadow-sm border border-border-light">
+              <div className="flex items-center gap-2 mb-6">
+                <Zap size={18} className="text-orange-500" fill="currentColor" />
+                <h3 className="text-[10px] font-black text-text-muted uppercase tracking-[0.15em]">Streak Power</h3>
+              </div>
+              <div className="flex flex-col gap-3">
                 {topStreaks.map((s, i) => (
-                  <div key={i} style={{ background: 'var(--bg-card)', borderRadius: 18, padding: '14px 18px', boxShadow: 'var(--shadow-sm)', border: '1px solid var(--border-light)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                       <div style={{ width: 8, height: 8, borderRadius: 2, background: i === 0 ? 'var(--accent-blue)' : 'var(--text-muted)' }} />
-                       <div>
-                        <p style={{ margin: 0, fontSize: 14, fontWeight: 800, color: 'var(--text-main)' }}>{s.name}</p>
-                        <p style={{ margin: '1px 0 0', fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>{s.tag}</p>
+                  <div key={i} className="flex items-center justify-between p-4 rounded-2xl bg-bg-input/50 border border-border-light hover:bg-bg-input transition-colors group">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-1.5 h-6 rounded-full ${i === 0 ? 'bg-orange-500' : 'bg-text-muted/30'}`} />
+                      <div>
+                        <p className="text-sm font-black text-text-main truncate max-w-[120px]">{s.name}</p>
+                        <p className="text-[9px] font-bold text-text-muted uppercase tracking-widest">{s.tag}</p>
                       </div>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      {s.missed >= 2 && <span style={{ fontSize: 10, fontWeight: 800, color: '#f59e0b', background: 'rgba(245, 158, 11, 0.1)', padding: '4px 8px', borderRadius: 8 }}>VULNERABLE</span>}
-                      <span style={{ fontSize: 15, fontWeight: 900, color: '#f97316' }}>🔥 {s.streak}d</span>
+                    <div className="flex items-center gap-2">
+                      {s.missed >= 2 && (
+                        <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" title="Vulnerable" />
+                      )}
+                      <span className="text-base font-black text-orange-500 group-hover:scale-110 transition-transform">🔥 {s.streak}d</span>
                     </div>
                   </div>
                 ))}
               </div>
             </section>
           )}
-        </>
-      )}
+
+          {/* Footer Quote / Branding */}
+          <div className="mt-auto pt-6 text-center lg:text-left opacity-40">
+            <p className="text-[10px] font-black text-text-muted uppercase tracking-widest leading-loose">
+              © 2026 GoalForge Strategy <br/>
+              Advanced Productivity Suite
+            </p>
+          </div>
+        </div>
+
+      </div>
     </div>
   );
 };
+

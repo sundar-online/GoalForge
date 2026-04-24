@@ -15,115 +15,48 @@ function AppInner() {
 
   if (loading) {
     return (
-      <div style={{
-        minHeight: '100vh',
-        background: 'linear-gradient(145deg, #0b0c10 0%, #151720 40%, #1a1c2e 100%)',
-        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-        gap: 0,
-        fontFamily: '-apple-system, BlinkMacSystemFont, "Inter", sans-serif',
-        overflow: 'hidden',
-        position: 'relative',
-      }}>
+      <div className="min-h-screen bg-bg-app flex flex-col items-center justify-center gap-0 font-inter overflow-hidden relative">
         {/* Background glow */}
-        <div style={{
-          position: 'absolute', width: 320, height: 320, borderRadius: '50%',
-          background: 'radial-gradient(circle, rgba(77,124,255,0.15) 0%, transparent 70%)',
-          filter: 'blur(40px)', animation: 'glowPulse 3s ease-in-out infinite',
-        }} />
+        <div className="absolute w-80 h-80 rounded-full bg-accent-blue/15 blur-[40px] animate-pulse" />
 
         {/* Orbital rings container */}
-        <div style={{ position: 'relative', width: 120, height: 120, marginBottom: 32 }}>
+        <div className="relative w-[120px] h-[120px] mb-8">
           {/* Outer orbit */}
-          <div style={{
-            position: 'absolute', inset: 0, borderRadius: '50%',
-            border: '1.5px solid rgba(77,124,255,0.12)',
-            animation: 'orbitSpin 8s linear infinite',
-          }}>
-            <div style={{
-              position: 'absolute', top: -4, left: '50%', transform: 'translateX(-50%)',
-              width: 8, height: 8, borderRadius: '50%',
-              background: '#5a85ff', boxShadow: '0 0 12px rgba(90,133,255,0.8)',
-            }} />
+          <div className="absolute inset-0 rounded-full border-[1.5px] border-accent-blue/10 animate-[spin_8s_linear_infinite]">
+            <div className="absolute top-[-4px] left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-accent-blue shadow-[0_0_12px_rgba(77,124,255,0.8)]" />
           </div>
 
           {/* Middle orbit */}
-          <div style={{
-            position: 'absolute', inset: 16, borderRadius: '50%',
-            border: '1px solid rgba(129,140,248,0.1)',
-            animation: 'orbitSpin 5s linear infinite reverse',
-          }}>
-            <div style={{
-              position: 'absolute', bottom: -3, left: '50%', transform: 'translateX(-50%)',
-              width: 6, height: 6, borderRadius: '50%',
-              background: '#818cf8', boxShadow: '0 0 10px rgba(129,140,248,0.7)',
-            }} />
+          <div className="absolute inset-4 rounded-full border border-indigo-400/10 animate-[spin_5s_linear_infinite_reverse]">
+            <div className="absolute bottom-[-3px] left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-indigo-400 shadow-[0_0_10px_rgba(129,140,248,0.7)]" />
           </div>
 
           {/* Center logo */}
-          <div style={{
-            position: 'absolute', inset: 30, borderRadius: 18,
-            background: 'linear-gradient(135deg, #4d7cff 0%, #818cf8 100%)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 8px 32px rgba(77,124,255,0.4), inset 0 1px 0 rgba(255,255,255,0.15)',
-            animation: 'logoPulse 2.5s ease-in-out infinite',
-          }}>
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <div className="absolute inset-[30px] rounded-2xl bg-linear-to-br from-accent-blue to-indigo-400 flex items-center justify-center shadow-lg shadow-accent-blue/40 ring-1 ring-white/10 animate-bounce">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
             </svg>
           </div>
         </div>
 
         {/* Brand text */}
-        <h1 style={{
-          margin: 0, fontSize: 28, fontWeight: 900, letterSpacing: '-1px',
-          background: 'linear-gradient(135deg, #ffffff 0%, #94a3b8 100%)',
-          WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-          animation: 'fadeSlideUp 0.8s ease-out both',
-        }}>
+        <h1 className="text-3xl font-black tracking-tighter bg-linear-to-br from-white to-slate-400 bg-clip-text text-transparent animate-in fade-in slide-in-from-bottom-3 duration-700">
           GoalForge
         </h1>
 
-        <p style={{
-          margin: '8px 0 0', fontSize: 13, fontWeight: 500, color: '#64748b',
-          letterSpacing: '0.08em',
-          animation: 'fadeSlideUp 0.8s ease-out 0.15s both',
-        }}>
-          Preparing your workspace
+        <p className="mt-2 text-[10px] font-black text-text-muted uppercase tracking-[0.3em] animate-in fade-in slide-in-from-bottom-4 duration-1000">
+          Syncing Neural Pathways
         </p>
 
         {/* Shimmer progress bar */}
-        <div style={{
-          marginTop: 28, width: 180, height: 3, borderRadius: 99,
-          background: 'rgba(255,255,255,0.06)', overflow: 'hidden',
-          animation: 'fadeSlideUp 0.8s ease-out 0.3s both',
-        }}>
-          <div style={{
-            width: '40%', height: '100%', borderRadius: 99,
-            background: 'linear-gradient(90deg, transparent, #5a85ff, transparent)',
-            animation: 'shimmer 1.5s ease-in-out infinite',
-          }} />
+        <div className="mt-8 w-44 h-[2px] rounded-full bg-white/5 overflow-hidden animate-in fade-in duration-1000">
+          <div className="w-[40%] h-full rounded-full bg-linear-to-r from-transparent via-accent-blue to-transparent animate-[shimmer_2s_infinite]" />
         </div>
 
         <style>{`
-          @keyframes orbitSpin {
-            from { transform: rotate(0deg); }
-            to   { transform: rotate(360deg); }
-          }
-          @keyframes logoPulse {
-            0%, 100% { transform: scale(1); }
-            50%      { transform: scale(1.06); }
-          }
-          @keyframes glowPulse {
-            0%, 100% { opacity: 0.6; transform: scale(1); }
-            50%      { opacity: 1; transform: scale(1.15); }
-          }
           @keyframes shimmer {
             0%   { transform: translateX(-200%); }
             100% { transform: translateX(550%); }
-          }
-          @keyframes fadeSlideUp {
-            from { opacity: 0; transform: translateY(12px); }
-            to   { opacity: 1; transform: translateY(0); }
           }
         `}</style>
       </div>

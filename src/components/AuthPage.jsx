@@ -28,100 +28,122 @@ export const AuthPage = () => {
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg-app)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, position: 'relative', overflow: 'hidden' }}>
+    <div className="min-h-screen bg-bg-app flex items-center justify-center p-6 relative overflow-hidden font-inter">
       
-      {/* Soft background blobs */}
-      <div style={{ position: 'absolute', top: -100, left: -100, width: 400, height: 400, background: 'var(--accent-blue-light)', borderRadius: '50%', filter: 'blur(80px)', opacity: 0.6 }} />
-      <div style={{ position: 'absolute', bottom: -100, right: -100, width: 400, height: 400, background: 'var(--accent-blue-light)', borderRadius: '50%', filter: 'blur(80px)', opacity: 0.6 }} />
+      {/* Cinematic background elements */}
+      <div className="absolute top-[-10%] left-[-10%] w-[50%] aspect-square bg-accent-blue/10 rounded-full blur-[120px] animate-pulse" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[50%] aspect-square bg-accent-blue/5 rounded-full blur-[120px]" />
 
-      <div style={{ width: '100%', maxWidth: 400, background: 'var(--bg-float)', borderRadius: 28, padding: '40px 32px', boxShadow: 'var(--shadow-float)', border: '1px solid var(--border-light)', backdropFilter: 'blur(20px)', position: 'relative', zIndex: 10 }}>
+      <div className="w-full max-w-md bg-bg-card/70 backdrop-blur-2xl rounded-[40px] p-10 md:p-12 shadow-2xl border border-white/10 relative z-10 animate-in fade-in zoom-in-95 duration-500">
         
         {/* Header */}
-        <div style={{ textAlign: 'center', marginBottom: 32 }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 48, height: 48, borderRadius: 16, background: 'var(--accent-blue)', color: 'white', marginBottom: 20, boxShadow: '0 8px 24px rgba(77,124,255,0.3)' }}>
-            <Rocket size={24} />
+        <div className="text-center mb-10">
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-accent-blue text-white mb-6 shadow-lg shadow-accent-blue/40 ring-4 ring-accent-blue/10">
+            <Rocket size={28} className="animate-bounce" />
           </div>
-          <h1 style={{ margin: '0 0 8px', fontSize: 28, fontWeight: 900, color: 'var(--text-main)', letterSpacing: '-0.5px' }}>
-            {isLogin ? 'Welcome back' : 'Create account'}
+          <h1 className="text-3xl font-black text-text-main tracking-tighter mb-2">
+            {isLogin ? 'Neural Interface' : 'Initialize Protocol'}
           </h1>
-          <p style={{ margin: 0, fontSize: 14, color: 'var(--text-muted)' }}>
-            {isLogin ? 'Sign in to continue your journey.' : 'Start forging your goals today.'}
+          <p className="text-sm font-bold text-text-muted uppercase tracking-[0.2em] opacity-60">
+            {isLogin ? 'Resuming Data Sync' : 'Creating New Identity'}
           </p>
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {authError && (
-            <div style={{ padding: '12px 16px', borderRadius: 12, background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', color: '#ef4444', fontSize: 13, fontWeight: 600, textAlign: 'center' }}>
-              {authError}
-            </div>
-          )}
-          {message && (
-            <div style={{ padding: '12px 16px', borderRadius: 12, background: 'rgba(34, 197, 94, 0.1)', border: '1px solid rgba(34, 197, 94, 0.2)', color: '#22c55e', fontSize: 13, fontWeight: 600, textAlign: 'center' }}>
-              {message}
-            </div>
-          )}
+        <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+          <AnimatePresence mode="wait">
+            {authError && (
+              <motion.div 
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-500 text-xs font-black text-center uppercase tracking-widest"
+              >
+                {authError}
+              </motion.div>
+            )}
+            {message && (
+              <motion.div 
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-xs font-black text-center uppercase tracking-widest"
+              >
+                {message}
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {!isLogin && (
-            <div>
-              <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Full Name</label>
-              <input type="text" required value={name} onChange={(e) => setName(e.target.value)}
-                placeholder="John Doe"
-                style={{ width: '100%', background: 'var(--bg-input)', border: '1px solid transparent', borderRadius: 14, padding: '14px 16px', fontSize: 15, fontWeight: 500, color: 'var(--text-main)', outline: 'none', transition: 'all 0.2s', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.02)' }}
-                onFocus={e => { e.target.style.background = 'var(--bg-card)'; e.target.style.borderColor = 'var(--border-med)'; e.target.style.boxShadow = '0 0 0 4px var(--accent-blue-light)'; }}
-                onBlur={e => { e.target.style.background = 'var(--bg-input)'; e.target.style.borderColor = 'transparent'; e.target.style.boxShadow = 'inset 0 2px 4px rgba(0,0,0,0.02)'; }}
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black text-text-muted uppercase tracking-widest px-1">Full Name</label>
+              <input 
+                type="text" 
+                required 
+                value={name} 
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Agent Name"
+                className="w-full bg-bg-input/50 border border-border-light rounded-xl px-4 py-4 text-sm font-bold text-text-main outline-hidden focus:border-accent-blue focus:ring-4 focus:ring-accent-blue/10 transition-all placeholder:text-text-muted/30"
               />
             </div>
           )}
 
-          <div>
-            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Email</label>
-            <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              style={{ width: '100%', background: 'var(--bg-input)', border: '1px solid transparent', borderRadius: 14, padding: '14px 16px', fontSize: 15, fontWeight: 500, color: 'var(--text-main)', outline: 'none', transition: 'all 0.2s', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.02)' }}
-              onFocus={e => { e.target.style.background = 'var(--bg-card)'; e.target.style.borderColor = 'var(--border-med)'; e.target.style.boxShadow = '0 0 0 4px var(--accent-blue-light)'; }}
-              onBlur={e => { e.target.style.background = 'var(--bg-input)'; e.target.style.borderColor = 'transparent'; e.target.style.boxShadow = 'inset 0 2px 4px rgba(0,0,0,0.02)'; }}
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-black text-text-muted uppercase tracking-widest px-1">Email Terminal</label>
+            <input 
+              type="email" 
+              required 
+              value={email} 
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@forge.com"
+              className="w-full bg-bg-input/50 border border-border-light rounded-xl px-4 py-4 text-sm font-bold text-text-main outline-hidden focus:border-accent-blue focus:ring-4 focus:ring-accent-blue/10 transition-all placeholder:text-text-muted/30"
             />
           </div>
 
-          <div>
-            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Password</label>
-            <div style={{ position: 'relative' }}>
-              <input type={showPassword ? "text" : "password"} required value={password} onChange={(e) => setPassword(e.target.value)}
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-black text-text-muted uppercase tracking-widest px-1">Encryption Key</label>
+            <div className="relative">
+              <input 
+                type={showPassword ? "text" : "password"} 
+                required 
+                value={password} 
+                onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                style={{ width: '100%', background: 'var(--bg-input)', border: '1px solid transparent', borderRadius: 14, padding: '14px 44px 14px 16px', fontSize: 15, fontWeight: 500, color: 'var(--text-main)', outline: 'none', transition: 'all 0.2s', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.02)' }}
-                onFocus={e => { e.target.style.background = 'var(--bg-card)'; e.target.style.borderColor = 'var(--border-med)'; e.target.style.boxShadow = '0 0 0 4px var(--accent-blue-light)'; }}
-                onBlur={e => { e.target.style.background = 'var(--bg-input)'; e.target.style.borderColor = 'transparent'; e.target.style.boxShadow = 'inset 0 2px 4px rgba(0,0,0,0.02)'; }}
+                className="w-full bg-bg-input/50 border border-border-light rounded-xl px-4 py-4 pr-12 text-sm font-bold text-text-main outline-hidden focus:border-accent-blue focus:ring-4 focus:ring-accent-blue/10 transition-all placeholder:text-text-muted/30"
               />
-              <button type="button" onClick={() => setShowPassword(!showPassword)}
-                style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 4, display: 'flex' }}>
+              <button 
+                type="button" 
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-text-muted hover:text-accent-blue transition-colors p-1"
+              >
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
           </div>
 
-          <button type="submit" disabled={loading}
-            style={{ width: '100%', padding: '16px', borderRadius: 14, background: 'var(--accent-blue)', color: 'white', border: 'none', fontSize: 15, fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer', marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'transform 0.2s', boxShadow: '0 4px 14px rgba(77,124,255,0.3)', opacity: loading ? 0.7 : 1 }}
-            onMouseEnter={e => !loading && (e.currentTarget.style.transform = 'translateY(-2px)')}
-            onMouseLeave={e => !loading && (e.currentTarget.style.transform = 'none')}
+          <button 
+            type="submit" 
+            disabled={loading}
+            className="w-full py-5 rounded-2xl bg-accent-blue text-white text-xs font-black uppercase tracking-[0.2em] shadow-lg shadow-accent-blue/30 hover:opacity-90 hover:-translate-y-0.5 active:translate-y-0 transition-all disabled:opacity-50 disabled:cursor-not-allowed mt-4"
           >
-            {loading ? <Loader2 size={20} className="animate-spin" /> : (isLogin ? 'Sign In' : 'Create Account')}
+            {loading ? <Loader2 size={20} className="animate-spin mx-auto" /> : (isLogin ? 'Establish Link' : 'Secure Vault')}
           </button>
         </form>
 
-        <div style={{ marginTop: 24, textAlign: 'center' }}>
-          <p style={{ margin: 0, fontSize: 14, color: 'var(--text-muted)' }}>
-            {isLogin ? "Don't have an account? " : "Already have an account? "}
-            <button type="button" onClick={() => { setIsLogin(!isLogin); setAuthError(''); setMessage(''); }}
-              style={{ background: 'none', border: 'none', color: 'var(--accent-blue)', fontWeight: 700, cursor: 'pointer', padding: 0, fontSize: 14 }}>
+        <div className="mt-10 text-center">
+          <p className="text-xs font-bold text-text-muted">
+            {isLogin ? "New user? " : "Existing agent? "}
+            <button 
+              type="button" 
+              onClick={() => { setIsLogin(!isLogin); setAuthError(''); setMessage(''); }}
+              className="text-accent-blue font-black hover:underline underline-offset-4 ml-1"
+            >
               {isLogin ? "Sign up" : "Sign in"}
             </button>
           </p>
         </div>
       </div>
       
-      <p style={{ position: 'absolute', bottom: 20, textAlign: 'center', width: '100%', fontSize: 12, color: 'var(--text-muted)', fontWeight: 500 }}>
-        Secured by Supabase Auth • No spam, ever.
+      <p className="absolute bottom-8 text-center w-full text-[10px] font-black text-text-muted uppercase tracking-[0.3em] opacity-40">
+        Secured by Forge-Sync Protocol
       </p>
     </div>
   );

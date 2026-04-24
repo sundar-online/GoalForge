@@ -7,43 +7,45 @@ export const WeeklyReportCard = ({ report }) => {
   const focusMins = Math.floor((totalFocusTime % 3600) / 60);
 
   return (
-    <div style={{ background: 'var(--bg-card)', borderRadius: 28, padding: '24px', boxShadow: 'var(--shadow-sm)', border: '1px solid var(--border-light)', display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h3 style={{ margin: 0, fontSize: 16, fontWeight: 900, color: 'var(--text-main)', letterSpacing: '-0.5px' }}>Weekly Performance</h3>
-        <span style={{ fontSize: 10, fontWeight: 800, color: 'var(--accent-blue)', background: 'var(--accent-blue-light)', padding: '4px 10px', borderRadius: 999, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Last 7 Days</span>
+    <div className="bg-bg-card rounded-[32px] p-6 shadow-sm border border-border-light flex flex-col gap-6">
+      <div className="flex justify-between items-center px-1">
+        <h3 className="text-base font-black text-text-main tracking-tight">Weekly Performance</h3>
+        <span className="text-[9px] font-black text-accent-blue bg-accent-blue-light px-3 py-1 rounded-full uppercase tracking-widest border border-accent-blue/10">Last 7 Days</span>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-        <div style={{ background: 'var(--bg-app)', borderRadius: 20, padding: '16px', border: '1px solid var(--border-light)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-            <Award size={14} color="var(--accent-blue)" />
-            <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Accuracy</span>
+      <div className="grid grid-cols-2 gap-4">
+        <div className="bg-bg-app rounded-2xl p-5 border border-border-light hover:shadow-md transition-shadow group">
+          <div className="flex items-center gap-2 mb-3">
+            <Award size={14} className="text-accent-blue" />
+            <span className="text-[10px] font-black text-text-muted uppercase tracking-widest">Accuracy</span>
           </div>
-          <p style={{ margin: 0, fontSize: 28, fontWeight: 950, color: 'var(--text-main)' }}>{weeklyAccuracy}%</p>
+          <p className="text-3xl font-black text-text-main tracking-tighter group-hover:scale-105 transition-transform origin-left">{weeklyAccuracy}%</p>
           {improvement !== 0 && (
-            <p style={{ margin: '4px 0 0', fontSize: 11, fontWeight: 800, color: improvement > 0 ? '#22c55e' : '#ef4444', display: 'flex', alignItems: 'center', gap: 4 }}>
+            <div className={`mt-2 flex items-center gap-1.5 text-[11px] font-black ${improvement > 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
               {improvement > 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-              {Math.abs(improvement)}% vs last week
-            </p>
+              <span>{Math.abs(improvement)}% vs last wk</span>
+            </div>
           )}
         </div>
 
-        <div style={{ background: 'var(--bg-app)', borderRadius: 20, padding: '16px', border: '1px solid var(--border-light)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-            <Clock size={14} color="#f97316" />
-            <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Focus Time</span>
+        <div className="bg-bg-app rounded-2xl p-5 border border-border-light hover:shadow-md transition-shadow group">
+          <div className="flex items-center gap-2 mb-3">
+            <Clock size={14} className="text-orange-500" />
+            <span className="text-[10px] font-black text-text-muted uppercase tracking-widest">Focus</span>
           </div>
-          <p style={{ margin: 0, fontSize: 24, fontWeight: 950, color: 'var(--text-main)' }}>{focusHrs}h {focusMins}m</p>
-          <p style={{ margin: '4px 0 0', fontSize: 11, fontWeight: 700, color: 'var(--text-muted)' }}>Deep work total</p>
+          <p className="text-2xl font-black text-text-main tracking-tighter group-hover:scale-105 transition-transform origin-left">{focusHrs}h {focusMins}m</p>
+          <p className="mt-2 text-[10px] font-bold text-text-muted/70 tracking-wide uppercase">Deep Work</p>
         </div>
       </div>
 
-      <div style={{ background: 'var(--bg-input)', borderRadius: 16, padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <Calendar size={14} color="var(--text-muted)" />
-          <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-main)' }}>Best Day</span>
+      <div className="bg-bg-input/50 rounded-2xl p-4 flex items-center justify-between border border-border-light group">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-xl bg-bg-card flex items-center justify-center shadow-sm group-hover:rotate-6 transition-transform">
+            <Calendar size={14} className="text-text-muted" />
+          </div>
+          <span className="text-sm font-bold text-text-main">Best Day</span>
         </div>
-        <span style={{ fontSize: 12, fontWeight: 900, color: 'var(--accent-blue)' }}>{bestDay}</span>
+        <span className="text-sm font-black text-accent-blue tracking-tight">{bestDay}</span>
       </div>
     </div>
   );

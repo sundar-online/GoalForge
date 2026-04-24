@@ -1,43 +1,45 @@
 import React from 'react';
-import { useHeatmap } from '../hooks/useHeatmap';
+import { getIntensity, generateHeatmapData } from '../utils/heatmapUtils';
 
 export const WeeklyHeatmap = ({ taskLogs, accuracy }) => {
-  const { heatmapCells } = useHeatmap(taskLogs, accuracy);
+  const cells = generateHeatmapData(30);
 
   return (
-    <div style={{ background: 'var(--bg-card)', borderRadius: 22, padding: '20px', border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-sm)' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+    <div className="bg-bg-card rounded-[28px] p-5 border border-border-light shadow-sm">
+      <div className="flex justify-between items-center mb-5">
         <div>
-          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Consistency Heatmap</span>
-          <p style={{ margin: '2px 0 0', fontSize: 10, color: 'var(--text-muted)' }}>Real daily activity tracking</p>
+          <h3 className="text-xs font-black text-text-muted uppercase tracking-widest">Consistency Map</h3>
+          <p className="text-lg font-black text-text-main tracking-tight">30-Day Activity Heatmap</p>
         </div>
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          <div style={{ display: 'flex', gap: 2 }}>
-            <div style={{ width: 8, height: 8, borderRadius: 2, background: 'var(--bg-input)' }} title="0% Completed" />
-            <div style={{ width: 8, height: 8, borderRadius: 2, background: '#faba2c' }} title="Low (>0%)" />
-            <div style={{ width: 8, height: 8, borderRadius: 2, background: 'var(--accent-blue)' }} title="Med (≥50%)" />
-            <div style={{ width: 8, height: 8, borderRadius: 2, background: '#22c55e' }} title="High (100%)" />
-          </div>
+        <div className="text-right">
+          <p className="text-[10px] font-black text-text-muted uppercase tracking-widest">System Accuracy</p>
+          <p className={`text-lg font-black ${accuracy >= 90 ? 'text-emerald-500' : 'text-accent-blue'}`}>{accuracy}%</p>
         </div>
       </div>
-      
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(10, 1fr)', gap: 6 }}>
-        {heatmapCells.map((cell, i) => (
-          <div key={i} title={`${cell.key} - ${cell.completionRate}%`} 
-            style={{ 
-              width: '100%', 
-              aspectRatio: '1/1', 
-              borderRadius: 4, 
-              background: cell.intensity,
-              border: cell.active ? '1px solid var(--accent-blue)' : 'none',
-              transition: 'all 0.3s ease',
-              cursor: 'help'
-            }} />
-        ))}
+
+      <div className="grid grid-cols-10 gap-2 sm:grid-cols-15 md:grid-cols-30 md:gap-1.5">
+        {cells.map((cell) => {
+          const color = getIntensity(cell.key, taskLogs);
+          return (
+            <div
+              key={cell.key}
+              className={`aspect-square rounded-sm transition-all duration-500 hover:scale-110 cursor-help ${cell.active ? 'ring-2 ring-accent-blue/30 scale-105' : ''}`}
+              style={{ backgroundColor: color }}
+              title={`${cell.key}: ${color}`}
+            />
+          );
+        })}
       </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 10 }}>
-        <span style={{ fontSize: 9, color: 'var(--text-muted)', fontWeight: 600 }}>30 days ago</span>
-        <span style={{ fontSize: 9, color: 'var(--text-muted)', fontWeight: 600 }}>Today</span>
+
+      <div className="mt-6 flex items-center justify-between text-[8px] font-black text-text-muted uppercase tracking-[0.15em]">
+        <span>Inactivity</span>
+        <div className="flex gap-1">
+          <div className="w-2 h-2 rounded-[1px] bg-bg-input" />
+          <div className="w-2 h-2 rounded-[1px] bg-[#faba2c]" />
+          <div className="w-2 h-2 rounded-[1px] bg-accent-blue" />
+          <div className="w-2 h-2 rounded-[1px] bg-[#22c55e]" />
+        </div>
+        <span>Peak Output</span>
       </div>
     </div>
   );

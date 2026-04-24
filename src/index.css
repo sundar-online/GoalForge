@@ -1,5 +1,27 @@
 @import "tailwindcss";
 
+@theme {
+  --color-bg-app: var(--bg-app);
+  --color-bg-card: var(--bg-card);
+  --color-bg-float: var(--bg-float);
+  --color-bg-input: var(--bg-input);
+  --color-bg-dark-elem: var(--bg-dark-elem);
+  
+  --color-text-main: var(--text-main);
+  --color-text-muted: var(--text-muted);
+  --color-text-inverted: var(--text-inverted);
+  
+  --color-border-light: var(--border-light);
+  --color-border-med: var(--border-med);
+
+  --color-accent-blue: var(--accent-blue);
+  --color-accent-blue-light: var(--accent-blue-light);
+
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-float: var(--shadow-float);
+}
+
 :root {
   --bg-app: #f0f2f7;
   --bg-card: #ffffff;
@@ -49,6 +71,7 @@ body {
   background-color: var(--bg-app);
   color: var(--text-main);
   transition: background-color 0.3s ease, color 0.3s ease;
+  overflow-x: hidden;
 }
 
 * {

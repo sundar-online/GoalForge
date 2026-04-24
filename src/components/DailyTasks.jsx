@@ -5,12 +5,6 @@ import { CalendarCheck, Plus, Clock, Trash2, Check, CalendarRange, Calendar } fr
 import { isTaskDone } from '../utils/calculationUtils';
 import { TODAY } from '../utils/dateUtils';
 
-const PRIORITY = {
-  High:   { color: '#dc2626', bg: 'rgba(239, 68, 68, 0.1)' },
-  Medium: { color: '#d97706', bg: 'rgba(245, 158, 11, 0.1)' },
-  Low:    { color: 'var(--accent-blue)', bg: 'var(--accent-blue-light)' },
-};
-
 const SCHEDULE_ICONS = {
   daily:  <Clock size={12} />,
   single: <Calendar size={12} />,
@@ -25,29 +19,21 @@ const LogTaskTimeModal = ({ task, onClose, logTaskTime }) => {
   const [mins, setMins] = useState(25);
   const submit = () => { logTaskTime(task.id, mins); onClose(); };
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: 20, backdropFilter: 'blur(4px)' }}
-      onClick={onClose}>
-      <div style={{ background: 'var(--bg-card)', borderRadius: 24, padding: '28px 24px', width: '100%', maxWidth: 340, boxShadow: 'var(--shadow-float)', border: '1px solid var(--border-light)' }}
-        onClick={e => e.stopPropagation()}>
-        <h3 style={{ margin: '0 0 4px', fontSize: 18, fontWeight: 800, color: 'var(--text-main)' }}>Log Time</h3>
-        <p style={{ margin: '0 0 20px', fontSize: 13, color: 'var(--text-muted)' }}>{task.title}</p>
-        <p style={{ margin: '0 0 8px', fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Minutes Spent</p>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[200] p-4 backdrop-blur-sm" onClick={onClose}>
+      <div className="bg-bg-card rounded-[28px] p-8 w-full max-w-[340px] shadow-float border border-border-light animate-in fade-in zoom-in-95" onClick={e => e.stopPropagation()}>
+        <h3 className="text-lg font-black text-text-main mb-1">Log Time</h3>
+        <p className="text-sm text-text-muted font-bold mb-6">{task.title}</p>
+        <p className="text-[10px] font-black text-text-muted uppercase tracking-widest mb-3">Minutes Spent</p>
+        <div className="flex items-center gap-4 mb-8">
           <button type="button" onClick={() => setMins(m => Math.max(1, m - 5))}
-            style={{ width: 40, height: 40, borderRadius: 12, background: 'var(--bg-input)', border: 'none', cursor: 'pointer', fontSize: 20, fontWeight: 700, color: 'var(--text-main)' }}>−</button>
-          <span style={{ flex: 1, textAlign: 'center', fontSize: 40, fontWeight: 900, color: 'var(--text-main)', letterSpacing: '-2px' }}>{mins}</span>
+            className="w-12 h-12 rounded-xl bg-bg-input text-text-main text-2xl font-black hover:bg-bg-input/80 transition-colors">−</button>
+          <span className="flex-1 text-center text-5xl font-black text-text-main tracking-tighter">{mins}</span>
           <button type="button" onClick={() => setMins(m => m + 5)}
-            style={{ width: 40, height: 40, borderRadius: 12, background: 'var(--bg-input)', border: 'none', cursor: 'pointer', fontSize: 20, fontWeight: 700, color: 'var(--text-main)' }}>+</button>
+            className="w-12 h-12 rounded-xl bg-bg-input text-text-main text-2xl font-black hover:bg-bg-input/80 transition-colors">+</button>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          <button type="button" onClick={onClose}
-            style={{ padding: '13px', borderRadius: 14, border: 'none', background: 'var(--bg-input)', fontWeight: 700, fontSize: 14, cursor: 'pointer', color: 'var(--text-muted)' }}>
-            Cancel
-          </button>
-          <button type="button" onClick={submit}
-            style={{ padding: '13px', borderRadius: 14, border: 'none', background: 'var(--accent-blue)', fontWeight: 700, fontSize: 14, cursor: 'pointer', color: '#fff', boxShadow: '0 4px 14px rgba(77,124,255,0.3)' }}>
-            Log {mins}m
-          </button>
+        <div className="grid grid-cols-2 gap-3">
+          <button type="button" onClick={onClose} className="py-4 rounded-xl bg-bg-input text-text-muted font-black text-sm transition-colors">Cancel</button>
+          <button type="button" onClick={submit} className="py-4 rounded-xl bg-accent-blue text-white font-black text-sm shadow-md shadow-accent-blue/20 transition-all active:scale-95">Log {mins}m</button>
         </div>
       </div>
     </div>
@@ -98,80 +84,115 @@ export const DailyTasks = () => {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+    <div className="flex flex-col gap-6 max-w-full">
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div>
-          <h2 style={{ margin: '0 0 4px', fontSize: 24, fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.5px', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <CalendarCheck size={22} color="var(--accent-blue)" /> Today's Tasks
+      <div className="flex justify-between items-start">
+        <div className="space-y-1">
+          <h2 className="text-2xl md:text-3xl font-black text-text-main tracking-tight flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-accent-blue/10 flex items-center justify-center">
+              <CalendarCheck size={24} className="text-accent-blue" />
+            </div>
+            Today's Forge
           </h2>
-          <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)' }}>Your scheduled items for today.</p>
+          <p className="text-sm text-text-muted font-medium ml-1">Daily operations and scheduled tasks.</p>
         </div>
         <button onClick={() => setIsAdding(!isAdding)}
-          style={{ background: isAdding ? 'rgba(239, 68, 68, 0.1)' : 'var(--bg-dark-elem)', color: isAdding ? '#ef4444' : 'var(--text-inverted)', border: 'none', borderRadius: 14, padding: '10px 18px', fontWeight: 700, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
-          <Plus size={16} strokeWidth={3} style={{ transform: isAdding ? 'rotate(45deg)' : 'none', transition: 'transform 0.3s' }} />
-          {isAdding ? 'Cancel' : '+ Task'}
+          className={`
+            px-5 py-3 rounded-2xl font-black text-sm flex items-center gap-2 transition-all duration-300 shadow-sm border
+            ${isAdding ? 'bg-rose-500/10 border-rose-500/20 text-rose-500' : 'bg-bg-dark-elem border-white/5 text-white hover:opacity-90'}
+          `}
+        >
+          <Plus size={18} strokeWidth={3} className={`transition-transform duration-300 ${isAdding ? 'rotate-45' : ''}`} />
+          {isAdding ? 'Cancel' : 'Add Task'}
         </button>
       </div>
 
       {/* Stats Bar */}
-      <div style={{ display: 'flex', gap: 0, background: 'var(--bg-card)', borderRadius: 16, overflow: 'hidden', boxShadow: 'var(--shadow-sm)', border: '1px solid var(--border-light)' }}>
-        {[{ label: 'Total', val: total }, { label: 'Completed', val: doneCount }, { label: 'Accuracy', val: `${accuracy}%` }].map((s, i) => (
-          <div key={i} style={{ flex: 1, padding: '14px 12px', textAlign: 'center', borderRight: i < 2 ? '1px solid var(--border-light)' : 'none' }}>
-            <p style={{ margin: '0 0 2px', fontSize: 22, fontWeight: 900, color: i === 2 ? (accuracy >= 80 ? '#22c55e' : 'var(--accent-blue)') : 'var(--text-main)', letterSpacing: '-0.5px' }}>{s.val}</p>
-            <p style={{ margin: 0, fontSize: 9, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{s.label}</p>
+      <div className="bg-bg-card rounded-[28px] overflow-hidden shadow-sm border border-border-light grid grid-cols-3">
+        {[
+          { label: 'Total', val: total },
+          { label: 'Done', val: doneCount },
+          { label: 'Focus', val: `${accuracy}%`, color: accuracy >= 80 ? 'text-emerald-500' : 'text-accent-blue' }
+        ].map((s, i) => (
+          <div key={i} className={`p-4 text-center space-y-1 ${i < 2 ? 'border-r border-border-light' : ''}`}>
+            <p className={`text-2xl font-black tracking-tighter ${s.color || 'text-text-main'}`}>{s.val}</p>
+            <p className="text-[9px] font-black text-text-muted uppercase tracking-widest">{s.label}</p>
           </div>
         ))}
       </div>
 
       {/* Add Form */}
-      {isAdding && (
-        <form onSubmit={submit} style={{ background: 'var(--bg-card)', borderRadius: 24, padding: '24px', border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-float)', display: 'flex', flexDirection: 'column', gap: 18 }}>
-          <input autoFocus required type="text" value={newTask.title} onChange={e => setNewTask({ ...newTask, title: e.target.value })} placeholder="What are we accomplishing?" style={{ fontSize: 18, fontWeight: 800, color: 'var(--text-main)', border: 'none', background: 'var(--bg-input)', padding: '14px 18px', borderRadius: 16, outline: 'none' }} />
-          
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <div>
-              <p style={{ margin: '0 0 6px', fontSize: 9, fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Schedule</p>
-              <select value={newTask.type} onChange={e => setNewTask({ ...newTask, type: e.target.value })} style={{ width: '100%', background: 'var(--bg-input)', border: 'none', borderRadius: 12, padding: '10px 14px', fontSize: 13, fontWeight: 600, color: 'var(--text-main)', outline: 'none' }}>
-                {Object.keys(SCHEDULE_LABELS).map(k => <option key={k} value={k}>{SCHEDULE_LABELS[k]}</option>)}
-              </select>
+      <AnimatePresence>
+        {isAdding && (
+          <motion.form 
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            onSubmit={submit} 
+            className="bg-bg-card rounded-[32px] p-6 flex flex-col gap-6 border border-border-light shadow-float overflow-hidden"
+          >
+            <input autoFocus required type="text" value={newTask.title} onChange={e => setNewTask({ ...newTask, title: e.target.value })} 
+              placeholder="What are we accomplishing?" 
+              className="w-full text-lg font-black text-text-main border-none bg-bg-input p-5 rounded-2xl outline-none placeholder:text-text-muted/40 focus:ring-2 ring-accent-blue/10 transition-all" 
+            />
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <p className="text-[10px] font-black text-text-muted uppercase tracking-widest ml-1">Schedule</p>
+                <select value={newTask.type} onChange={e => setNewTask({ ...newTask, type: e.target.value })} className="w-full bg-bg-input border-none rounded-xl p-4 text-sm font-bold text-text-main outline-none appearance-none hover:bg-bg-input/80 transition-colors">
+                  {Object.keys(SCHEDULE_LABELS).map(k => <option key={k} value={k}>{SCHEDULE_LABELS[k]}</option>)}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <p className="text-[10px] font-black text-text-muted uppercase tracking-widest ml-1">Tracking</p>
+                <select value={newTask.completionType} onChange={e => setNewTask({ ...newTask, completionType: e.target.value })} className="w-full bg-bg-input border-none rounded-xl p-4 text-sm font-bold text-text-main outline-none appearance-none hover:bg-bg-input/80 transition-colors">
+                  {Object.keys(TYPE_LABELS).map(k => <option key={k} value={k}>{TYPE_LABELS[k]}</option>)}
+                </select>
+              </div>
             </div>
-            <div>
-              <p style={{ margin: '0 0 6px', fontSize: 9, fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Tracking Mode</p>
-              <select value={newTask.completionType} onChange={e => setNewTask({ ...newTask, completionType: e.target.value })} style={{ width: '100%', background: 'var(--bg-input)', border: 'none', borderRadius: 12, padding: '10px 14px', fontSize: 13, fontWeight: 600, color: 'var(--text-main)', outline: 'none' }}>
-                {Object.keys(TYPE_LABELS).map(k => <option key={k} value={k}>{TYPE_LABELS[k]}</option>)}
-              </select>
-            </div>
-          </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            {newTask.type === 'single' && (
-              <div><p style={{ margin: '0 0 6px', fontSize: 9, fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Date</p>
-              <input type="date" required value={newTask.targetDate} onChange={e => setNewTask({ ...newTask, targetDate: e.target.value })} style={{ width: '100%', background: 'var(--bg-input)', border: 'none', borderRadius: 12, padding: '10px', fontSize: 13, color: 'var(--text-main)' }} /></div>
-            )}
-            {newTask.type === 'range' && (
-              <>
-                <div><p style={{ margin: '0 0 4px', fontSize: 9, fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Start</p>
-                <input type="date" required value={newTask.startDate} onChange={e => setNewTask({ ...newTask, startDate: e.target.value })} style={{ width: '100%', background: 'var(--bg-input)', border: 'none', borderRadius: 12, padding: '10px', fontSize: 13, color: 'var(--text-main)' }} /></div>
-                <div><p style={{ margin: '0 0 4px', fontSize: 9, fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>End</p>
-                <input type="date" required value={newTask.endDate} onChange={e => setNewTask({ ...newTask, endDate: e.target.value })} style={{ width: '100%', background: 'var(--bg-input)', border: 'none', borderRadius: 12, padding: '10px', fontSize: 13, color: 'var(--text-main)' }} /></div>
-              </>
-            )}
-            {newTask.completionType === 'time' && (
-              <div><p style={{ margin: '0 0 4px', fontSize: 9, fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Goal (min)</p>
-              <input type="number" required value={newTask.targetTime} onChange={e => setNewTask({ ...newTask, targetTime: e.target.value })} style={{ width: '100%', background: 'var(--bg-input)', border: 'none', borderRadius: 12, padding: '10px', fontSize: 13, color: 'var(--text-main)' }} /></div>
-            )}
-            {newTask.completionType === 'count' && (
-              <div><p style={{ margin: '0 0 4px', fontSize: 9, fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Target Units</p>
-              <input type="number" required value={newTask.targetCount} onChange={e => setNewTask({ ...newTask, targetCount: e.target.value })} style={{ width: '100%', background: 'var(--bg-input)', border: 'none', borderRadius: 12, padding: '10px', fontSize: 13, color: 'var(--text-main)' }} /></div>
-            )}
-          </div>
-          <button type="submit" style={{ background: 'var(--accent-blue)', color: '#fff', border: 'none', borderRadius: 16, padding: '14px', fontWeight: 800, fontSize: 15, cursor: 'pointer', boxShadow: '0 8px 24px rgba(77,124,255,0.3)' }}>Create Task</button>
-        </form>
-      )}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {newTask.type === 'single' && (
+                <div className="space-y-2">
+                  <p className="text-[10px] font-black text-text-muted uppercase tracking-widest ml-1">Date</p>
+                  <input type="date" required value={newTask.targetDate} onChange={e => setNewTask({ ...newTask, targetDate: e.target.value })} className="w-full bg-bg-input border-none rounded-xl p-4 text-sm font-bold text-text-main outline-none" />
+                </div>
+              )}
+              {newTask.type === 'range' && (
+                <>
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-black text-text-muted uppercase tracking-widest ml-1">Start</p>
+                    <input type="date" required value={newTask.startDate} onChange={e => setNewTask({ ...newTask, startDate: e.target.value })} className="w-full bg-bg-input border-none rounded-xl p-4 text-sm font-bold text-text-main outline-none" />
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-black text-text-muted uppercase tracking-widest ml-1">End</p>
+                    <input type="date" required value={newTask.endDate} onChange={e => setNewTask({ ...newTask, endDate: e.target.value })} className="w-full bg-bg-input border-none rounded-xl p-4 text-sm font-bold text-text-main outline-none" />
+                  </div>
+                </>
+              )}
+              {newTask.completionType === 'time' && (
+                <div className="space-y-2">
+                  <p className="text-[10px] font-black text-text-muted uppercase tracking-widest ml-1">Goal (min)</p>
+                  <input type="number" required value={newTask.targetTime} onChange={e => setNewTask({ ...newTask, targetTime: e.target.value })} className="w-full bg-bg-input border-none rounded-xl p-4 text-sm font-bold text-text-main outline-none" />
+                </div>
+              )}
+              {newTask.completionType === 'count' && (
+                <div className="space-y-2">
+                  <p className="text-[10px] font-black text-text-muted uppercase tracking-widest ml-1">Target Units</p>
+                  <input type="number" required value={newTask.targetCount} onChange={e => setNewTask({ ...newTask, targetCount: e.target.value })} className="w-full bg-bg-input border-none rounded-xl p-4 text-sm font-bold text-text-main outline-none" />
+                </div>
+              )}
+            </div>
+            
+            <button type="submit" className="w-full bg-accent-blue text-white rounded-2xl py-4 font-black text-base shadow-xl shadow-accent-blue/30 hover:opacity-90 active:scale-[0.98] transition-all">
+              Create Task
+            </button>
+          </motion.form>
+        )}
+      </AnimatePresence>
 
       {/* Task List */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div className="flex flex-col gap-4">
         <AnimatePresence initial={false}>
           {todayTasks
             .slice().sort((a,b) => isTaskDone(a) - isTaskDone(b))
@@ -189,49 +210,67 @@ export const DailyTasks = () => {
 
                 return (
                   <motion.div layout key={task.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }}
-                    style={{ background: 'var(--bg-card)', borderRadius: 22, padding: '16px 18px', border: `1px solid ${tDone ? 'rgba(34,197,94,0.3)' : 'var(--border-light)'}`, display: 'flex', flexDirection: 'column', gap: 12, boxShadow: 'var(--shadow-sm)' }}>
-                    
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                    className={`
+                      bg-bg-card rounded-[28px] p-5 border transition-all duration-300 flex flex-col gap-4
+                      ${tDone ? 'border-emerald-500/30 bg-emerald-500/5 opacity-70' : 'border-border-light shadow-sm hover:border-border-med'}
+                    `}
+                  >
+                    <div className="flex items-center gap-4">
                       <button onClick={() => toggleTaskComplete(task.id)} 
-                        style={{ width: 32, height: 32, borderRadius: 11, background: tDone ? '#22c55e' : 'var(--bg-input)', border: `2px solid ${tDone ? '#22c55e' : 'var(--border-med)'}`, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
-                        {tDone ? <Check size={18} color="#fff" strokeWidth={3} /> : (isCheck ? null : <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--text-muted)', opacity: 0.2 }} />)}
+                        className={`
+                          w-10 h-10 shrink-0 rounded-xl border-2 flex items-center justify-center transition-all duration-200
+                          ${tDone ? 'bg-emerald-500 border-emerald-500 scale-95' : 'bg-bg-input border-border-med hover:border-accent-blue'}
+                        `}
+                      >
+                        {tDone ? <Check size={20} className="text-white" strokeWidth={3} /> : (isCheck ? null : <div className="w-2 h-2 rounded-full bg-text-muted/20" />)}
                       </button>
 
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-                          <span style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', background: 'var(--accent-blue-light)', color: 'var(--accent-blue)', padding: '2px 8px', borderRadius: 6, display: 'flex', alignItems: 'center', gap: 5 }}>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-[9px] font-black uppercase tracking-widest bg-accent-blue-light text-accent-blue px-2 py-0.5 rounded-md flex items-center gap-1.5">
                             {SCHEDULE_ICONS[sType]} {SCHEDULE_LABELS[sType]}
                           </span>
-                          {task.currentStreak > 0 && <span style={{ fontSize: 10, fontWeight: 700, color: '#f97316', background: 'rgba(249,115,22,0.1)', padding: '2px 6px', borderRadius: 4 }}>🔥 {task.currentStreak}d</span>}
+                          {task.currentStreak > 0 && <span className="text-[9px] font-black text-orange-500 bg-orange-500/10 px-2 py-0.5 rounded-md">🔥 {task.currentStreak}d</span>}
                         </div>
-                        <p style={{ margin: 0, fontSize: 16, fontWeight: 800, color: tDone ? '#22c55e' : 'var(--text-main)', textDecoration: tDone ? 'line-through' : 'none', opacity: tDone ? 0.7 : 1 }}>{task.title}</p>
-                        <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>
-                          {isCheck ? (tDone ? 'Completed' : 'Status: Pending') : `${current} / ${target} ${isCount ? 'units' : 'mins'}`}
+                        <p className={`text-base font-black tracking-tight truncate ${tDone ? 'text-emerald-600 line-through' : 'text-text-main'}`}>{task.title}</p>
+                        <p className="text-[11px] font-bold text-text-muted uppercase tracking-wide mt-0.5">
+                          {isCheck ? (tDone ? 'Completed' : 'Priority Task') : `${current} / ${target} ${isCount ? 'units' : 'mins'}`}
                         </p>
                       </div>
 
-                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <div className="flex gap-2 items-center">
                         {isCount ? (
-                          <div style={{ display: 'flex', background: 'var(--bg-input)', borderRadius: 10, border: '1px solid var(--border-light)', overflow: 'hidden' }}>
-                            <button onClick={() => updateTaskCount(task.id, -1)} style={{ padding: '6px 10px', border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-main)', fontWeight: 800 }}>−</button>
-                            <button onClick={() => updateTaskCount(task.id, 1)} style={{ padding: '6px 10px', border: 'none', borderLeft: '1px solid var(--border-light)', background: 'none', cursor: 'pointer', color: 'var(--accent-blue)', fontWeight: 800 }}>+</button>
+                          <div className="flex bg-bg-input rounded-xl border border-border-light overflow-hidden">
+                            <button onClick={() => updateTaskCount(task.id, -1)} className="px-3 py-1.5 text-text-main font-black hover:bg-border-light">−</button>
+                            <button onClick={() => updateTaskCount(task.id, 1)} className="px-3 py-1.5 text-accent-blue font-black border-l border-border-light hover:bg-border-light transition-colors">+</button>
                           </div>
                         ) : (isTime && !tDone) && (
-                          <button onClick={() => setShowLog(task)} style={{ padding: '7px 14px', borderRadius: 10, background: 'var(--accent-blue)', border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 800, color: '#fff' }}>+ Log</button>
+                          <button onClick={() => setShowLog(task)} className="px-4 py-2 rounded-xl bg-accent-blue text-white text-[11px] font-black shadow-md shadow-accent-blue/20 active:scale-95 transition-all">+ Log</button>
                         )}
-                        <button onClick={() => deleteTask(task.id)} style={{ width: 34, height: 34, borderRadius: 10, background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Trash2 size={18} /></button>
+                        <button onClick={() => deleteTask(task.id)} className="w-9 h-9 rounded-xl text-text-muted hover:text-rose-500 hover:bg-rose-500/10 transition-all flex items-center justify-center"><Trash2 size={18} /></button>
                       </div>
                     </div>
                     
                     {!isCheck && (
-                      <div style={{ background: tDone ? 'rgba(34,197,94,0.15)' : 'var(--border-med)', borderRadius: 99, height: 5, overflow: 'hidden' }}>
-                        <div style={{ width: `${pct}%`, height: '100%', background: tDone ? '#22c55e' : 'var(--accent-blue)', transition: 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)' }} />
+                      <div className="bg-bg-input rounded-full h-1.5 overflow-hidden">
+                        <div className={`h-full transition-all duration-700 ${tDone ? 'bg-emerald-500' : 'bg-accent-blue'}`} style={{ width: `${pct}%` }} />
                       </div>
                     )}
                   </motion.div>
                 );
               })}
         </AnimatePresence>
+        
+        {todayTasks.length === 0 && !isAdding && (
+          <div className="py-24 flex flex-col items-center justify-center text-center">
+             <div className="w-20 h-20 rounded-full bg-bg-input flex items-center justify-center mb-6">
+               <CalendarCheck size={32} className="text-text-muted/30" />
+             </div>
+             <p className="text-lg font-black text-text-muted tracking-tight">Your forge is silent.</p>
+             <p className="text-sm font-bold text-text-muted/50 mt-1">Add a task to start crushing your day.</p>
+             <button onClick={() => setIsAdding(true)} className="mt-8 px-8 py-4 rounded-2xl bg-accent-blue text-white font-black shadow-lg shadow-accent-blue/20 hover:opacity-90 transition-all active:scale-95">Add First Task</button>
+          </div>
+        )}
       </div>
       
       {showLog && <LogTaskTimeModal task={showLog} onClose={() => setShowLog(null)} logTaskTime={logTaskTime} />}

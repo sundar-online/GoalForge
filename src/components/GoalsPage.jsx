@@ -6,12 +6,12 @@ import { addDays } from '../utils/dateUtils';
 
 
 const TAG_COLORS = {
-  Engineering: { bg: 'var(--accent-blue-light)', color: 'var(--accent-blue)' },
-  Learning:    { bg: 'rgba(234, 88, 12, 0.1)',   color: '#ea580c' },
-  Fitness:     { bg: 'rgba(22, 163, 74, 0.1)',   color: '#16a34a' },
-  Creative:    { bg: 'rgba(147, 51, 234, 0.1)',  color: '#9333ea' },
-  Business:    { bg: 'rgba(217, 119, 6, 0.1)',   color: '#d97706' },
-  General:     { bg: 'var(--bg-input)',          color: 'var(--text-muted)' },
+  Engineering: { bg: 'bg-accent-blue-light', color: 'text-accent-blue' },
+  Learning:    { bg: 'bg-orange-500/10',     color: 'text-orange-600' },
+  Fitness:     { bg: 'bg-emerald-500/10',    color: 'text-emerald-600' },
+  Creative:    { bg: 'bg-purple-500/10',     color: 'text-purple-600' },
+  Business:    { bg: 'bg-amber-500/10',      color: 'text-amber-600' },
+  General:     { bg: 'bg-bg-input',          color: 'text-text-muted' },
 };
 
 // ── Extend Deadline Modal ──────────────────────────────────
@@ -21,38 +21,42 @@ const ExtendDeadlineModal = ({ goal, onClose, onExtend }) => {
   const newDeadline = addDays(currentDeadline, selectedDays);
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: 20, backdropFilter: 'blur(8px)' }} onClick={onClose}>
-      <div style={{ background: 'var(--bg-card)', borderRadius: 28, padding: '32px 28px', width: '100%', maxWidth: 380, boxShadow: 'var(--shadow-float)', border: '1px solid var(--border-light)' }} onClick={e => e.stopPropagation()}>
-        <h3 style={{ margin: '0 0 8px', fontSize: 20, fontWeight: 900, color: 'var(--text-main)', letterSpacing: '-0.5px' }}>Extend Deadline</h3>
-        <p style={{ margin: '0 0 24px', fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5 }}>Push back the deadline for "<b>{goal.title}</b>" without losing your streak or progress.</p>
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[300] p-4 backdrop-blur-md" onClick={onClose}>
+      <div className="bg-bg-card rounded-[32px] p-8 w-full max-w-md shadow-float border border-border-light animate-in fade-in zoom-in-95" onClick={e => e.stopPropagation()}>
+        <h3 className="text-xl font-black text-text-main tracking-tight mb-2">Extend Deadline</h3>
+        <p className="text-sm text-text-muted font-medium leading-relaxed mb-6">Push back the deadline for "<b>{goal.title}</b>" without losing your progress.</p>
         
-        <div style={{ marginBottom: 24 }}>
-          <p style={{ margin: '0 0 10px', fontSize: 10, fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Duration</p>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+        <div className="space-y-3 mb-6">
+          <p className="text-[10px] font-black text-text-muted uppercase tracking-widest">Duration</p>
+          <div className="grid grid-cols-3 gap-3">
             {[3, 7, 30].map(d => (
               <button key={d} onClick={() => setSelectedDays(d)}
-                style={{ padding: '12px 0', borderRadius: 14, border: '2px solid', borderColor: selectedDays === d ? 'var(--accent-blue)' : 'var(--bg-input)', background: selectedDays === d ? 'var(--accent-blue-light)' : 'var(--bg-input)', color: selectedDays === d ? 'var(--accent-blue)' : 'var(--text-main)', fontWeight: 700, fontSize: 13, cursor: 'pointer', transition: 'all 0.2s' }}>
+                className={`
+                  py-3.5 rounded-2xl font-bold text-sm transition-all border-2
+                  ${selectedDays === d ? 'border-accent-blue bg-accent-blue-light text-accent-blue' : 'border-bg-input bg-bg-input text-text-main hover:border-border-med'}
+                `}
+              >
                 +{d} Days
               </button>
             ))}
           </div>
         </div>
 
-        <div style={{ background: 'var(--bg-input)', borderRadius: 18, padding: '16px', marginBottom: 28 }}>
-           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-             <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>Current Deadline</span>
-             <span style={{ fontSize: 12, color: 'var(--text-main)', fontWeight: 700 }}>{goal.deadline || 'None'}</span>
+        <div className="bg-bg-input/50 rounded-[22px] p-5 space-y-3 mb-8 border border-border-light">
+           <div className="flex justify-between items-center">
+             <span className="text-xs font-bold text-text-muted">Current</span>
+             <span className="text-sm font-black text-text-main">{goal.deadline || 'None'}</span>
            </div>
-           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-             <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>New Deadline</span>
-             <span style={{ fontSize: 13, color: 'var(--accent-blue)', fontWeight: 900 }}>{newDeadline}</span>
+           <div className="flex justify-between items-center pt-3 border-t border-border-light/50">
+             <span className="text-xs font-bold text-text-muted">New Target</span>
+             <span className="text-sm font-black text-accent-blue">{newDeadline}</span>
            </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <button onClick={onClose} style={{ padding: '14px', borderRadius: 16, border: 'none', background: 'var(--bg-input)', fontWeight: 700, fontSize: 14, cursor: 'pointer', color: 'var(--text-muted)' }}>Cancel</button>
+        <div className="grid grid-cols-2 gap-4">
+          <button onClick={onClose} className="py-4 rounded-2xl bg-bg-input text-text-muted font-black text-sm hover:bg-bg-input/80 transition-colors">Cancel</button>
           <button onClick={() => { onExtend(goal.id, newDeadline); onClose(); }}
-            style={{ padding: '14px', borderRadius: 16, border: 'none', background: 'var(--accent-blue)', fontWeight: 700, fontSize: 14, cursor: 'pointer', color: '#fff', boxShadow: '0 6px 20px rgba(77,124,255,0.3)' }}>
+            className="py-4 rounded-2xl bg-accent-blue text-white font-black text-sm shadow-lg shadow-accent-blue/30 hover:opacity-90 active:scale-95 transition-all">
             Confirm
           </button>
         </div>
@@ -66,29 +70,21 @@ const LogTimeModal = ({ habit, goalId, onClose, logHabitTime }) => {
   const [mins, setMins] = useState(25);
   const submit = () => { logHabitTime(goalId, habit.id, mins); onClose(); };
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: 20, backdropFilter: 'blur(4px)' }}
-      onClick={onClose}>
-      <div style={{ background: 'var(--bg-card)', borderRadius: 24, padding: '28px 24px', width: '100%', maxWidth: 340, boxShadow: 'var(--shadow-float)', border: '1px solid var(--border-light)' }}
-        onClick={e => e.stopPropagation()}>
-        <h3 style={{ margin: '0 0 4px', fontSize: 18, fontWeight: 800, color: 'var(--text-main)' }}>Log Time</h3>
-        <p style={{ margin: '0 0 20px', fontSize: 13, color: 'var(--text-muted)' }}>{habit.title}</p>
-        <p style={{ margin: '0 0 8px', fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Minutes Spent</p>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[200] p-4 backdrop-blur-sm" onClick={onClose}>
+      <div className="bg-bg-card rounded-[28px] p-8 w-full max-w-[340px] shadow-float border border-border-light animate-in fade-in zoom-in-95" onClick={e => e.stopPropagation()}>
+        <h3 className="text-lg font-black text-text-main mb-1">Log Time</h3>
+        <p className="text-sm text-text-muted font-bold mb-6">{habit.title}</p>
+        <p className="text-[10px] font-black text-text-muted uppercase tracking-widest mb-3">Minutes Spent</p>
+        <div className="flex items-center gap-4 mb-8">
           <button onClick={() => setMins(m => Math.max(1, m - 5))}
-            style={{ width: 40, height: 40, borderRadius: 12, background: 'var(--bg-input)', border: 'none', cursor: 'pointer', fontSize: 20, fontWeight: 700, color: 'var(--text-main)' }}>−</button>
-          <span style={{ flex: 1, textAlign: 'center', fontSize: 40, fontWeight: 900, color: 'var(--text-main)', letterSpacing: '-2px' }}>{mins}</span>
+            className="w-12 h-12 rounded-xl bg-bg-input text-text-main text-2xl font-black hover:bg-bg-input/80 transition-colors">−</button>
+          <span className="flex-1 text-center text-5xl font-black text-text-main tracking-tighter">{mins}</span>
           <button onClick={() => setMins(m => m + 5)}
-            style={{ width: 40, height: 40, borderRadius: 12, background: 'var(--bg-input)', border: 'none', cursor: 'pointer', fontSize: 20, fontWeight: 700, color: 'var(--text-main)' }}>+</button>
+            className="w-12 h-12 rounded-xl bg-bg-input text-text-main text-2xl font-black hover:bg-bg-input/80 transition-colors">+</button>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          <button onClick={onClose}
-            style={{ padding: '13px', borderRadius: 14, border: 'none', background: 'var(--bg-input)', fontWeight: 700, fontSize: 14, cursor: 'pointer', color: 'var(--text-muted)' }}>
-            Cancel
-          </button>
-          <button onClick={submit}
-            style={{ padding: '13px', borderRadius: 14, border: 'none', background: 'var(--accent-blue)', fontWeight: 700, fontSize: 14, cursor: 'pointer', color: '#fff' }}>
-            Log {mins}m
-          </button>
+        <div className="grid grid-cols-2 gap-3">
+          <button onClick={onClose} className="py-4 rounded-xl bg-bg-input text-text-muted font-black text-sm transition-colors">Cancel</button>
+          <button onClick={submit} className="py-4 rounded-xl bg-accent-blue text-white font-black text-sm shadow-md shadow-accent-blue/20 transition-all active:scale-95">Log {mins}m</button>
         </div>
       </div>
     </div>
@@ -113,61 +109,47 @@ const HabitRow = ({ habit, goalId, logHabitTime, deleteHabit, toggleHabitCheck, 
 
   return (
     <>
-      <div style={{ 
-        padding: '14px 16px', 
-        borderRadius: 14, 
-        background: done ? 'rgba(34,197,94,0.05)' : 'var(--bg-input)', 
-        border: `1px solid ${done ? 'rgba(34,197,94,0.2)' : 'var(--border-light)'}`, 
-        display: 'flex', 
-        flexDirection: 'column', 
-        gap: 10,
-        opacity: done ? 0.8 : 1,
-        transition: 'all 0.3s'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1 }}>
+      <div className={`
+        p-4 rounded-2xl transition-all duration-300 border flex flex-col gap-3
+        ${done ? 'bg-emerald-500/5 border-emerald-500/10 opacity-70' : 'bg-bg-input border-border-light hover:border-border-med'}
+      `}>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
             <button
                onClick={() => { if (isCheck) toggleHabitCheck(goalId, habit.id); }}
-               style={{ 
-                 width: 32, 
-                 height: 32, 
-                 borderRadius: 10, 
-                 background: done ? '#22c55e' : 'var(--bg-card)', 
-                 border: `2px solid ${done ? '#22c55e' : 'var(--border-med)'}`, 
-                 cursor: isCheck ? 'pointer' : 'default', 
-                 display: 'flex', 
-                 alignItems: 'center', 
-                 justifyContent: 'center',
-                 transition: 'all 0.2s'
-               }}
+               className={`
+                 w-9 h-9 shrink-0 rounded-xl border-2 flex items-center justify-center transition-all duration-200
+                 ${done ? 'bg-emerald-500 border-emerald-500 scale-95' : 'bg-bg-card border-border-med cursor-pointer hover:border-accent-blue'}
+                 ${!isCheck && !done ? 'cursor-default' : ''}
+               `}
             >
-              {done ? <Check size={16} color="#fff" strokeWidth={3} /> : (isCheck ? null : <Icon size={16} color="var(--text-muted)" />)}
+              {done ? <Check size={18} className="text-white" strokeWidth={3} /> : (isCheck ? null : <Icon size={16} className="text-text-muted" />)}
             </button>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: done ? '#22c55e' : 'var(--text-main)', textDecoration: done ? 'line-through' : 'none' }}>{habit.title}</p>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
-                <p style={{ margin: 0, fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>
-                  {isCheck ? (done ? 'Completed' : 'Pending') : `${current} / ${target} ${isCount ? '' : 'mins'}`}
+            <div className="flex-1 min-w-0">
+              <p className={`text-sm font-black tracking-tight truncate ${done ? 'text-emerald-600 line-through' : 'text-text-main'}`}>{habit.title}</p>
+              <div className="flex items-center gap-3 mt-0.5">
+                <p className="text-[11px] font-bold text-text-muted uppercase tracking-wide">
+                  {isCheck ? (done ? 'Completed' : 'Pending') : `${current}/${target} ${isCount ? 'units' : 'mins'}`}
                 </p>
-                {habit.streak > 0 && <span style={{ fontSize: 10, fontWeight: 700, color: '#f97316' }}>🔥 {habit.streak}d</span>}
+                {habit.streak > 0 && <span className="text-[10px] font-black text-orange-500 bg-orange-500/10 px-1.5 py-0.5 rounded-md">🔥 {habit.streak}d</span>}
               </div>
             </div>
           </div>
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          <div className="flex gap-2 items-center">
             {isCount ? (
-              <div style={{ display: 'flex', background: 'var(--bg-card)', borderRadius: 10, border: '1px solid var(--border-light)', overflow: 'hidden' }}>
-                 <button onClick={() => updateHabitCount(goalId, habit.id, -1)} style={{ padding: '6px 12px', border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-main)', fontWeight: 800 }}>−</button>
-                 <button onClick={() => updateHabitCount(goalId, habit.id, 1)} style={{ padding: '6px 12px', border: 'none', borderLeft: '1px solid var(--border-light)', background: 'none', cursor: 'pointer', color: 'var(--accent-blue)', fontWeight: 800 }}>+</button>
+              <div className="flex bg-bg-card rounded-xl border border-border-light overflow-hidden shadow-sm">
+                 <button onClick={() => updateHabitCount(goalId, habit.id, -1)} className="px-3 py-1.5 text-text-main font-black hover:bg-bg-input transition-colors">−</button>
+                 <button onClick={() => updateHabitCount(goalId, habit.id, 1)} className="px-3 py-1.5 text-accent-blue font-black border-l border-border-light hover:bg-bg-input transition-colors">+</button>
               </div>
             ) : (!isCheck && !done) && (
-              <button onClick={() => setShowLog(true)} style={{ padding: '6px 12px', borderRadius: 10, background: 'var(--accent-blue)', border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700, color: '#fff' }}>+ Log</button>
+              <button onClick={() => setShowLog(true)} className="px-4 py-2 rounded-xl bg-accent-blue text-white text-[11px] font-black shadow-md shadow-accent-blue/20 active:scale-95 transition-all">+ Log</button>
             )}
-            <button onClick={() => deleteHabit(goalId, habit.id)} style={{ width: 32, height: 32, borderRadius: 10, background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Trash2 size={14} /></button>
+            <button onClick={() => deleteHabit(goalId, habit.id)} className="w-9 h-9 rounded-xl text-text-muted hover:text-rose-500 hover:bg-rose-500/10 transition-all flex items-center justify-center"><Trash2 size={16} /></button>
           </div>
         </div>
         {!isCheck && (
-          <div style={{ background: done ? 'rgba(34,197,94,0.2)' : 'var(--border-med)', borderRadius: 999, height: 4, overflow: 'hidden' }}>
-            <div style={{ width: `${pct}%`, height: '100%', background: done ? '#22c55e' : 'var(--accent-blue)', transition: 'width 0.5s' }} />
+          <div className="w-full bg-bg-card rounded-full h-1.5 overflow-hidden">
+            <div className={`h-full transition-all duration-700 ${done ? 'bg-emerald-500' : 'bg-accent-blue'}`} style={{ width: `${pct}%` }} />
           </div>
         )}
       </div>
@@ -254,112 +236,125 @@ export const GoalsPage = () => {
   const R = 28; const CIRC = 2 * Math.PI * R;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+    <div className="flex flex-col gap-6 max-w-full">
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div>
-          <h2 style={{ margin: '0 0 4px', fontSize: 24, fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.5px', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Target size={22} color="var(--accent-blue)" /> Goals System
+      <div className="flex justify-between items-start">
+        <div className="space-y-1">
+          <h2 className="text-2xl md:text-3xl font-black text-text-main tracking-tight flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-accent-blue/10 flex items-center justify-center">
+              <Target size={24} className="text-accent-blue" />
+            </div>
+            Goals System
           </h2>
-          <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)' }}>Build habits to drive goal progress.</p>
+          <p className="text-sm text-text-muted font-medium ml-1">Build daily systems to drive long-term progress.</p>
         </div>
         <button onClick={() => setShowAddGoal(!showAddGoal)}
-          style={{ width: 40, height: 40, borderRadius: 12, background: showAddGoal ? 'rgba(239, 68, 68, 0.1)' : 'var(--bg-card)', border: '1px solid var(--border-light)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.3s' }}>
-          <Plus size={20} color={showAddGoal ? '#ef4444' : 'var(--text-main)'} style={{ transform: showAddGoal ? 'rotate(45deg)' : 'none', transition: 'transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)' }} />
+          className={`
+            w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-300 shadow-sm border
+            ${showAddGoal ? 'bg-rose-500/10 border-rose-500/20 text-rose-500 rotate-45' : 'bg-bg-card border-border-light text-text-main hover:bg-bg-input'}
+          `}
+        >
+          <Plus size={24} />
         </button>
       </div>
 
       {/* Analytics Bar */}
-      <div style={{ background: 'var(--bg-dark-elem)', borderRadius: 20, padding: '18px 20px', display: 'flex', justifyContent: 'space-between', border: '1px solid var(--border-light)' }}>
+      <div className="bg-bg-dark-elem rounded-3xl p-6 grid grid-cols-3 gap-4 border border-white/5 shadow-xl">
         {[
-          { label: 'Avg Progress', val: `${avgProgress}%` },
-          { label: 'Completed', val: doneGoals },
-          { label: 'Active', val: activeGoals },
+          { label: 'Avg Mastery', val: `${avgProgress}%`, color: 'text-accent-blue' },
+          { label: 'Finished', val: doneGoals, color: 'text-emerald-400' },
+          { label: 'In Progress', val: activeGoals, color: 'text-white' },
         ].map((s, i) => (
-          <div key={i} style={{ textAlign: 'center' }}>
-            <p style={{ margin: '0 0 3px', fontSize: 20, fontWeight: 900, color: 'var(--text-inverted)', letterSpacing: '-0.5px' }}>{s.val}</p>
-            <p style={{ margin: 0, fontSize: 9, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{s.label}</p>
+          <div key={i} className="text-center space-y-1">
+            <p className={`text-2xl md:text-3xl font-black tracking-tighter ${s.color}`}>{s.val}</p>
+            <p className="text-[9px] font-black text-white/40 uppercase tracking-widest leading-none">{s.label}</p>
           </div>
         ))}
       </div>
 
       {/* Add Goal Form */}
       {showAddGoal && (
-        <form onSubmit={submitGoal} style={{ background: 'var(--bg-card)', borderRadius: 28, padding: '24px', display: 'flex', flexDirection: 'column', gap: 20, border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-float)' }}>
-          <div>
-             <p style={{ margin: '0 0 8px', fontSize: 10, fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>Core Vision</p>
+        <form onSubmit={submitGoal} className="bg-bg-card rounded-[32px] p-6 md:p-8 flex flex-col gap-8 border border-border-light shadow-float animate-in fade-in slide-in-from-top-4 duration-500">
+          <div className="space-y-3">
+             <p className="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] ml-1">Core Vision</p>
              <input autoFocus required type="text" value={newGoal.title} onChange={e => setNewGoal({ ...newGoal, title: e.target.value })}
                placeholder="What major milestone are we hitting?"
-               style={{ width: '100%', fontSize: 18, fontWeight: 800, color: 'var(--text-main)', border: 'none', background: 'var(--bg-input)', padding: '14px 18px', borderRadius: 16, outline: 'none' }} />
+               className="w-full text-xl md:text-2xl font-black text-text-main border-none bg-bg-input p-6 rounded-2xl outline-none placeholder:text-text-muted/50 focus:ring-2 ring-accent-blue/20 transition-all" />
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-            <div>
-              <p style={{ margin: '0 0 8px', fontSize: 10, fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>Category</p>
-              <select value={newGoal.tag} onChange={e => setNewGoal({ ...newGoal, tag: e.target.value })} style={{ width: '100%', background: 'var(--bg-input)', border: 'none', borderRadius: 14, padding: '12px 16px', fontSize: 14, fontWeight: 600, color: 'var(--text-main)', outline: 'none', appearance: 'none' }}>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-3">
+              <p className="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] ml-1">Category</p>
+              <select value={newGoal.tag} onChange={e => setNewGoal({ ...newGoal, tag: e.target.value })} className="w-full bg-bg-input border-none rounded-xl p-4 font-bold text-text-main outline-none appearance-none hover:bg-bg-input/80 transition-colors">
                 {Object.keys(TAG_COLORS).map(t => <option key={t}>{t}</option>)}
               </select>
             </div>
-            <div>
-              <p style={{ margin: '0 0 8px', fontSize: 10, fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>Target Date</p>
-              <input type="date" value={newGoal.deadline} onChange={e => setNewGoal({ ...newGoal, deadline: e.target.value })} style={{ width: '100%', background: 'var(--bg-input)', border: 'none', borderRadius: 14, padding: '12px 16px', fontSize: 14, fontWeight: 600, color: 'var(--text-main)', outline: 'none' }} />
+            <div className="space-y-3">
+              <p className="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] ml-1">Target Date</p>
+              <input type="date" value={newGoal.deadline} onChange={e => setNewGoal({ ...newGoal, deadline: e.target.value })} className="w-full bg-bg-input border-none rounded-xl p-4 font-bold text-text-main outline-none hover:bg-bg-input/80 transition-colors" />
             </div>
           </div>
 
-          <div style={{ background: 'var(--bg-input)', borderRadius: 20, padding: '18px' }}>
-            <p style={{ margin: '0 0 12px', fontSize: 10, fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>Forge Logic (Strategy)</p>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
-              {['ALL', 'ANY', 'CUSTOM'].map(m => (
-                <button key={m} type="button" onClick={() => setNewGoal({ ...newGoal, mode: m })}
-                  style={{ padding: '12px 0', borderRadius: 14, border: '2px solid', borderColor: newGoal.mode === m ? 'var(--accent-blue)' : 'var(--bg-card)', background: newGoal.mode === m ? 'var(--accent-blue-light)' : 'var(--bg-card)', color: newGoal.mode === m ? 'var(--accent-blue)' : 'var(--text-main)', fontWeight: 700, fontSize: 12, cursor: 'pointer', transition: 'all 0.2s shadow 0.2s', boxShadow: newGoal.mode === m ? '0 4px 12px rgba(77,124,255,0.2)' : 'none' }}>
-                  {m === 'ALL' ? 'Complete All' : m === 'ANY' ? 'Any One' : 'Min Required'}
-                </button>
-              ))}
+          <div className="bg-bg-input/50 rounded-[28px] p-6 border border-border-light space-y-6">
+            <div>
+              <p className="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] mb-4">Forge Logic (Strategy)</p>
+              <div className="grid grid-cols-3 gap-3">
+                {['ALL', 'ANY', 'CUSTOM'].map(m => (
+                  <button key={m} type="button" onClick={() => setNewGoal({ ...newGoal, mode: m })}
+                    className={`
+                      py-4 rounded-2xl font-black text-xs transition-all border-2
+                      ${newGoal.mode === m ? 'border-accent-blue bg-white text-accent-blue shadow-lg shadow-accent-blue/10' : 'border-transparent bg-bg-card text-text-muted hover:border-border-med'}
+                    `}
+                  >
+                    {m === 'ALL' ? 'Complete All' : m === 'ANY' ? 'Any One' : 'Custom'}
+                  </button>
+                ))}
+              </div>
             </div>
+            
             {newGoal.mode === 'CUSTOM' && (
-              <div style={{ marginTop: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bg-card)', padding: '10px 14px', borderRadius: 12, border: '1px solid var(--border-light)' }}>
-                <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-main)' }}>Minimum habits needed:</span>
-                <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-input)', borderRadius: 10, border: '1px solid var(--border-light)', overflow: 'hidden' }}>
-                    <button type="button" onClick={() => setNewGoal(prev => ({ ...prev, minHabits: Math.max(1, parseInt(prev.minHabits) - 1) }))}
-                      style={{ padding: '8px 14px', border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-main)', fontWeight: 800 }}>−</button>
-                    <span style={{ minWidth: 28, textAlign: 'center', fontSize: 15, fontWeight: 950, color: 'var(--accent-blue)' }}>{newGoal.minHabits}</span>
-                    <button type="button" onClick={() => setNewGoal(prev => ({ ...prev, minHabits: Math.min(prev.habits.length, parseInt(prev.minHabits) + 1) }))}
-                      style={{ padding: '8px 14px', border: 'none', background: 'none', cursor: 'pointer', color: 'var(--accent-blue)', fontWeight: 800, borderLeft: '1px solid var(--border-light)' }}>+</button>
+              <div className="bg-bg-card rounded-2xl p-4 border border-border-light flex items-center justify-between animate-in fade-in zoom-in-95">
+                <span className="text-xs font-black text-text-main">Min required habits:</span>
+                <div className="flex items-center bg-bg-input rounded-xl border border-border-light overflow-hidden">
+                    <button type="button" onClick={() => setNewGoal(prev => ({ ...prev, minHabits: Math.max(1, parseInt(prev.minHabits) - 1) }))} className="w-10 h-10 flex items-center justify-center font-black text-text-main hover:bg-border-light">−</button>
+                    <span className="w-8 text-center text-sm font-black text-accent-blue">{newGoal.minHabits}</span>
+                    <button type="button" onClick={() => setNewGoal(prev => ({ ...prev, minHabits: Math.min(prev.habits.length, parseInt(prev.minHabits) + 1) }))} className="w-10 h-10 flex items-center justify-center font-black text-accent-blue border-l border-border-light hover:bg-border-light">+</button>
                 </div>
               </div>
             )}
-            <p style={{ margin: '14px 0 0', fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>
-              {newGoal.mode === 'ALL' ? '🔥 The goal is done only when EVERY habit is finished.' : 
-               newGoal.mode === 'ANY' ? '⚡ Completing ANY one habit counts as a full day of progress.' : 
-               `🎯 You must finish at least ${newGoal.minHabits} habit${newGoal.minHabits > 1 ? 's' : ''} daily.`}
+            
+            <p className="text-xs font-bold text-text-muted italic leading-relaxed px-1">
+              {newGoal.mode === 'ALL' ? '⚡ Mastery increases only when EVERY habit in the system is finished today.' : 
+               newGoal.mode === 'ANY' ? '🚀 Completing ANY one habit counts as a full day of progress.' : 
+               `🎯 You must finish at least ${newGoal.minHabits} habit${newGoal.minHabits > 1 ? 's' : ''} daily to progress.`}
             </p>
           </div>
 
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-               <p style={{ margin: 0, fontSize: 10, fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>Daily Systems (Habits)</p>
-               <button type="button" onClick={addStagingHabit} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 10, border: 'none', background: 'var(--accent-blue-light)', color: 'var(--accent-blue)', fontWeight: 800, fontSize: 11, cursor: 'pointer' }}>
-                 <Plus size={14} /> Add System
+          <div className="space-y-4">
+            <div className="flex justify-between items-end px-1">
+               <p className="text-[10px] font-black text-text-muted uppercase tracking-[0.2em]">Daily Systems</p>
+               <button type="button" onClick={addStagingHabit} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-accent-blue/10 text-accent-blue font-black text-[11px] hover:bg-accent-blue/20 transition-all">
+                 <Plus size={14} strokeWidth={3} /> Add Habit
                </button>
             </div>
             
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div className="grid grid-cols-1 gap-4">
               {newGoal.habits.map((h, idx) => (
-                <div key={h.id} style={{ background: 'var(--bg-input)', borderRadius: 18, padding: '14px', position: 'relative' }}>
-                   <div style={{ display: 'flex', gap: 10, marginBottom: 10 }}>
-                      <input required type="text" value={h.title} onChange={e => updateStagingHabit(h.id, { title: e.target.value })} placeholder={`Habit #${idx + 1}...`} style={{ flex: 1, background: 'transparent', border: 'none', borderBottom: '1.5px solid var(--border-light)', padding: '6px 0', fontSize: 14, fontWeight: 700, color: 'var(--text-main)', outline: 'none' }} />
-                      <button type="button" onClick={() => removeStagingHabit(h.id)} style={{ padding: '6px', color: 'var(--text-muted)', cursor: 'pointer', border: 'none', background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Trash2 size={16} /></button>
+                <div key={h.id} className="bg-bg-input/80 rounded-2xl p-5 border border-border-light space-y-4 relative group hover:border-border-med transition-colors">
+                   <div className="flex gap-4">
+                      <input required type="text" value={h.title} onChange={e => updateStagingHabit(h.id, { title: e.target.value })} placeholder={`Habit #${idx + 1}...`} className="flex-1 bg-transparent border-b-2 border-border-light p-2 font-bold text-text-main outline-none focus:border-accent-blue transition-colors" />
+                      <button type="button" onClick={() => removeStagingHabit(h.id)} className="p-2 text-text-muted hover:text-rose-500 transition-colors"><Trash2 size={18} /></button>
                    </div>
-                   <div style={{ display: 'flex', gap: 10 }}>
-                      <select value={h.type} onChange={e => updateStagingHabit(h.id, { type: e.target.value })} style={{ flex: 1, background: 'var(--bg-card)', border: 'none', borderRadius: 10, padding: '8px 12px', fontSize: 12, fontWeight: 600, color: 'var(--text-main)' }}>
-                        <option value="time">⏱️ Time</option>
-                        <option value="check">✅ Check</option>
-                        <option value="count">🔢 Count</option>
+                   <div className="flex flex-wrap gap-3">
+                      <select value={h.type} onChange={e => updateStagingHabit(h.id, { type: e.target.value })} className="flex-1 min-w-[120px] bg-bg-card rounded-xl px-4 py-2.5 text-xs font-black text-text-main border-none shadow-sm">
+                        <option value="time">⏱️ Time-Based</option>
+                        <option value="check">✅ Simple Check</option>
+                        <option value="count">🔢 Count-Based</option>
                       </select>
                       {h.type !== 'check' && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--bg-card)', padding: '4px 10px', borderRadius: 10 }}>
-                           <input type="number" min="1" value={h.type === 'count' ? h.targetCount : h.targetTime} onChange={e => updateStagingHabit(h.id, { [h.type === 'count' ? 'targetCount' : 'targetTime']: e.target.value })} style={{ width: 50, background: 'transparent', border: 'none', fontSize: 13, fontWeight: 800, color: 'var(--accent-blue)', outline: 'none', textAlign: 'center' }} />
-                           <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)' }}>{h.type === 'count' ? 'units' : 'mins'}</span>
+                        <div className="flex items-center gap-2 bg-bg-card px-4 py-2 rounded-xl shadow-sm border border-border-light/50">
+                           <input type="number" min="1" value={h.type === 'count' ? h.targetCount : h.targetTime} onChange={e => updateStagingHabit(h.id, { [h.type === 'count' ? 'targetCount' : 'targetTime']: e.target.value })} className="w-12 bg-transparent text-center font-black text-accent-blue outline-none" />
+                           <span className="text-[10px] font-black text-text-muted uppercase tracking-widest">{h.type === 'count' ? 'units' : 'mins'}</span>
                         </div>
                       )}
                    </div>
@@ -368,14 +363,14 @@ export const GoalsPage = () => {
             </div>
           </div>
 
-          <button type="submit" style={{ background: 'var(--accent-blue)', color: '#fff', border: 'none', borderRadius: 16, padding: '16px', fontWeight: 800, fontSize: 15, cursor: 'pointer', boxShadow: '0 8px 25px rgba(77,124,255,0.3)', marginTop: 10 }}>
-            Forge Strategy
+          <button type="submit" className="w-full bg-accent-blue text-white rounded-2xl py-5 font-black text-lg shadow-xl shadow-accent-blue/30 hover:shadow-2xl hover:opacity-90 active:scale-[0.98] transition-all">
+            Forge New System
           </button>
         </form>
       )}
 
-      {/* Goal Cards */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Goal Cards Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6">
         {goals
           .sort((a, b) => {
             const aDone = isGoalDoneToday(a);
@@ -388,79 +383,88 @@ export const GoalsPage = () => {
           const isOpen = expandedGoal === goal.id;
           const habitsTotal = goal.habits.length;
           const dailyProgress = calculateGoalDailyProgress(goal);
-
           const doneToday = isGoalDoneToday(goal);
 
           return (
-            <div key={goal.id} style={{ background: 'var(--bg-card)', borderRadius: 22, overflow: 'hidden', border: `2px solid ${doneToday ? '#22c55e' : 'var(--border-light)'}`, transition: 'all 0.3s' }}>
-              <div style={{ padding: '18px 20px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 14 }} onClick={() => setExpandedGoal(isOpen ? null : goal.id)}>
-                <div style={{ position: 'relative', width: 68, height: 68, flexShrink: 0 }}>
-                  <svg width="68" height="68" viewBox="0 0 68 68">
-                    <circle cx="34" cy="34" r={R} fill="none" stroke="var(--border-light)" strokeWidth="6" />
-                    <circle cx="34" cy="34" r={R} fill="none" stroke="var(--accent-blue)" strokeWidth="6" strokeDasharray={CIRC} strokeDashoffset={CIRC - (CIRC * (goal.progress || 0)) / 100} strokeLinecap="round" transform="rotate(-90 34 34)" style={{ transition: 'stroke-dashoffset 0.8s' }} />
-                  </svg>
-                  <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                    <span style={{ fontSize: 13, fontWeight: 900, color: 'var(--text-main)', lineHeight: 1 }}>{goal.progress || 0}%</span>
-                    <span style={{ fontSize: 7, fontWeight: 800, color: 'var(--text-muted)' }}>MASTERY</span>
+            <div key={goal.id} className={`
+              bg-bg-card rounded-[32px] overflow-hidden border-2 transition-all duration-500 h-fit
+              ${doneToday ? 'border-emerald-500 shadow-lg shadow-emerald-500/5' : 'border-border-light hover:border-border-med shadow-sm'}
+            `}>
+              <div className="p-6 cursor-pointer group" onClick={() => setExpandedGoal(isOpen ? null : goal.id)}>
+                <div className="flex items-center gap-5">
+                  <div className="relative w-20 h-20 shrink-0">
+                    <svg className="w-full h-full -rotate-90" viewBox="0 0 68 68">
+                      <circle cx="34" cy="34" r={R} fill="none" className="stroke-bg-input" strokeWidth="6" />
+                      <circle 
+                        cx="34" cy="34" r={R} fill="none" className="stroke-accent-blue" strokeWidth="6" 
+                        strokeDasharray={CIRC} strokeDashoffset={CIRC - (CIRC * (goal.progress || 0)) / 100} 
+                        strokeLinecap="round" className="transition-all duration-1000 ease-out"
+                      />
+                    </svg>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                      <span className="text-base font-black text-text-main tracking-tighter leading-none">{goal.progress || 0}%</span>
+                      <span className="text-[7px] font-black text-text-muted uppercase tracking-widest mt-0.5">Mastery</span>
+                    </div>
                   </div>
-                </div>
 
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-                    <span style={{ fontSize: 9, fontWeight: 800, color: tc.color, background: tc.bg, padding: '2px 8px', borderRadius: 999 }}>{goal.tag}</span>
-                    <span style={{ fontSize: 9, fontWeight: 800, color: 'var(--accent-blue)', background: 'var(--accent-blue-light)', padding: '2px 8px', borderRadius: 999 }}>
-                      Today: {dailyProgress}%
-                    </span>
-                  </div>
-                  <p style={{ margin: 0, fontSize: 16, fontWeight: 800, color: 'var(--text-main)' }}>{goal.title}</p>
-                  
-                  {/* Small Daily Progress Bar */}
-                  <div style={{ background: 'var(--bg-input)', height: 4, borderRadius: 99, marginTop: 6, width: '60%', overflow: 'hidden' }}>
-                    <div style={{ width: `${dailyProgress}%`, height: '100%', background: dailyProgress === 100 ? '#22c55e' : 'var(--accent-blue)', transition: 'width 0.4s' }} />
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
-                    <button onClick={(e) => { e.stopPropagation(); setExtendingGoal(goal); }} style={{ background: 'var(--bg-input)', border: 'none', borderRadius: 6, padding: '3px 8px', fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
-                      <Calendar size={12} /> {goal.deadline || 'No deadline'}
-                    </button>
-                    {goal.extensions?.length > 0 && <span title="Extension History" style={{ display: 'flex', alignItems: 'center', color: 'var(--accent-blue)', opacity: 0.6 }}><History size={12} /></span>}
-                  </div>
-                </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2 mb-2">
+                      <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md ${tc.bg} ${tc.color}`}>{goal.tag}</span>
+                      <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md bg-accent-blue-light text-accent-blue">Today: {dailyProgress}%</span>
+                    </div>
+                    <p className="text-lg font-black text-text-main tracking-tight leading-tight mb-3 group-hover:text-accent-blue transition-colors">{goal.title}</p>
+                    
+                    <div className="w-full bg-bg-input h-1.5 rounded-full overflow-hidden mb-3">
+                      <div className={`h-full transition-all duration-1000 ${dailyProgress === 100 ? 'bg-emerald-500' : 'bg-accent-blue'}`} style={{ width: `${dailyProgress}%` }} />
+                    </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <button onClick={e => { e.stopPropagation(); deleteGoal(goal.id); }} style={{ width: 32, height: 32, borderRadius: 10, background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Trash2 size={16} /></button>
-                  {isOpen ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                    <div className="flex items-center gap-3">
+                      <button onClick={(e) => { e.stopPropagation(); setExtendingGoal(goal); }} className="px-2 py-1 rounded-md bg-bg-input text-[10px] font-bold text-text-muted hover:bg-border-med transition-colors flex items-center gap-2">
+                        <Calendar size={12} /> {goal.deadline || 'No deadline'}
+                      </button>
+                      {goal.extensions?.length > 0 && <History size={12} className="text-accent-blue opacity-50" />}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-2 items-center">
+                    <button onClick={e => { e.stopPropagation(); deleteGoal(goal.id); }} className="w-9 h-9 rounded-xl text-text-muted hover:text-rose-500 hover:bg-rose-500/10 transition-all flex items-center justify-center"><Trash2 size={18} /></button>
+                    {isOpen ? <ChevronUp size={24} className="text-text-muted" /> : <ChevronDown size={24} className="text-text-muted" />}
+                  </div>
                 </div>
               </div>
 
               {isOpen && (
-                <div style={{ borderTop: '1px solid var(--border-light)', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {goal.habits
-                    .sort((a, b) => {
-                      const aDone = a.type === 'check' ? a.completed : (a.type === 'count' ? (a.currentCount >= (a.targetCount || 10)) : (a.timeSpent >= (a.targetTime || 15)));
-                      const bDone = b.type === 'check' ? b.completed : (b.type === 'count' ? (b.currentCount >= (b.targetCount || 10)) : (b.timeSpent >= (b.targetTime || 15)));
-                      if (aDone !== bDone) return aDone ? 1 : -1;
-                      return 0;
-                    })
-                    .map(h => <HabitRow key={h.id} habit={h} goalId={goal.id} logHabitTime={logHabitTime} deleteHabit={deleteHabit} toggleHabitCheck={toggleHabitCheck} updateHabitCount={updateHabitCount} />)}
+                <div className="px-6 pb-6 pt-2 border-t border-border-light space-y-4 animate-in slide-in-from-top-4">
+                  <div className="flex flex-col gap-3">
+                    {goal.habits
+                      .sort((a, b) => {
+                        const aDone = a.type === 'check' ? a.completed : (a.type === 'count' ? (a.currentCount >= (a.targetCount || 10)) : (a.timeSpent >= (a.targetTime || 15)));
+                        const bDone = b.type === 'check' ? b.completed : (b.type === 'count' ? (b.currentCount >= (b.targetCount || 10)) : (b.timeSpent >= (b.targetTime || 15)));
+                        if (aDone !== bDone) return aDone ? 1 : -1;
+                        return 0;
+                      })
+                      .map(h => <HabitRow key={h.id} habit={h} goalId={goal.id} logHabitTime={logHabitTime} deleteHabit={deleteHabit} toggleHabitCheck={toggleHabitCheck} updateHabitCount={updateHabitCount} />)}
+                  </div>
+                  
                   {showAddHabit === goal.id ? (
-                    <form onSubmit={e => submitHabit(e, goal.id)} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      <input autoFocus required type="text" value={newHabit.title} onChange={e => setNewHabit({ ...newHabit, title: e.target.value })} placeholder="New habit name..." style={{ border: 'none', borderBottom: '2px solid var(--accent-blue)', background: 'transparent', padding: '10px 0', fontSize: 14, fontWeight: 600, color: 'var(--text-main)', outline: 'none' }} />
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        <select value={newHabit.type} onChange={e => setNewHabit({ ...newHabit, type: e.target.value })} style={{ flex: 1, border: 'none', borderRadius: 10, padding: '10px', fontSize: 13, background: 'var(--bg-input)', color: 'var(--text-main)' }}>
+                    <form onSubmit={e => submitHabit(e, goal.id)} className="bg-bg-input/50 p-5 rounded-2xl border border-border-light space-y-4 animate-in zoom-in-95">
+                      <input autoFocus required type="text" value={newHabit.title} onChange={e => setNewHabit({ ...newHabit, title: e.target.value })} placeholder="New habit name..." className="w-full bg-transparent border-b-2 border-accent-blue p-2 font-bold text-text-main outline-none placeholder:text-text-muted/40" />
+                      <div className="flex gap-3">
+                        <select value={newHabit.type} onChange={e => setNewHabit({ ...newHabit, type: e.target.value })} className="flex-1 bg-bg-card rounded-xl px-4 py-3 text-xs font-black text-text-main shadow-sm border-none">
                           <option value="time">⏱️ Time</option>
                           <option value="check">✅ Check</option>
                           <option value="count">🔢 Count</option>
                         </select>
-                        <input type="number" min="1" value={newHabit.type === 'count' ? newHabit.targetCount : newHabit.targetTime} onChange={e => setNewHabit(h => ({ ...h, [h.type === 'count' ? 'targetCount' : 'targetTime']: e.target.value }))} style={{ width: 80, border: 'none', borderRadius: 10, padding: '10px', fontSize: 13, background: 'var(--bg-input)', color: 'var(--text-main)' }} />
+                        <input type="number" min="1" value={newHabit.type === 'count' ? newHabit.targetCount : newHabit.targetTime} onChange={e => setNewHabit(h => ({ ...h, [h.type === 'count' ? 'targetCount' : 'targetTime']: e.target.value }))} className="w-20 bg-bg-card rounded-xl px-4 py-3 text-sm font-black text-accent-blue shadow-sm border-none" />
                       </div>
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        <button type="submit" style={{ flex: 1, padding: '10px', borderRadius: 12, background: 'var(--accent-blue)', border: 'none', color: '#fff', fontWeight: 700 }}>Add</button>
-                        <button type="button" onClick={() => setShowAddHabit(null)} style={{ padding: '10px', borderRadius: 12, background: 'var(--bg-input)', border: 'none', color: 'var(--text-muted)', fontWeight: 700 }}>Cancel</button>
+                      <div className="flex gap-3 pt-2">
+                        <button type="submit" className="flex-1 py-3.5 rounded-xl bg-accent-blue text-white font-black text-sm shadow-md active:scale-95 transition-all">Add Daily Habit</button>
+                        <button type="button" onClick={() => setShowAddHabit(null)} className="px-6 py-3.5 rounded-xl bg-bg-input text-text-muted font-black text-sm hover:bg-bg-input/80 transition-colors">Cancel</button>
                       </div>
                     </form>
                   ) : (
-                    <button onClick={() => setShowAddHabit(goal.id)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px', borderRadius: 12, background: 'var(--bg-input)', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 700, color: 'var(--accent-blue)', width: '100%' }}>
-                      <Plus size={16} /> Add Daily Habit
+                    <button onClick={() => setShowAddHabit(goal.id)} className="w-full py-4 rounded-2xl bg-bg-input border border-border-light border-dashed text-accent-blue font-black text-sm flex items-center justify-center gap-3 hover:bg-bg-input/80 transition-all">
+                      <Plus size={18} strokeWidth={3} /> Add Daily Habit
                     </button>
                   )}
                 </div>
@@ -473,9 +477,13 @@ export const GoalsPage = () => {
       {extendingGoal && <ExtendDeadlineModal goal={extendingGoal} onClose={() => setExtendingGoal(null)} onExtend={extendGoalDeadline} />}
       
       {goals.length === 0 && !showAddGoal && (
-        <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--text-muted)' }}>
-          <Target size={48} strokeWidth={1.5} style={{ display: 'block', margin: '0 auto 12px' }} />
-          <p style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>No goals yet. Create one!</p>
+        <div className="flex flex-col items-center justify-center py-32 text-text-muted/50">
+          <div className="w-24 h-24 rounded-full bg-bg-input flex items-center justify-center mb-6">
+            <Target size={48} strokeWidth={1.5} />
+          </div>
+          <p className="text-xl font-black tracking-tight text-text-muted">No Systems Forged Yet</p>
+          <p className="text-sm font-bold mt-2">Forge your first goal to start your journey.</p>
+          <button onClick={() => setShowAddGoal(true)} className="mt-8 px-8 py-4 rounded-2xl bg-accent-blue text-white font-black shadow-lg shadow-accent-blue/20 hover:opacity-90 transition-all active:scale-95">Forge Now</button>
         </div>
       )}
     </div>

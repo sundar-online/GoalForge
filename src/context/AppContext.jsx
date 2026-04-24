@@ -107,6 +107,16 @@ export const AppProvider = ({ children }) => {
     syncFromCloud();
   }, [user]);
 
+  const [currentDate, setCurrentDate] = useState(TODAY());
+
+  useEffect(() => {
+    const itv = setInterval(() => {
+      const now = TODAY();
+      if (now !== currentDate) setCurrentDate(now);
+    }, 60000);
+    return () => clearInterval(itv);
+  }, [currentDate]);
+
   const toggleTheme = () => {
     const newTheme = settings.theme === 'light' ? 'dark' : 'light';
     setSettings(prev => ({ ...prev, theme: newTheme }));
@@ -114,10 +124,9 @@ export const AppProvider = ({ children }) => {
   };
 
   useEffect(() => {
-
     if (loading) return;
 
-    const todayStr = TODAY();
+    const todayStr = currentDate;
     const yesterdayStr = addDays(todayStr, -1);
     const lastActive = settings.lastActiveDate || yesterdayStr;
 
@@ -222,20 +231,7 @@ export const AppProvider = ({ children }) => {
     setSettings(prev => ({ ...prev, focusTimeToday: 0, lastActiveDate: todayStr }));
     if (user) db.upsertUserSettings(user.id, { theme, focusTimeToday: 0, lastReset: todayStr });
     
-  }, [loading, user, settings.lastActiveDate]);
-
-  // Periodic date check (every minute) - Triggers reset effect by force-updating lastActiveDate if needed
-  useEffect(() => {
-    const itv = setInterval(() => {
-      const liveToday = TODAY();
-      if (settings.lastActiveDate && settings.lastActiveDate !== liveToday) {
-         // Reset lastActiveDate locally to trigger the reset useEffect
-         setSettings(prev => ({ ...prev, lastActiveDate: prev.lastActiveDate }));
-      }
-    }, 60000);
-    return () => clearInterval(itv);
-  }, [settings.lastActiveDate]);
-
+  }, [loading, user, settings.lastActiveDate, currentDate]);
 
   // ── Automatic Daily Summary Sync ─────────────────────────
   useEffect(() => {

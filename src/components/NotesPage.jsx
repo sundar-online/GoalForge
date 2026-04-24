@@ -6,7 +6,7 @@ import {
   FileText, ListChecks, MoreVertical, Search, X, Clock
 } from 'lucide-react';
 
-// ── Helpers ──────────────────────────────────────────────
+// -- Helpers --
 const fmtDate = (iso) => {
   const d = new Date(iso);
   const now = new Date();
@@ -24,76 +24,6 @@ const getPreview = (note) => {
   }
   if (note.content) return note.content.slice(0, 80) + (note.content.length > 80 ? '…' : '');
   return 'Empty note';
-};
-
-// ── Style Constants ──────────────────────────────────────
-const card = {
-  background: 'var(--bg-card)',
-  borderRadius: 20,
-  padding: '18px 20px',
-  boxShadow: 'var(--shadow-sm)',
-  border: '1px solid var(--border-light)',
-  cursor: 'pointer',
-  transition: 'all 0.25s cubic-bezier(0.34,1.56,0.64,1)',
-};
-
-const fab = {
-  position: 'fixed',
-  bottom: 110,
-  right: 'max(24px, calc(50% - 235px))',
-  width: 56,
-  height: 56,
-  borderRadius: 18,
-  background: 'var(--accent-blue)',
-  border: 'none',
-  cursor: 'pointer',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  boxShadow: '0 8px 28px rgba(77,124,255,0.45)',
-  transition: 'all 0.3s cubic-bezier(0.34,1.56,0.64,1)',
-  zIndex: 90,
-};
-
-const inputStyle = {
-  width: '100%',
-  background: 'var(--bg-input)',
-  border: '1px solid var(--border-med)',
-  borderRadius: 14,
-  padding: '12px 16px',
-  fontSize: 14,
-  fontWeight: 500,
-  color: 'var(--text-main)',
-  outline: 'none',
-  fontFamily: 'inherit',
-  transition: 'border 0.2s, box-shadow 0.2s',
-};
-
-const btnPrimary = {
-  background: 'var(--accent-blue)',
-  color: '#fff',
-  border: 'none',
-  borderRadius: 14,
-  padding: '12px 20px',
-  fontSize: 14,
-  fontWeight: 700,
-  cursor: 'pointer',
-  transition: 'all 0.2s',
-  display: 'flex',
-  alignItems: 'center',
-  gap: 8,
-};
-
-const btnGhost = {
-  background: 'transparent',
-  color: 'var(--text-muted)',
-  border: 'none',
-  borderRadius: 12,
-  padding: '10px 16px',
-  fontSize: 13,
-  fontWeight: 600,
-  cursor: 'pointer',
-  transition: 'all 0.2s',
 };
 
 // ── Main Component ───────────────────────────────────────
@@ -216,69 +146,57 @@ export const NotesPage = () => {
   // ── RENDER: New Note ──────────────────────────────────
   if (view === 'new') {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-        {/* Header */}
-        <header style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <button onClick={() => setView('list')}
-            style={{ width: 42, height: 42, borderRadius: 14, background: 'var(--bg-card)', border: '1px solid var(--border-light)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-main)', transition: 'background 0.2s', flexShrink: 0 }}>
+      <div className="flex flex-col gap-6">
+        <header className="flex items-center gap-4">
+          <button 
+            onClick={() => setView('list')}
+            className="w-11 h-11 rounded-xl bg-bg-card border border-border-light flex items-center justify-center text-text-main hover:bg-bg-input transition-all active:scale-90"
+          >
             <ArrowLeft size={18} />
           </button>
-          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 900, color: 'var(--text-main)', letterSpacing: '-0.5px' }}>
-            New Note
-          </h1>
+          <h1 className="text-2xl font-black text-text-main tracking-tight">New Note</h1>
         </header>
 
-        {/* Form */}
-        <div style={{ ...card, cursor: 'default', display: 'flex', flexDirection: 'column', gap: 18, padding: '24px' }}>
-          <div>
-            <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8, display: 'block' }}>Title</label>
+        <div className="bg-bg-card border border-border-light p-6 rounded-3xl flex flex-col gap-6 shadow-sm">
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-text-muted uppercase tracking-widest px-1">Title</label>
             <input
               ref={titleRef}
               value={newTitle}
               onChange={e => setNewTitle(e.target.value)}
-              placeholder="Note title..."
-              style={inputStyle}
+              placeholder="Give your note a title..."
+              className="w-full bg-bg-input border border-border-med rounded-xl px-4 py-3 text-sm font-bold text-text-main outline-hidden focus:border-accent-blue transition-colors"
               onKeyDown={e => e.key === 'Enter' && handleCreateNote()}
             />
           </div>
 
-          <div>
-            <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 10, display: 'block' }}>Type</label>
-            <div style={{ display: 'flex', gap: 10 }}>
+          <div className="space-y-3">
+            <label className="text-[10px] font-black text-text-muted uppercase tracking-widest px-1">Structure</label>
+            <div className="grid grid-cols-2 gap-3">
               {[
-                { id: 'text', icon: FileText, label: 'Text Note' },
+                { id: 'text', icon: FileText, label: 'Free Text' },
                 { id: 'checklist', icon: ListChecks, label: 'Checklist' },
               ].map(t => (
                 <button
                   key={t.id}
                   onClick={() => setNewType(t.id)}
-                  style={{
-                    flex: 1,
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
-                    padding: '18px 14px',
-                    borderRadius: 16,
-                    background: newType === t.id ? 'var(--accent-blue-light)' : 'var(--bg-input)',
-                    border: `2px solid ${newType === t.id ? 'var(--accent-blue)' : 'var(--border-med)'}`,
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                    color: newType === t.id ? 'var(--accent-blue)' : 'var(--text-muted)',
-                  }}
+                  className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all ${
+                    newType === t.id 
+                    ? 'bg-accent-blue/10 border-accent-blue text-accent-blue' 
+                    : 'bg-bg-input border-border-med text-text-muted grayscale hover:grayscale-0'
+                  }`}
                 >
-                  <t.icon size={22} strokeWidth={newType === t.id ? 2.5 : 2} />
-                  <span style={{ fontSize: 12, fontWeight: 700 }}>{t.label}</span>
+                  <t.icon size={20} strokeWidth={2.5} />
+                  <span className="text-xs font-black">{t.label}</span>
                 </button>
               ))}
             </div>
           </div>
 
-          <button onClick={handleCreateNote} disabled={!newTitle.trim()}
-            style={{
-              ...btnPrimary,
-              justifyContent: 'center',
-              opacity: newTitle.trim() ? 1 : 0.5,
-              transform: newTitle.trim() ? 'none' : 'scale(0.98)',
-            }}>
-            <Plus size={18} strokeWidth={2.5} />
+          <button 
+            onClick={handleCreateNote}
+            className="w-full py-4 rounded-2xl bg-accent-blue text-white font-black text-sm hover:opacity-90 transition-opacity"
+          >
             Create Note
           </button>
         </div>
@@ -294,64 +212,51 @@ export const NotesPage = () => {
     const progressPct = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;
 
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <div className="flex flex-col gap-6">
         {/* Header */}
-        <header style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <header className="flex items-center gap-4">
           <button onClick={() => { setView('list'); setActiveNote(null); }}
-            style={{ width: 42, height: 42, borderRadius: 14, background: 'var(--bg-card)', border: '1px solid var(--border-light)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-main)', transition: 'background 0.2s', flexShrink: 0 }}>
+            className="w-11 h-11 rounded-xl bg-bg-card border border-border-light flex items-center justify-center text-text-main hover:bg-bg-input transition-all active:scale-90 shadow-sm flex-shrink-0">
             <ArrowLeft size={18} />
           </button>
-          <div style={{ flex: 1 }}>
+          <div className="flex-1 min-w-0">
             <input
               value={activeNote.title}
               onChange={e => handleUpdateTitle(e.target.value)}
-              style={{ width: '100%', background: 'transparent', border: 'none', fontSize: 20, fontWeight: 900, color: 'var(--text-main)', outline: 'none', fontFamily: 'inherit', letterSpacing: '-0.5px', padding: 0 }}
-              placeholder="Untitled"
+              className="w-full bg-transparent border-none text-2xl font-black text-text-main outline-hidden p-0 tracking-tight"
+              placeholder="Untitled System"
             />
-            <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
-              <Clock size={11} /> {fmtDate(activeNote.updated_at || activeNote.created_at)}
+            <p className="text-[10px] font-black text-text-muted uppercase tracking-widest flex items-center gap-1.5 mt-1">
+              <Clock size={10} /> {fmtDate(activeNote.updated_at || activeNote.created_at)}
             </p>
           </div>
           <button onClick={() => handleDeleteNote(activeNote.id)}
-            style={{ width: 42, height: 42, borderRadius: 14, background: 'rgba(239,68,68,0.08)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ef4444', transition: 'background 0.2s', flexShrink: 0 }}>
-            <Trash2 size={17} />
+            className="w-11 h-11 rounded-xl bg-red-500/10 hover:bg-red-500/20 flex items-center justify-center text-red-500 transition-all active:scale-90 flex-shrink-0">
+            <Trash2 size={18} />
           </button>
         </header>
 
         {/* Checklist Progress */}
         {isChecklist && totalCount > 0 && (
-          <div style={{ ...card, cursor: 'default', padding: '16px 20px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-main)' }}>Progress</span>
-              <span style={{
-                fontSize: 13, fontWeight: 800,
-                color: progressPct === 100 ? '#22c55e' : 'var(--accent-blue)',
-              }}>
-                {doneCount}/{totalCount} done
+          <div className="bg-bg-card border border-border-light p-5 rounded-2xl shadow-sm">
+            <div className="flex justify-between items-center mb-3">
+              <span className="text-[10px] font-black text-text-muted uppercase tracking-widest">Synchronization</span>
+              <span className={`text-xs font-black ${progressPct === 100 ? 'text-emerald-500' : 'text-accent-blue'}`}>
+                {doneCount}/{totalCount} Units Active
               </span>
             </div>
-            <div style={{ background: 'var(--bg-input)', borderRadius: 999, height: 8, overflow: 'hidden' }}>
-              <div style={{
-                width: `${progressPct}%`,
-                height: '100%',
-                borderRadius: 999,
-                background: progressPct === 100
-                  ? 'linear-gradient(90deg, #22c55e, #4ade80)'
-                  : 'linear-gradient(90deg, var(--accent-blue), #818cf8)',
-                transition: 'width 0.5s cubic-bezier(0.34,1.56,0.64,1)',
-              }} />
+            <div className="bg-bg-input rounded-full h-2.5 overflow-hidden">
+              <div 
+                className={`h-full rounded-full transition-all duration-700 ease-out ${progressPct === 100 ? 'bg-emerald-500 shadow-[0_0_12px_rgba(34,197,94,0.4)]' : 'bg-accent-blue shadow-[0_0_12px_rgba(77,124,255,0.4)]'}`}
+                style={{ width: `${progressPct}%` }}
+              />
             </div>
-            {progressPct === 100 && (
-              <p style={{ margin: '8px 0 0', fontSize: 12, fontWeight: 700, color: '#22c55e', textAlign: 'center' }}>
-                🎉 All items completed!
-              </p>
-            )}
           </div>
         )}
 
         {/* Checklist Items */}
         {isChecklist && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div className="flex flex-col gap-3">
             <AnimatePresence initial={false}>
               {[...activeNote.checklist]
                 .sort((a, b) => Number(a.completed) - Number(b.completed))
@@ -362,126 +267,71 @@ export const NotesPage = () => {
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.95 }}
-                    transition={{ 
-                      layout: { type: "spring", stiffness: 350, damping: 25 },
-                      opacity: { duration: 0.2 }
-                    }}
-                    style={{
-                      ...card,
-                      cursor: 'default',
-                      padding: '14px 16px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 12,
-                      opacity: item.completed ? 0.65 : 1,
-                      transition: 'opacity 0.3s ease',
-                      border: `1px solid ${item.completed ? 'var(--border-med)' : 'var(--border-light)'}`,
-                    }}
+                    className={`bg-bg-card border p-4 rounded-2xl flex items-center gap-4 transition-all ${item.completed ? 'border-border-med opacity-60' : 'border-border-light shadow-xs'}`}
                   >
                     <button
                       onClick={() => handleToggleItem(item.id)}
-                      style={{
-                        width: 28, height: 28, borderRadius: 10,
-                        background: item.completed ? 'var(--accent-blue)' : 'var(--bg-input)',
-                        border: `2px solid ${item.completed ? 'var(--accent-blue)' : 'var(--border-med)'}`,
-                        cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        transition: 'all 0.25s cubic-bezier(0.34,1.56,0.64,1)',
-                        flexShrink: 0,
-                      }}
+                      className={`w-7 h-7 rounded-lg border-2 flex items-center justify-center transition-all ${
+                        item.completed 
+                        ? 'bg-accent-blue border-accent-blue' 
+                        : 'bg-bg-input border-border-med'
+                      }`}
                     >
-                      {item.completed && (
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                          <polyline points="20 6 9 17 4 12" />
-                        </svg>
-                      )}
+                      {item.completed && <Check size={14} strokeWidth={4} className="text-white" />}
                     </button>
                     <input
                       value={item.text}
                       onChange={e => handleUpdateItemText(item.id, e.target.value)}
-                      style={{
-                        flex: 1,
-                        background: 'transparent',
-                        border: 'none',
-                        fontSize: 14,
-                        fontWeight: 600,
-                        color: 'var(--text-main)',
-                        outline: 'none',
-                        fontFamily: 'inherit',
-                        padding: 0,
-                        textDecoration: item.completed ? 'line-through' : 'none',
-                        transition: 'color 0.2s',
-                      }}
+                      className={`flex-1 bg-transparent border-none text-sm font-bold text-text-main outline-hidden p-0 ${item.completed ? 'line-through' : ''}`}
                     />
                     <button
                       onClick={() => handleDeleteItem(item.id)}
-                      style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 4, color: 'var(--text-muted)', opacity: 0.5, transition: 'opacity 0.2s' }}
-                      onMouseEnter={e => e.currentTarget.style.opacity = 1}
-                      onMouseLeave={e => e.currentTarget.style.opacity = 0.5}
+                      className="text-text-muted opacity-30 hover:opacity-100 hover:text-red-500 transition-all p-1"
                     >
-                      <X size={15} />
+                      <X size={14} />
                     </button>
                   </motion.div>
                 ))}
             </AnimatePresence>
 
-            {/* Add New Item */}
-            <div style={{ ...card, cursor: 'default', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12, borderStyle: 'dashed' }}>
-              <div style={{
-                width: 28, height: 28, borderRadius: 10,
-                background: 'var(--bg-input)',
-                border: '2px dashed var(--border-med)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                flexShrink: 0,
-              }}>
-                <Plus size={14} color="var(--text-muted)" />
+            <div className="bg-bg-card border-2 border-dashed border-border-med p-4 rounded-2xl flex items-center gap-4 group focus-within:border-accent-blue transition-colors">
+              <div className="w-7 h-7 rounded-lg border-2 border-dashed border-border-med flex items-center justify-center">
+                <Plus size={14} className="text-text-muted" />
               </div>
               <input
                 ref={newItemRef}
                 value={newItemText}
                 onChange={e => setNewItemText(e.target.value)}
-                placeholder="Add new item..."
-                style={{
-                  flex: 1,
-                  background: 'transparent',
-                  border: 'none',
-                  fontSize: 14,
-                  fontWeight: 500,
-                  color: 'var(--text-main)',
-                  outline: 'none',
-                  fontFamily: 'inherit',
-                  padding: 0,
-                }}
+                placeholder="Add sub-task..."
+                className="flex-1 bg-transparent border-none text-sm font-medium text-text-main outline-hidden p-0"
                 onKeyDown={e => e.key === 'Enter' && handleAddItem()}
               />
               {newItemText.trim() && (
-                <button onClick={handleAddItem}
-                  style={{ ...btnPrimary, padding: '8px 14px', fontSize: 12, borderRadius: 10 }}>
-                  Add
+                <button 
+                  onClick={handleAddItem}
+                  className="bg-accent-blue text-white px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest active:scale-95 transition-all"
+                >
+                  Append
                 </button>
               )}
             </div>
           </div>
         )}
 
-        {/* Text Content (for non-checklist notes) */}
+        {/* Text Content */}
         {!isChecklist && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div className="flex flex-col gap-4">
             <textarea
               value={activeNote.content || ''}
               onChange={e => handleUpdateContent(e.target.value)}
-              placeholder="Start writing..."
-              style={{
-                ...inputStyle,
-                minHeight: 240,
-                resize: 'vertical',
-                lineHeight: 1.7,
-                fontSize: 15,
-                borderRadius: 20,
-                padding: '20px',
-              }}
+              placeholder="Start forging your thoughts..."
+              className="w-full min-h-[300px] bg-bg-card border border-border-light rounded-[32px] p-8 text-base font-medium text-text-main leading-relaxed outline-hidden focus:border-accent-blue transition-colors shadow-sm resize-none"
             />
-            <button onClick={handleConvertToChecklist} style={{ ...btnGhost, display: 'flex', alignItems: 'center', gap: 8, alignSelf: 'flex-start' }}>
-              <ListChecks size={15} /> Convert to checklist
+            <button 
+              onClick={handleConvertToChecklist} 
+              className="flex items-center gap-2 text-[10px] font-black text-text-muted uppercase tracking-widest hover:text-accent-blue transition-colors px-4"
+            >
+              <ListChecks size={14} /> Convert to operational checklist
             </button>
           </div>
         )}
@@ -489,33 +339,33 @@ export const NotesPage = () => {
     );
   }
 
-  // ── RENDER: Notes List ────────────────────────────────
+  // -- RENDER: Notes List --
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+    <div className="flex flex-col gap-6 pb-24">
       {/* Header */}
-      <header>
-        <h1 style={{ margin: 0, fontSize: 26, fontWeight: 900, color: 'var(--text-main)', letterSpacing: '-0.8px' }}>
-          Notes
-        </h1>
-        <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-muted)' }}>
-          {notes.length} {notes.length === 1 ? 'note' : 'notes'}
-        </p>
+      <header className="flex justify-between items-end">
+        <div>
+          <h1 className="text-3xl font-black text-text-main tracking-tight">System Logs</h1>
+          <p className="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] mt-1">
+            {notes.length} {notes.length === 1 ? 'Stored Record' : 'Stored Records'}
+          </p>
+        </div>
       </header>
 
       {/* Search */}
       {notes.length > 0 && (
-        <div style={{ position: 'relative' }}>
-          <Search size={16} color="var(--text-muted)" style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)' }} />
+        <div className="relative group">
+          <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted group-focus-within:text-accent-blue transition-colors" />
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Search notes..."
-            style={{ ...inputStyle, paddingLeft: 42, borderRadius: 16 }}
+            placeholder="Search through records..."
+            className="w-full bg-bg-card border border-border-light rounded-2xl pl-12 pr-12 py-4 text-sm font-bold text-text-main outline-hidden focus:border-accent-blue transition-all shadow-xs"
           />
           {search && (
             <button onClick={() => setSearch('')}
-              style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 2 }}>
-              <X size={15} />
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-main p-1">
+              <X size={16} />
             </button>
           )}
         </div>
@@ -523,33 +373,26 @@ export const NotesPage = () => {
 
       {/* Notes Grid */}
       {filtered.length === 0 ? (
-        <div style={{
-          ...card,
-          cursor: 'default',
-          display: 'flex', flexDirection: 'column', alignItems: 'center',
-          padding: '48px 20px', gap: 12, textAlign: 'center',
-        }}>
-          <div style={{
-            width: 64, height: 64, borderRadius: 20,
-            background: 'var(--accent-blue-light)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <FileText size={28} color="var(--accent-blue)" />
+        <div className="bg-bg-card border border-border-light p-12 rounded-[32px] flex flex-col items-center text-center gap-4 shadow-sm">
+          <div className="w-16 h-16 rounded-2xl bg-bg-input flex items-center justify-center text-text-muted">
+            <FileText size={32} />
           </div>
-          <p style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--text-main)' }}>
-            {search ? 'No notes found' : 'No notes yet'}
-          </p>
-          <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)', maxWidth: 260, lineHeight: 1.5 }}>
-            {search ? 'Try a different search term' : 'Create your first note to get started. Use text notes or checklists to stay organized.'}
-          </p>
+          <div className="space-y-1">
+            <p className="text-lg font-black text-text-main">
+              {search ? 'No Matches Found' : 'Neural Net Empty'}
+            </p>
+            <p className="text-sm text-text-muted font-medium max-w-[240px] leading-relaxed">
+              {search ? 'Adjust your query parameters.' : 'Initialize your first record to begin tracking strategies and observations.'}
+            </p>
+          </div>
           {!search && (
-            <button onClick={() => setView('new')} style={{ ...btnPrimary, marginTop: 4 }}>
-              <Plus size={18} strokeWidth={2.5} /> Create Note
+            <button onClick={() => setView('new')} className="mt-2 bg-accent-blue hover:bg-accent-blue/90 px-6 py-3 rounded-xl text-white text-xs font-black uppercase tracking-widest transition-all active:scale-95 shadow-lg shadow-accent-blue/20">
+              New Record
             </button>
           )}
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div className="flex flex-col gap-3">
           {filtered.map(note => {
             const isChecklist = Array.isArray(note.checklist);
             const doneCount = isChecklist ? note.checklist.filter(c => c.completed).length : 0;
@@ -560,112 +403,62 @@ export const NotesPage = () => {
               <div
                 key={note.id}
                 onClick={() => openNote(note)}
-                style={card}
-                onMouseEnter={e => {
-                  e.currentTarget.style.transform = 'translateY(-2px)';
-                  e.currentTarget.style.boxShadow = 'var(--shadow-md)';
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.transform = 'none';
-                  e.currentTarget.style.boxShadow = 'var(--shadow-sm)';
-                }}
+                className="bg-bg-card border border-border-light p-5 rounded-2xl shadow-xs hover:shadow-md hover:border-accent-blue/30 transition-all cursor-pointer group active:scale-[0.99]"
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                      <div style={{
-                        width: 30, height: 30, borderRadius: 10,
-                        background: isChecklist ? 'rgba(168,85,247,0.12)' : 'var(--accent-blue-light)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        flexShrink: 0,
-                      }}>
-                        {isChecklist
-                          ? <ListChecks size={15} color="#a855f7" strokeWidth={2.5} />
-                          : <FileText size={15} color="var(--accent-blue)" strokeWidth={2.5} />
-                        }
+                <div className="flex justify-between items-start gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${isChecklist ? 'bg-purple-500/10 text-purple-500' : 'bg-accent-blue/10 text-accent-blue'}`}>
+                        {isChecklist ? <ListChecks size={16} strokeWidth={2.5} /> : <FileText size={16} strokeWidth={2.5} />}
                       </div>
-                      <h3 style={{
-                        margin: 0, fontSize: 15, fontWeight: 700, color: 'var(--text-main)',
-                        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                      }}>
+                      <h3 className="font-black text-text-main tracking-tight truncate">
                         {note.title}
                       </h3>
                     </div>
-                    <p style={{ margin: '0 0 0 38px', fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                    <p className="text-xs font-bold text-text-muted line-clamp-1 pl-11">
                       {getPreview(note)}
                     </p>
                   </div>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flexShrink: 0, marginLeft: 12 }}>
-                    <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)' }}>
+                  <div className="flex flex-col items-end gap-2 shrink-0">
+                    <span className="text-[9px] font-black text-text-muted uppercase tracking-widest">
                       {fmtDate(note.updated_at || note.created_at)}
                     </span>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setMenuId(menuId === note.id ? null : note.id); }}
-                      style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 4, color: 'var(--text-muted)', borderRadius: 8, transition: 'background 0.2s' }}
-                      onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-input)'}
-                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                    >
-                      <MoreVertical size={15} />
-                    </button>
+                    <div className="relative">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setMenuId(menuId === note.id ? null : note.id); }}
+                        className="p-1.5 rounded-lg text-text-muted hover:bg-bg-input hover:text-text-main transition-colors"
+                      >
+                        <MoreVertical size={14} />
+                      </button>
+                      
+                      {menuId === note.id && (
+                        <div className="absolute top-10 right-0 w-40 bg-bg-card border border-border-light rounded-xl shadow-float z-50 p-1 animate-in fade-in zoom-in-95">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleDeleteNote(note.id); }}
+                            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-red-500 hover:bg-red-500/10 text-xs font-black transition-colors"
+                          >
+                            <Trash2 size={14} /> Delete
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
 
-                {/* Checklist mini-progress */}
                 {isChecklist && totalCount > 0 && (
-                  <div style={{ marginTop: 12, marginLeft: 38 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div style={{ flex: 1, background: 'var(--bg-input)', borderRadius: 999, height: 5, overflow: 'hidden' }}>
-                        <div style={{
-                          width: `${progressPct}%`,
-                          height: '100%',
-                          borderRadius: 999,
-                          background: progressPct === 100
-                            ? '#22c55e'
-                            : 'linear-gradient(90deg, var(--accent-blue), #818cf8)',
-                          transition: 'width 0.5s ease',
-                        }} />
+                  <div className="mt-4 pl-11">
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1 h-1.5 bg-bg-input rounded-full overflow-hidden">
+                        <div 
+                          className={`h-full rounded-full transition-all duration-500 ${progressPct === 100 ? 'bg-emerald-500' : 'bg-accent-blue'}`}
+                          style={{ width: `${progressPct}%` }}
+                        />
                       </div>
-                      <span style={{
-                        fontSize: 11, fontWeight: 700, flexShrink: 0,
-                        color: progressPct === 100 ? '#22c55e' : 'var(--accent-blue)',
-                      }}>
+                      <span className={`text-[10px] font-black ${progressPct === 100 ? 'text-emerald-500' : 'text-text-muted'}`}>
                         {doneCount}/{totalCount}
                       </span>
                     </div>
-                  </div>
-                )}
-
-                {/* Context Menu */}
-                {menuId === note.id && (
-                  <div
-                    onClick={e => e.stopPropagation()}
-                    style={{
-                      marginTop: 10,
-                      background: 'var(--bg-float)',
-                      borderRadius: 14,
-                      boxShadow: 'var(--shadow-md)',
-                      padding: 6,
-                      border: '1px solid var(--border-light)',
-                    }}
-                  >
-                    <button
-                      onClick={() => handleDeleteNote(note.id)}
-                      style={{
-                        width: '100%',
-                        display: 'flex', alignItems: 'center', gap: 10,
-                        padding: '10px 14px',
-                        borderRadius: 10,
-                        background: 'transparent',
-                        border: 'none', cursor: 'pointer',
-                        fontSize: 13, fontWeight: 700, color: '#ef4444',
-                        transition: 'background 0.2s',
-                      }}
-                      onMouseEnter={e => e.currentTarget.style.background = 'rgba(239,68,68,0.08)'}
-                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                    >
-                      <Trash2 size={15} /> Delete Note
-                    </button>
                   </div>
                 )}
               </div>
@@ -677,11 +470,9 @@ export const NotesPage = () => {
       {/* FAB */}
       <button
         onClick={() => setView('new')}
-        style={fab}
-        onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.1)'; e.currentTarget.style.boxShadow = '0 12px 36px rgba(77,124,255,0.55)'; }}
-        onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = '0 8px 28px rgba(77,124,255,0.45)'; }}
+        className="fixed bottom-24 right-6 md:right-8 lg:right-12 w-14 h-14 rounded-2xl bg-accent-blue text-white shadow-lg shadow-accent-blue/30 flex items-center justify-center hover:scale-110 active:scale-90 transition-all z-50 group"
       >
-        <Plus size={26} color="white" strokeWidth={2.5} />
+        <Plus size={28} strokeWidth={3} className="group-hover:rotate-90 transition-transform duration-300" />
       </button>
     </div>
   );
