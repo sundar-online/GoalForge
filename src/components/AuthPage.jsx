@@ -51,26 +51,22 @@ export const AuthPage = () => {
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-          <AnimatePresence mode="wait">
+          <div>
             {authError && (
-              <motion.div 
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-500 text-xs font-black text-center uppercase tracking-widest"
+              <div 
+                className="p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-500 text-xs font-black text-center uppercase tracking-widest animate-in fade-in slide-in-from-top-2"
               >
                 {authError}
-              </motion.div>
+              </div>
             )}
             {message && (
-              <motion.div 
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-xs font-black text-center uppercase tracking-widest"
+              <div 
+                className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-xs font-black text-center uppercase tracking-widest animate-in fade-in slide-in-from-top-2"
               >
                 {message}
-              </motion.div>
+              </div>
             )}
-          </AnimatePresence>
+          </div>
 
           {!isLogin && (
             <div className="space-y-1.5">
