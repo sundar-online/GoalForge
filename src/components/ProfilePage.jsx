@@ -6,13 +6,14 @@ import { Award, Zap, Target, Clock, Flame, TrendingUp, Star, Lock, ChevronRight 
 
 export const ProfilePage = () => {
   const {
-    xpData, goals, tasks, notes,
+    xpData: rawXpData, goals, tasks, notes,
     focusTime, focusHistory, accuracy,
     disciplineScore, allHabits,
   } = useAppContext();
   const { displayName, user } = useAuth();
   const [selectedBadge, setSelectedBadge] = useState(null);
 
+  const xpData = rawXpData || { totalXP: 0, earnedBadges: [], badgeUnlockDates: {}, xpHistory: [], totalCompletions: 0, perfectDays: 0, comebackCount: 0 };
   const { totalXP, earnedBadges = [], badgeUnlockDates = {}, xpHistory = [] } = xpData;
   const levelInfo = getLevelFromXP(totalXP);
 

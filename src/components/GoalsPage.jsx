@@ -396,9 +396,9 @@ export const GoalsPage = () => {
                     <svg className="w-full h-full -rotate-90" viewBox="0 0 68 68">
                       <circle cx="34" cy="34" r={R} fill="none" className="stroke-bg-input" strokeWidth="6" />
                       <circle 
-                        cx="34" cy="34" r={R} fill="none" className="stroke-accent-blue" strokeWidth="6" 
+                        cx="34" cy="34" r={R} fill="none" className="stroke-accent-blue transition-all duration-1000 ease-out" strokeWidth="6" 
                         strokeDasharray={CIRC} strokeDashoffset={CIRC - (CIRC * (goal.progress || 0)) / 100} 
-                        strokeLinecap="round" className="transition-all duration-1000 ease-out"
+                        strokeLinecap="round"
                       />
                     </svg>
                     <div className="absolute inset-0 flex flex-col items-center justify-center">

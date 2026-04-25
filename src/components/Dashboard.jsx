@@ -16,8 +16,11 @@ export const Dashboard = ({ setView }) => {
     focusTime, focusHistory, taskLogs,
     disciplineScore, userLevel, insights,
     theme, toggleTheme, loading, weeklyReport, syncError, retrySync,
-    xpData, currentLevelInfo
+    xpData: rawXpData, currentLevelInfo: rawLevelInfo
   } = useAppContext();
+
+  const xpData = rawXpData || { totalXP: 0, earnedBadges: [], xpHistory: [] };
+  const currentLevelInfo = rawLevelInfo || { level: 1, title: 'Recruit', progress: 0, xpForNext: 100, isMaxLevel: false };
 
   const { displayName, signOut, user } = useAuth();
   const [showSignOut, setShowSignOut] = useState(false);

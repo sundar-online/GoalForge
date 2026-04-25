@@ -62,7 +62,7 @@ export const AppProvider = ({ children }) => {
   const [notes, setNotes] = useState(() => safeParse(STORAGE_KEYS.NOTES, []));
 
   // Gamification state
-  const [xpData, setXpData] = useState(() => safeParse(STORAGE_KEYS.XP, DEFAULT_XP_DATA));
+  const [xpData, setXpData] = useState(() => ({ ...DEFAULT_XP_DATA, ...safeParse(STORAGE_KEYS.XP, DEFAULT_XP_DATA) }));
   const [levelUpEvent, setLevelUpEvent] = useState(null);   // { level, title }
   const [badgeUnlockEvent, setBadgeUnlockEvent] = useState(null); // badge definition object
   
