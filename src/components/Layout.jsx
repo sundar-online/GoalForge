@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, Target, CalendarCheck, Timer, StickyNote } from 'lucide-react';
+import { Home, Target, CalendarCheck, Timer, StickyNote, Award } from 'lucide-react';
 
 const NAV = [
   { id: 'dashboard', icon: Home,          label: 'Home'   },
@@ -7,6 +7,7 @@ const NAV = [
   { id: 'tasks',     icon: CalendarCheck, label: 'Tasks'  },
   { id: 'notes',     icon: StickyNote,    label: 'Notes'  },
   { id: 'focus',     icon: Timer,         label: 'Focus'  },
+  { id: 'profile',   icon: Award,         label: 'Profile'},
 ];
 
 export const Layout = ({ children, currentView, setView }) => {

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import * as db from '../lib/supabaseDb';
 import { useAuth } from './AuthContext';
 import { TODAY, addDays, diffDays } from '../utils/dateUtils';
@@ -13,6 +13,7 @@ import {
   getSmartAlerts
 } from '../utils/calculationUtils';
 import { diffDays as calcDiffDays } from '../utils/dateUtils';
+import { XP_SOURCES, getLevelFromXP, evaluateBadges, getNewlyEarnedBadges } from '../utils/gamificationEngine';
 
 
 const AppContext = createContext();
@@ -22,7 +23,20 @@ const STORAGE_KEYS = {
   TASKS: 'goalforge_tasks',
   LOGS: 'goalforge_logs',
   SETTINGS: 'goalforge_settings',
-  NOTES: 'goalforge_notes'
+  NOTES: 'goalforge_notes',
+  XP: 'goalforge_xp'
+};
+
+const DEFAULT_XP_DATA = {
+  totalXP: 0,
+  level: 1,
+  earnedBadges: [],
+  badgeUnlockDates: {},
+  perfectDays: 0,
+  comebackCount: 0,
+  totalCompletions: 0,
+  lastXPDate: '',
+  xpHistory: [],  // last 50 entries: { amount, reason, date }
 };
 
 const safeParse = (key, fallback) => {
@@ -46,6 +60,11 @@ export const AppProvider = ({ children }) => {
   const [tasks, setTasks] = useState(() => safeParse(STORAGE_KEYS.TASKS, []));
   const [taskLogs, setTaskLogs] = useState(() => safeParse(STORAGE_KEYS.LOGS, {}));
   const [notes, setNotes] = useState(() => safeParse(STORAGE_KEYS.NOTES, []));
+
+  // Gamification state
+  const [xpData, setXpData] = useState(() => safeParse(STORAGE_KEYS.XP, DEFAULT_XP_DATA));
+  const [levelUpEvent, setLevelUpEvent] = useState(null);   // { level, title }
+  const [badgeUnlockEvent, setBadgeUnlockEvent] = useState(null); // badge definition object
   
   // Settings - composite state
   const [settings, setSettings] = useState(() => safeParse(STORAGE_KEYS.SETTINGS, {
@@ -65,6 +84,7 @@ export const AppProvider = ({ children }) => {
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.TASKS, JSON.stringify(tasks)); }, [tasks]);
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify(taskLogs)); }, [taskLogs]);
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.NOTES, JSON.stringify(notes)); }, [notes]);
+  useEffect(() => { localStorage.setItem(STORAGE_KEYS.XP, JSON.stringify(xpData)); }, [xpData]);
   useEffect(() => { 
     localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
     document.documentElement.setAttribute('data-theme', settings.theme || 'dark');
@@ -407,6 +427,11 @@ export const AppProvider = ({ children }) => {
             else if (h.lastCompletedDate !== today) updatedH.streak = 1;
             updatedH.lastCompletedDate = today;
             updatedH.missedDays = 0;
+            // XP: Habit completed via time
+            awardXP(XP_SOURCES.HABIT_COMPLETE, `Completed: ${h.title}`);
+            incrementCompletions();
+            // Comeback detection
+            if ((h.missedDays || 0) >= 2) recordComeback();
           }
           
           if (user) db.upsertHabit(user.id, goalId, updatedH);
@@ -483,12 +508,16 @@ export const AppProvider = ({ children }) => {
           const newCount = Math.max(0, (h.currentCount || 0) + delta);
           let updatedH = { ...h, currentCount: newCount };
           if (newCount >= (h.targetCount || 10) && !h.completed) {
-            updatedH.completed = true;
-            if (h.lastCompletedDate === yesterday) updatedH.streak += 1;
-            else if (h.lastCompletedDate !== today) updatedH.streak = 1;
-            updatedH.lastCompletedDate = today;
-            updatedH.missedDays = 0;
-          } else if (newCount < (h.targetCount || 10)) {
+             updatedH.completed = true;
+             if (h.lastCompletedDate === yesterday) updatedH.streak += 1;
+             else if (h.lastCompletedDate !== today) updatedH.streak = 1;
+             updatedH.lastCompletedDate = today;
+             updatedH.missedDays = 0;
+             // XP: Habit completed via count
+             awardXP(XP_SOURCES.HABIT_COMPLETE, `Completed: ${h.title}`);
+             incrementCompletions();
+             if ((h.missedDays || 0) >= 2) recordComeback();
+           } else if (newCount < (h.targetCount || 10)) {
             updatedH.completed = false;
           }
           if (user) db.upsertHabit(user.id, goalId, updatedH);
@@ -555,6 +584,11 @@ export const AppProvider = ({ children }) => {
           else if (t.lastCompletedDate !== todayStr) newStreak = 1;
           updated = { ...updated, currentStreak: newStreak, lastCompletedDate: todayStr, missedDays: 0 };
         }
+        // XP: Task completed via toggle
+        if (isDone) {
+          awardXP(XP_SOURCES.TASK_COMPLETE, `Completed: ${t.title}`);
+          incrementCompletions();
+        }
         if (user) db.upsertTask(user.id, updated);
         return updated;
       }
@@ -581,6 +615,9 @@ export const AppProvider = ({ children }) => {
           else if (t.lastCompletedDate !== todayStr) newStreak = 1;
           updated = { ...updated, currentStreak: newStreak, lastCompletedDate: todayStr, missedDays: 0 };
         }
+        // XP: Task completed via count
+        awardXP(XP_SOURCES.TASK_COMPLETE, `Completed: ${t.title}`);
+        incrementCompletions();
       } else if (newCount < target) {
         updated.completed = false;
       }
@@ -605,6 +642,11 @@ export const AppProvider = ({ children }) => {
             if (t.lastCompletedDate === yesterdayStr) newStreak += 1;
             else if (t.lastCompletedDate !== todayStr) newStreak = 1;
             updated = { ...updated, currentStreak: newStreak, lastCompletedDate: todayStr, missedDays: 0 };
+          }
+          // XP: Task completed via time
+          if (!updated.completed) {
+            awardXP(XP_SOURCES.TASK_COMPLETE, `Completed: ${t.title}`);
+            incrementCompletions();
           }
           updated.completed = true;
         }
@@ -648,6 +690,121 @@ export const AppProvider = ({ children }) => {
   const updateNote = (id, updates) => setNotes(prev => prev.map(n => n.id === id ? { ...n, ...updates } : n));
   const deleteNote = id => setNotes(prev => prev.filter(n => n.id !== id));
 
+  // ── Gamification: XP Award Engine ───────────────────────
+  const awardXP = useCallback((amount, reason) => {
+    setXpData(prev => {
+      const newTotal = prev.totalXP + amount;
+      const prevLevelInfo = getLevelFromXP(prev.totalXP);
+      const newLevelInfo = getLevelFromXP(newTotal);
+
+      // Level up detection
+      if (newLevelInfo.level > prevLevelInfo.level) {
+        setLevelUpEvent({ level: newLevelInfo.level, title: newLevelInfo.title });
+      }
+
+      // XP history (keep last 50)
+      const entry = { amount, reason, date: new Date().toISOString() };
+      const newHistory = [entry, ...(prev.xpHistory || [])].slice(0, 50);
+
+      return { ...prev, totalXP: newTotal, level: newLevelInfo.level, xpHistory: newHistory };
+    });
+  }, []);
+
+  const incrementCompletions = useCallback(() => {
+    setXpData(prev => ({ ...prev, totalCompletions: (prev.totalCompletions || 0) + 1 }));
+  }, []);
+
+  const recordPerfectDay = useCallback(() => {
+    setXpData(prev => ({ ...prev, perfectDays: (prev.perfectDays || 0) + 1 }));
+  }, []);
+
+  const recordComeback = useCallback(() => {
+    setXpData(prev => ({ ...prev, comebackCount: (prev.comebackCount || 0) + 1 }));
+  }, []);
+
+  // Award XP on focus session completion (called from FocusMode when timer reaches 0)
+  const awardFocusXP = useCallback(() => {
+    awardXP(XP_SOURCES.FOCUS_SESSION, 'Focus session completed');
+  }, [awardXP]);
+
+  // ── Gamification: Badge Evaluation ──────────────────────
+  const currentLevelInfo = useMemo(() => getLevelFromXP(xpData.totalXP), [xpData.totalXP]);
+
+  const badgeState = useMemo(() => ({
+    goals, tasks, notes,
+    focusHistory, focusTime,
+    perfectDays: xpData.perfectDays || 0,
+    level: currentLevelInfo.level,
+    comebackCount: xpData.comebackCount || 0,
+    totalCompletions: xpData.totalCompletions || 0,
+  }), [goals, tasks, notes, focusHistory, focusTime, xpData.perfectDays, currentLevelInfo.level, xpData.comebackCount, xpData.totalCompletions]);
+
+  const currentlyEarnedBadges = useMemo(() => evaluateBadges(badgeState), [badgeState]);
+
+  // Detect newly earned badges and persist them
+  const prevBadgesRef = useRef(xpData.earnedBadges || []);
+  useEffect(() => {
+    const prev = prevBadgesRef.current;
+    const newBadges = getNewlyEarnedBadges(prev, currentlyEarnedBadges);
+
+    if (newBadges.length > 0) {
+      // Show the first new badge as a toast (queue if multiple)
+      setBadgeUnlockEvent(newBadges[0]);
+
+      setXpData(prevData => {
+        const now = new Date().toISOString();
+        const newDates = { ...prevData.badgeUnlockDates };
+        newBadges.forEach(b => { newDates[b.id] = now; });
+        return {
+          ...prevData,
+          earnedBadges: currentlyEarnedBadges,
+          badgeUnlockDates: newDates,
+        };
+      });
+
+      prevBadgesRef.current = currentlyEarnedBadges;
+    } else if (currentlyEarnedBadges.length !== prev.length) {
+      // Sync without event (e.g. on load)
+      setXpData(prevData => ({ ...prevData, earnedBadges: currentlyEarnedBadges }));
+      prevBadgesRef.current = currentlyEarnedBadges;
+    }
+  }, [currentlyEarnedBadges]);
+
+  // ── Gamification: Daily XP Checks (in daily reset) ─────
+  // Perfect day check & streak milestone XP are awarded during daily reset.
+  // We hook into the existing daily reset effect by checking in the task summary effect.
+  const lastXPDateRef = useRef(xpData.lastXPDate || '');
+  useEffect(() => {
+    if (loading) return;
+    const today = TODAY();
+    if (lastXPDateRef.current === today) return;
+
+    // Check if yesterday was a perfect day
+    const yesterday = addDays(today, -1);
+    const ydayLog = taskLogs[yesterday];
+    if (ydayLog && ydayLog.total_tasks > 0 && ydayLog.completed_tasks === ydayLog.total_tasks) {
+      awardXP(XP_SOURCES.PERFECT_DAY, `Perfect day on ${yesterday}`);
+      recordPerfectDay();
+    }
+
+    // Check streak milestones (every 5 days)
+    const allStreaks = [
+      ...goals.flatMap(g => (g.habits || []).map(h => h.streak || 0)),
+      ...tasks.map(t => t.currentStreak || 0)
+    ];
+    const maxStreak = Math.max(0, ...allStreaks);
+    if (maxStreak > 0 && maxStreak % 5 === 0) {
+      const milestoneKey = `streak_${maxStreak}`;
+      const alreadyAwarded = (xpData.xpHistory || []).some(e => e.reason === milestoneKey);
+      if (!alreadyAwarded) {
+        awardXP(XP_SOURCES.STREAK_MILESTONE, `${maxStreak}-day streak milestone`);
+      }
+    }
+
+    lastXPDateRef.current = today;
+    setXpData(prev => ({ ...prev, lastXPDate: today }));
+  }, [loading, taskLogs, goals, tasks]);
+
   const value = {
     goals, addGoal, updateGoal, deleteGoal, extendGoalDeadline,
     addHabit, deleteHabit, logHabitTime, toggleHabitCheck, updateHabitCount,
@@ -657,7 +814,11 @@ export const AppProvider = ({ children }) => {
     accuracy, alerts, weeklyReport, disciplineScore, userLevel, insights: getInsights(accuracy, avgStreak, focusTime),
     notes, addNote, updateNote, deleteNote,
     loading, taskLogs, syncError, retrySync: syncFromCloud,
-    totalItems, completedItems, todayTasks, allHabits
+    totalItems, completedItems, todayTasks, allHabits,
+    // Gamification
+    xpData, awardXP, incrementCompletions, awardFocusXP, recordComeback,
+    currentLevelInfo, levelUpEvent, setLevelUpEvent,
+    badgeUnlockEvent, setBadgeUnlockEvent,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

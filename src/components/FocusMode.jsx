@@ -5,7 +5,7 @@ import { Play, Pause, RotateCcw, Target, Coffee, Zap, Volume2, VolumeX, CheckCir
 import { TODAY } from '../utils/dateUtils';
 
 export const FocusMode = () => {
-  const { tasks, goals, addFocusTime, addFocusTimeToHabit, focusTime } = useAppContext();
+  const { tasks, goals, addFocusTime, addFocusTimeToHabit, focusTime, awardFocusXP } = useAppContext();
   
   // -- State Hooks --
   const [duration, setDuration] = useState(25);
@@ -84,6 +84,7 @@ export const FocusMode = () => {
       if (time === 0 && isActive) {
         setIsActive(false);
         playTone(880, 0.7);
+        awardFocusXP(); // +20 XP for completing a focus session
       }
     }
     return () => clearInterval(timerRef.current);

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AppProvider } from './context/AppContext';
+import { AppProvider, useAppContext } from './context/AppContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Layout } from './components/Layout';
 import { Dashboard } from './components/Dashboard';
@@ -8,6 +8,9 @@ import { DailyTasks } from './components/DailyTasks';
 import { FocusMode } from './components/FocusMode';
 import { NotesPage } from './components/NotesPage';
 import { AuthPage } from './components/AuthPage';
+import { ProfilePage } from './components/ProfilePage';
+import { LevelUpModal } from './components/LevelUpModal';
+import { BadgeToast } from './components/BadgeToast';
 
 function AppInner() {
   const { user, loading } = useAuth();
@@ -72,16 +75,40 @@ function AppInner() {
       case 'tasks':     return <DailyTasks />;
       case 'notes':     return <NotesPage />;
       case 'focus':     return <FocusMode />;
+      case 'profile':   return <ProfilePage />;
       default:          return <Dashboard setView={setCurrentView} />;
     }
   };
 
   return (
     <AppProvider>
+      <GamificationOverlays />
       <Layout currentView={currentView} setView={setCurrentView}>
         {renderView()}
       </Layout>
     </AppProvider>
+  );
+}
+
+/** Renders level-up and badge modals, reading from context. */
+function GamificationOverlays() {
+  const { levelUpEvent, setLevelUpEvent, badgeUnlockEvent, setBadgeUnlockEvent } = useAppContext();
+  return (
+    <>
+      {levelUpEvent && (
+        <LevelUpModal
+          level={levelUpEvent.level}
+          title={levelUpEvent.title}
+          onClose={() => setLevelUpEvent(null)}
+        />
+      )}
+      {badgeUnlockEvent && (
+        <BadgeToast
+          badge={badgeUnlockEvent}
+          onClose={() => setBadgeUnlockEvent(null)}
+        />
+      )}
+    </>
   );
 }
 

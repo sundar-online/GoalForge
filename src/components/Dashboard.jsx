@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { calculateGoalDailyProgress, isHabitDoneToday } from '../utils/calculationUtils';
+import { BADGE_DEFINITIONS } from '../utils/gamificationEngine';
 import { useAuth } from '../context/AuthContext';
-import { AlertTriangle, AlertCircle, TrendingUp, TrendingDown, CheckCircle2, Clock, Zap, LogOut, Moon, Sun, Sparkles, Trophy, ChevronRight, Target } from 'lucide-react';
+import { AlertTriangle, AlertCircle, TrendingUp, TrendingDown, CheckCircle2, Clock, Zap, LogOut, Moon, Sun, Sparkles, Trophy, ChevronRight, Target, Award } from 'lucide-react';
 import { WeeklyHeatmap } from './WeeklyHeatmap';
 import { WeeklyReportCard } from './WeeklyReportCard';
 import { SkeletonLoader } from './SkeletonLoader';
@@ -14,7 +15,8 @@ export const Dashboard = ({ setView }) => {
     todayTasks, allHabits,
     focusTime, focusHistory, taskLogs,
     disciplineScore, userLevel, insights,
-    theme, toggleTheme, loading, weeklyReport, syncError, retrySync
+    theme, toggleTheme, loading, weeklyReport, syncError, retrySync,
+    xpData, currentLevelInfo
   } = useAppContext();
 
   const { displayName, signOut, user } = useAuth();
@@ -122,34 +124,72 @@ export const Dashboard = ({ setView }) => {
         {/* Left/Main Column */}
         <div className="lg:col-span-8 flex flex-col gap-6 lg:gap-8">
           
-          {/* Discipline Hero Card */}
-          <section className="bg-linear-to-br from-bg-dark-elem to-[#1e1e1e] rounded-[32px] p-6 md:p-8 shadow-2xl relative overflow-hidden group">
+          {/* Discipline + XP Hero Card */}
+          <section className="bg-linear-to-br from-bg-dark-elem to-[#1e1e2e] rounded-[32px] p-6 md:p-8 shadow-2xl relative overflow-hidden group">
             <div className="absolute -top-10 -right-10 opacity-10 group-hover:scale-110 group-hover:rotate-12 transition-transform duration-700">
               <Trophy size={200} className="text-white" />
             </div>
             <div className="relative z-10">
-              <div className="flex justify-between items-center mb-6">
+              <div className="flex justify-between items-start mb-6">
                 <div>
-                  <p className="text-[10px] font-black text-white/60 uppercase tracking-[0.15em] mb-1">Current Rank</p>
-                  <h2 className="text-3xl md:text-4xl font-black text-white tracking-tighter">{userLevel}</h2>
+                  <p className="text-[10px] font-black text-white/60 uppercase tracking-[0.15em] mb-1">Level {currentLevelInfo.level}</p>
+                  <h2 className="text-3xl md:text-4xl font-black text-white tracking-tighter">{currentLevelInfo.title}</h2>
                 </div>
                 <div className="text-right">
-                  <div className="text-4xl md:text-5xl font-black text-white leading-none tracking-tighter">{disciplineScore}</div>
-                  <p className="text-[10px] font-black text-white/50 uppercase tracking-widest mt-1">Discipline Score</p>
+                  <div className="text-4xl md:text-5xl font-black text-white leading-none tracking-tighter">{xpData.totalXP.toLocaleString()}</div>
+                  <p className="text-[10px] font-black text-white/50 uppercase tracking-widest mt-1">Total XP</p>
                 </div>
               </div>
-              <div className="h-2.5 bg-white/10 rounded-full overflow-hidden mb-6">
-                <div 
-                  className="h-full bg-accent-blue rounded-full transition-all duration-[1.5s] ease-out shadow-[0_0_15px_rgba(77,124,255,0.5)]"
-                  style={{ width: `${disciplineScore}%` }}
-                />
-              </div>
-              {insights.length > 0 && (
-                <div className="flex items-center gap-3 bg-white/5 p-4 rounded-2xl border border-white/10 backdrop-blur-md">
-                  <Sparkles size={18} className="text-accent-blue shrink-0 animate-pulse" />
-                  <p className="text-sm font-semibold text-white/90 leading-snug">{insights[0]}</p>
+
+              {/* XP Progress Bar */}
+              <div className="mb-2">
+                <div className="flex justify-between text-[9px] font-black text-white/40 uppercase tracking-widest mb-1.5">
+                  <span>Level {currentLevelInfo.level}</span>
+                  <span>{currentLevelInfo.isMaxLevel ? 'MAX' : `Level ${currentLevelInfo.level + 1}`}</span>
                 </div>
-              )}
+                <div className="h-2.5 bg-white/10 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-gradient-to-r from-accent-blue to-indigo-400 rounded-full transition-all duration-[1.5s] ease-out"
+                    style={{ width: `${currentLevelInfo.progress}%`, boxShadow: '0 0 15px rgba(90,133,255,0.5)' }}
+                  />
+                </div>
+                {!currentLevelInfo.isMaxLevel && (
+                  <p className="text-[9px] font-bold text-white/30 text-right mt-1">{currentLevelInfo.xpForNext - xpData.totalXP} XP to next level</p>
+                )}
+              </div>
+
+              {/* Bottom row: Discipline Score + Badges */}
+              <div className="flex items-center justify-between mt-4 pt-4 border-t border-white/10">
+                <div className="flex items-center gap-3">
+                  <div className="px-3 py-1.5 rounded-xl bg-white/10 border border-white/10">
+                    <p className="text-[8px] font-black text-white/40 uppercase tracking-widest">Discipline</p>
+                    <p className="text-lg font-black text-white leading-none tracking-tighter">{disciplineScore}</p>
+                  </div>
+                  {insights.length > 0 && (
+                    <div className="flex items-center gap-2 bg-white/5 px-3 py-2 rounded-xl border border-white/10 max-w-[200px]">
+                      <Sparkles size={14} className="text-accent-blue shrink-0 animate-pulse" />
+                      <p className="text-[11px] font-semibold text-white/70 leading-snug truncate">{insights[0]}</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Earned Badges Preview */}
+                {(xpData.earnedBadges || []).length > 0 && (
+                  <div className="flex items-center gap-1">
+                    {(xpData.earnedBadges || []).slice(0, 4).map(id => {
+                      const badge = BADGE_DEFINITIONS.find(b => b.id === id);
+                      return badge ? (
+                        <div key={id} className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center" title={badge.title}>
+                          <span className="text-sm">{badge.icon}</span>
+                        </div>
+                      ) : null;
+                    })}
+                    {(xpData.earnedBadges || []).length > 4 && (
+                      <span className="text-[10px] font-black text-white/40 ml-1">+{(xpData.earnedBadges || []).length - 4}</span>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </section>
 
