@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAppContext } from '../context/AppContext';
 import {
-  Plus, ArrowLeft, Trash2, CheckSquare, Square,
+  Plus, ArrowLeft, Trash2, CheckSquare, Square, Check,
   FileText, ListChecks, MoreVertical, Search, X, Clock
 } from 'lucide-react';
 
@@ -212,7 +212,7 @@ export const NotesPage = () => {
     const progressPct = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;
 
     return (
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-6 pb-32 md:pb-10">
         {/* Header */}
         <header className="flex items-center gap-4">
           <button onClick={() => { setView('list'); setActiveNote(null); }}
@@ -309,7 +309,7 @@ export const NotesPage = () => {
               {newItemText.trim() && (
                 <button 
                   onClick={handleAddItem}
-                  className="bg-accent-blue text-white px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest active:scale-95 transition-all"
+                  className="bg-accent-blue text-white px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest active:scale-95 transition-all shrink-0"
                 >
                   Append
                 </button>
