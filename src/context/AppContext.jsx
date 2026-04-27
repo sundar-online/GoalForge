@@ -14,6 +14,11 @@ import {
 } from '../utils/calculationUtils';
 import { diffDays as calcDiffDays } from '../utils/dateUtils';
 import { XP_SOURCES, getLevelFromXP, evaluateBadges, getNewlyEarnedBadges } from '../utils/gamificationEngine';
+import { 
+  analyzeUserBehavior, 
+  generateRecoveryStrategies, 
+  getSmartSuggestions 
+} from '../utils/aiAnalysisEngine';
 
 
 const AppContext = createContext();
@@ -71,8 +76,13 @@ export const AppProvider = ({ children }) => {
     theme: 'dark',
     focusTimeToday: 0,
     lastActiveDate: '',
-    focusHistory: {}
+    focusHistory: {},
+    dismissedInsights: []
   }));
+
+  // AI Insights State
+  const [aiInsights, setAiInsights] = useState([]);
+  const [recoveryStrategies, setRecoveryStrategies] = useState([]);
 
   const theme = settings.theme || 'dark';
   const focusTime = settings.focusTimeToday || 0;
@@ -346,6 +356,70 @@ export const AppProvider = ({ children }) => {
   const alerts = useMemo(() => {
     return [...smartAlerts];
   }, [smartAlerts]);
+
+  // ── AI Analysis Effect ───────────────────────────────────
+  useEffect(() => {
+    if (loading) return;
+    
+    const insights = analyzeUserBehavior(goals, tasks, taskLogs, focusTime);
+    const strategies = generateRecoveryStrategies(goals, tasks);
+    
+    // Filter out dismissed insights
+    const dismissed = settings.dismissedInsights || [];
+    const filteredInsights = insights.filter(i => !dismissed.includes(i.id));
+    const filteredStrategies = strategies.filter(s => !dismissed.includes(s.id));
+    
+    setAiInsights(filteredInsights);
+    setRecoveryStrategies(filteredStrategies);
+  }, [goals, tasks, taskLogs, focusTime, settings.dismissedInsights, loading]);
+
+  const dismissInsight = (id) => {
+    setSettings(prev => ({
+      ...prev,
+      dismissedInsights: [...(prev.dismissedInsights || []), id]
+    }));
+  };
+
+  const applyRecoveryPlan = (plan) => {
+    if (plan.isHabit) {
+      setGoals(prev => prev.map(g => {
+        if (g.id === plan.parentId) {
+          const updatedHabits = g.habits.map(h => {
+            if (h.id === plan.itemId) {
+              const updatedH = { 
+                ...h, 
+                [plan.type === 'count' ? 'targetCount' : 'targetTime']: plan.newTarget,
+                isRecovering: true,
+                originalTarget: plan.originalTarget
+              };
+              if (user) db.upsertHabit(user.id, g.id, updatedH);
+              return updatedH;
+            }
+            return h;
+          });
+          return { ...g, habits: updatedHabits };
+        }
+        return g;
+      }));
+    } else {
+      setTasks(prev => prev.map(t => {
+        if (t.id === plan.itemId) {
+          const updatedT = { 
+            ...t, 
+            [plan.type === 'count' ? 'targetCount' : 'targetTime']: plan.newTarget,
+            isRecovering: true,
+            originalTarget: plan.originalTarget
+          };
+          if (user) db.upsertTask(user.id, updatedT);
+          return updatedT;
+        }
+        return t;
+      }));
+    }
+    // Dismiss the recovery insight after applying
+    dismissInsight(`recovery_${plan.itemId}`);
+    awardXP(10, 'Recovery plan activated');
+  };
 
   // ── Actions ──────────────────────────────────────────────
   const addGoal = (goal) => {
@@ -845,6 +919,12 @@ export const AppProvider = ({ children }) => {
     xpData, awardXP, incrementCompletions, awardFocusXP, recordComeback,
     currentLevelInfo, levelUpEvent, setLevelUpEvent,
     badgeUnlockEvent, setBadgeUnlockEvent,
+    currentlyEarnedBadges,
+    aiInsights,
+    recoveryStrategies,
+    dismissInsight,
+    applyRecoveryPlan,
+    smartSuggestions: getSmartSuggestions(new Date(), tasks, accuracy)
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

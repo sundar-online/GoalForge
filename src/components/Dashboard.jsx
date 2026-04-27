@@ -7,6 +7,7 @@ import { AlertTriangle, AlertCircle, TrendingUp, TrendingDown, CheckCircle2, Clo
 import { WeeklyHeatmap } from './WeeklyHeatmap';
 import { WeeklyReportCard } from './WeeklyReportCard';
 import { SkeletonLoader } from './SkeletonLoader';
+import AIInsights from './AIInsights';
 
 export const Dashboard = ({ setView }) => {
   const {
@@ -198,6 +199,9 @@ export const Dashboard = ({ setView }) => {
               </div>
             </div>
           </section>
+
+          {/* AI Insights & Recovery */}
+          <AIInsights />
 
           {/* Alert Banners (Stacked) */}
           {alerts.length > 0 && (
