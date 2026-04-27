@@ -43,13 +43,16 @@ export const Dashboard = ({ setView }) => {
   else if (accuracy > 0) accColor = '#faba2c';
   else accColor = 'var(--bg-input)';
 
-  const topStreaks = goals
-    .map(g => ({ 
-      name: g.title, 
-      tag: g.tag, 
-      streak: g.habits.length === 0 ? 0 : Math.max(...g.habits.map(h => h.streak || 0)), 
-      missed: g.missedDays || 0 
-    }))
+  const topStreaks = (goals || [])
+    .map(g => {
+      const habits = g.habits || [];
+      return { 
+        name: g.title, 
+        tag: g.tag, 
+        streak: habits.length === 0 ? 0 : Math.max(...habits.map(h => h.streak || 0)), 
+        missed: g.missedDays || 0 
+      };
+    })
     .filter(g => g.streak > 0 || g.missed > 0)
     .sort((a, b) => b.streak - a.streak).slice(0, 3);
 

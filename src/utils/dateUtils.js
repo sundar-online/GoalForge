@@ -16,7 +16,10 @@ export const TOMORROW = () => {
 
 
 export const addDays = (dateStr, n) => {
+  if (!dateStr || dateStr === 'NaN-NaN-NaN') dateStr = TODAY();
   const [year, month, day] = dateStr.split('-').map(Number);
+  if (isNaN(year) || isNaN(month) || isNaN(day)) return TODAY();
+  
   const d = new Date(year, month - 1, day);
   d.setDate(d.getDate() + n);
   const y = d.getFullYear();
