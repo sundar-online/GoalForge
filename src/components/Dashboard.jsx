@@ -50,7 +50,7 @@ export const Dashboard = ({ setView }) => {
       return { 
         name: g.title, 
         tag: g.tag, 
-        streak: habits.length === 0 ? 0 : Math.max(...habits.map(h => h.streak || 0)), 
+        streak: g.streak || 0, 
         missed: g.missedDays || 0 
       };
     })

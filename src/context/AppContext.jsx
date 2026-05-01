@@ -2,22 +2,22 @@ import React, { createContext, useContext, useState, useEffect, useMemo, useCall
 import * as db from '../lib/supabaseDb';
 import { useAuth } from './AuthContext';
 import { TODAY, addDays, diffDays } from '../utils/dateUtils';
-import { 
-  isGoalDoneToday, 
-  isTaskDone, 
-  calculateAccuracy, 
-  calculateDisciplineScore, 
-  getUserLevel, 
+import {
+  isGoalDoneToday,
+  isTaskDone,
+  calculateAccuracy,
+  calculateDisciplineScore,
+  getUserLevel,
   getInsights,
   calculateWeeklyReport,
   getSmartAlerts
 } from '../utils/calculationUtils';
 import { diffDays as calcDiffDays } from '../utils/dateUtils';
 import { XP_SOURCES, getLevelFromXP, evaluateBadges, getNewlyEarnedBadges } from '../utils/gamificationEngine';
-import { 
-  analyzeUserBehavior, 
-  generateRecoveryStrategies, 
-  getSmartSuggestions 
+import {
+  analyzeUserBehavior,
+  generateRecoveryStrategies,
+  getSmartSuggestions
 } from '../utils/aiAnalysisEngine';
 
 
@@ -70,7 +70,9 @@ export const AppProvider = ({ children }) => {
   const [xpData, setXpData] = useState(() => ({ ...DEFAULT_XP_DATA, ...safeParse(STORAGE_KEYS.XP, DEFAULT_XP_DATA) }));
   const [levelUpEvent, setLevelUpEvent] = useState(null);   // { level, title }
   const [badgeUnlockEvent, setBadgeUnlockEvent] = useState(null); // badge definition object
-  
+  // Queue to handle multiple badge unlocks in sequence
+  const badgeQueueRef = useRef([]);
+
   // Settings - composite state
   const [settings, setSettings] = useState(() => safeParse(STORAGE_KEYS.SETTINGS, {
     theme: 'dark',
@@ -95,7 +97,7 @@ export const AppProvider = ({ children }) => {
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify(taskLogs)); }, [taskLogs]);
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.NOTES, JSON.stringify(notes)); }, [notes]);
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.XP, JSON.stringify(xpData)); }, [xpData]);
-  useEffect(() => { 
+  useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
     document.documentElement.setAttribute('data-theme', settings.theme || 'dark');
   }, [settings]);
@@ -165,106 +167,117 @@ export const AppProvider = ({ children }) => {
     // 1. Calculate updated goals
     const updatedGoals = goals.map(goal => {
       const gLastActive = goal.lastActiveDate || lastActive;
-      
-      // Safety: check for invalid dates
       const start = new Date(gLastActive);
       const end = new Date(todayStr);
-      let daysDiff = 1;
+      let daysDiff = 0;
       if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
         daysDiff = Math.floor((end - start) / (1000 * 60 * 60 * 24));
       }
-      
-      // Safety: Prevent excessive loops if date is corrupted (max 365 days)
-      const safeDiff = Math.min(365, Math.max(0, daysDiff));
 
-      const habits = goal.habits || [];
-      const updatedHabits = habits.map(h => {
+      if (daysDiff <= 0) return goal;
+
+      const updatedHabits = (goal.habits || []).map(h => {
         let updatedH = { ...h };
-        const wasLogicallyDoneOnLastActive = updatedH.completed || 
-          (updatedH.type === 'time' && (updatedH.timeSpent || 0) >= (updatedH.targetTime || 15)) ||
-          (updatedH.type === 'count' && (updatedH.currentCount || 0) >= (updatedH.targetCount || 10));
 
-        if (wasLogicallyDoneOnLastActive) {
-          if (updatedH.lastCompletedDate === addDays(gLastActive, -1)) updatedH.streak += 1;
-          else if (updatedH.lastCompletedDate !== gLastActive) updatedH.streak = 1;
-          updatedH.lastCompletedDate = gLastActive;
-          updatedH.missedDays = 0;
-        } else {
+        // During reset, we don't increment streaks (toggles do that).
+        // we only check for misses and reset daily status.
+        if (!updatedH.completed &&
+          !(updatedH.type === 'time' && (updatedH.timeSpent || 0) >= (updatedH.targetTime || 15)) &&
+          !(updatedH.type === 'count' && (updatedH.currentCount || 0) >= (updatedH.targetCount || 10))) {
           updatedH.missedDays = (updatedH.missedDays || 0) + 1;
+        } else {
+          updatedH.missedDays = 0;
         }
 
-        if (safeDiff > 1) {
-          for (let i = 1; i < safeDiff; i++) {
-             updatedH.missedDays += 1;
-             if (updatedH.missedDays >= 3) { updatedH.streak = 0; updatedH.missedDays = 0; }
+        // Process gap days
+        if (daysDiff > 1) {
+          for (let i = 1; i < daysDiff; i++) {
+            updatedH.missedDays += 1;
+            if (updatedH.missedDays >= 3) { updatedH.streak = 0; }
           }
         }
 
-        if (updatedH.missedDays >= 3) { updatedH.streak = 0; updatedH.missedDays = 0; }
+        if (updatedH.missedDays >= 3) { updatedH.streak = 0; }
 
-        updatedH.timeSpent = 0;
-        updatedH.completed = false;
-        updatedH.currentCount = 0;
-        return updatedH;
+        return { ...updatedH, timeSpent: 0, completed: false, currentCount: 0, lastActiveDate: todayStr };
       });
 
-      const wasGoalDoneOnLastActiveDay = habitsAfterProcess => {
-        const doneHabitsCount = habitsAfterProcess.filter(hr => hr.lastCompletedDate === gLastActive).length;
-        return (goal.mode === 'ANY' && doneHabitsCount > 0) || (goal.mode === 'CUSTOM' && doneHabitsCount >= (goal.minHabits || 1)) || (goal.mode === 'ALL' && doneHabitsCount === habitsAfterProcess.length);
-      };
+      // Update goal level missed days
+      const doneOnLastActive = (goal.mode === 'ANY' && updatedHabits.some(h => h.lastCompletedDate === gLastActive)) ||
+        (goal.mode === 'ALL' && updatedHabits.every(h => h.lastCompletedDate === gLastActive)) ||
+        (goal.mode === 'CUSTOM' && updatedHabits.filter(h => h.lastCompletedDate === gLastActive).length >= (goal.minHabits || 1));
 
+      let newGoalMissed = goal.missedDays || 0;
+      let newGoalStreak = goal.streak || 0;
       let newDaysCompleted = goal.daysCompleted || 0;
-      if (wasGoalDoneOnLastActiveDay(updatedHabits)) {
+
+      if (!doneOnLastActive) {
+        newGoalMissed += 1;
+      } else {
+        newGoalMissed = 0;
         newDaysCompleted += 1;
       }
 
-      const totalDays = Math.max(1, calcDiffDays(goal.startDate || goal.createdAt || todayStr, goal.deadline || addDays(todayStr, 30)));
-      const updatedGoal = { 
-        ...goal, 
-        habits: updatedHabits, 
-        daysCompleted: newDaysCompleted,
-        progress: Math.min(100, Math.round((newDaysCompleted / totalDays) * 100)),
-        lastActiveDate: todayStr 
-      };
+      // Process goal gap
+      if (daysDiff > 1) {
+        for (let i = 1; i < daysDiff; i++) {
+          newGoalMissed += 1;
+        }
+      }
 
-      return updatedGoal;
+      // RESILIENCE RULE: Goal streak only resets to 0 if ALL habits have failed (missedDays >= 3)
+      const allHabitsFailed = updatedHabits.length > 0 && updatedHabits.every(h => (h.missedDays || 0) >= 3);
+      if (allHabitsFailed) {
+        newGoalStreak = 0;
+        newGoalMissed = Math.max(3, newGoalMissed); // Ensure goal missedDays also reflects failure
+      }
+
+      const totalDays = Math.max(1, calcDiffDays(goal.startDate || goal.createdAt || todayStr, goal.deadline || addDays(todayStr, 30)));
+      const progress = Math.min(100, Math.round((newDaysCompleted / totalDays) * 100));
+
+      return {
+        ...goal,
+        habits: updatedHabits,
+        missedDays: newGoalMissed,
+        streak: newGoalStreak,
+        daysCompleted: newDaysCompleted,
+        progress,
+        lastActiveDate: todayStr
+      };
     });
 
     // 2. Calculate updated tasks
     const updatedTasks = tasks.map(t => {
       if ((t.schedule_type || t.type) === 'daily') {
-         const wasDone = isTaskDone(t);
-         let newStreak = t.currentStreak || 0;
-         let newMissed = t.missedDays || 0;
-         let lastComp = t.lastCompletedDate;
+        const tLastActive = t.lastActiveDate || lastActive;
+        const start = new Date(tLastActive);
+        const end = new Date(todayStr);
+        let daysDiff = 0;
+        if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+          daysDiff = Math.floor((end - start) / (1000 * 60 * 60 * 24));
+        }
+        if (daysDiff <= 0) return t;
 
-         if (wasDone) {
-           if (lastComp === addDays(lastActive, -1)) newStreak += 1;
-           else if (lastComp !== lastActive) newStreak = 1;
-           lastComp = lastActive;
-           newMissed = 0;
-         } else {
-           newMissed += 1;
-         }
+        let newMissed = t.missedDays || 0;
+        let newStreak = t.currentStreak || 0;
 
-         // Reuse safeDiff from above or calculate
-         const start = new Date(lastActive);
-         const end = new Date(todayStr);
-         let diff = 1;
-         if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
-           diff = Math.floor((end - start) / (1000 * 60 * 60 * 24));
-         }
-         const safeDiffT = Math.min(365, Math.max(0, diff));
+        if (!t.completed &&
+          !(t.completionType === 'count' && (t.currentCount || 0) >= (t.targetCount || 10)) &&
+          !(t.completionType === 'time' && (t.timeSpent || 0) >= (t.targetTime || 30))) {
+          newMissed += 1;
+        } else {
+          newMissed = 0;
+        }
 
-         if (safeDiffT > 1) {
-            for (let i = 1; i < safeDiffT; i++) {
-               newMissed += 1;
-               if (newMissed >= 3) { newStreak = 0; newMissed = 0; }
-            }
-         }
+        if (daysDiff > 1) {
+          for (let i = 1; i < daysDiff; i++) {
+            newMissed += 1;
+            if (newMissed >= 3) { newStreak = 0; newMissed = 0; }
+          }
+        }
+        if (newMissed >= 3) { newStreak = 0; newMissed = 0; }
 
-         if (newMissed >= 3) { newStreak = 0; newMissed = 0; }
-         return { ...t, timeSpent: 0, currentCount: 0, completed: false, currentStreak: newStreak, missedDays: newMissed, lastCompletedDate: lastComp };
+        return { ...t, timeSpent: 0, currentCount: 0, completed: false, currentStreak: newStreak, missedDays: newMissed, lastActiveDate: todayStr };
       }
       return t;
     });
@@ -274,7 +287,7 @@ export const AppProvider = ({ children }) => {
     setTasks(updatedTasks);
     setSettings(prev => ({ ...prev, focusTimeToday: 0, lastActiveDate: todayStr }));
 
-    // 4. Persist to DB (outside of state updates)
+    // 4. Persist to DB
     if (user) {
       updatedGoals.forEach(g => {
         db.upsertGoal(user.id, g);
@@ -285,7 +298,7 @@ export const AppProvider = ({ children }) => {
       });
       db.upsertUserSettings(user.id, { theme, focusTimeToday: 0, lastReset: todayStr });
     }
-    
+
   }, [loading, user, settings.lastActiveDate, currentDate]);
 
   // ── Automatic Daily Summary Sync ─────────────────────────
@@ -302,7 +315,7 @@ export const AppProvider = ({ children }) => {
     const allHabits = goals.flatMap(g => g.habits || []);
     const goalsDone = goals.filter(isGoalDoneToday).length;
     const taskDone = todayTasks.filter(isTaskDone).length;
-    
+
     const summary = {
       date: today,
       total_tasks: goals.length + todayTasks.length,
@@ -310,7 +323,7 @@ export const AppProvider = ({ children }) => {
       time_spent: todayTasks.reduce((acc, t) => acc + (t.timeSpent || 0), 0) + allHabits.reduce((acc, h) => acc + (h.timeSpent || 0), 0),
       auto_completed: true
     };
-    
+
     setTaskLogs(prev => {
       const current = prev[today];
       // Force update if total or completed units have changed due to logic updates or user action
@@ -318,7 +331,7 @@ export const AppProvider = ({ children }) => {
       return { ...prev, [today]: summary };
     });
     if (user) db.upsertTaskLog(user.id, summary);
-  }, [tasks, goals, loading, user]);
+  }, [completedItems, totalItems, loading, user]); // Only sync when completion counts change, not on every state mutation
 
   // ── Computed Metrics ─────────────────────────────────────
   const todayStr = TODAY();
@@ -348,11 +361,11 @@ export const AppProvider = ({ children }) => {
 
   const weeklyReport = useMemo(() => calculateWeeklyReport(taskLogs), [taskLogs]);
 
-  const smartAlerts = useMemo(() => 
-    getSmartAlerts(accuracy, goals, tasks, weeklyReport), 
+  const smartAlerts = useMemo(() =>
+    getSmartAlerts(accuracy, goals, tasks, weeklyReport),
     [accuracy, goals, tasks, weeklyReport]
   );
-  
+
   const alerts = useMemo(() => {
     return [...smartAlerts];
   }, [smartAlerts]);
@@ -360,15 +373,15 @@ export const AppProvider = ({ children }) => {
   // ── AI Analysis Effect ───────────────────────────────────
   useEffect(() => {
     if (loading) return;
-    
+
     const insights = analyzeUserBehavior(goals, tasks, taskLogs, focusTime);
     const strategies = generateRecoveryStrategies(goals, tasks);
-    
+
     // Filter out dismissed insights
     const dismissed = settings.dismissedInsights || [];
     const filteredInsights = insights.filter(i => !dismissed.includes(i.id));
     const filteredStrategies = strategies.filter(s => !dismissed.includes(s.id));
-    
+
     setAiInsights(filteredInsights);
     setRecoveryStrategies(filteredStrategies);
   }, [goals, tasks, taskLogs, focusTime, settings.dismissedInsights, loading]);
@@ -386,8 +399,8 @@ export const AppProvider = ({ children }) => {
         if (g.id === plan.parentId) {
           const updatedHabits = g.habits.map(h => {
             if (h.id === plan.itemId) {
-              const updatedH = { 
-                ...h, 
+              const updatedH = {
+                ...h,
                 [plan.type === 'count' ? 'targetCount' : 'targetTime']: plan.newTarget,
                 isRecovering: true,
                 originalTarget: plan.originalTarget
@@ -404,8 +417,8 @@ export const AppProvider = ({ children }) => {
     } else {
       setTasks(prev => prev.map(t => {
         if (t.id === plan.itemId) {
-          const updatedT = { 
-            ...t, 
+          const updatedT = {
+            ...t,
             [plan.type === 'count' ? 'targetCount' : 'targetTime']: plan.newTarget,
             isRecovering: true,
             originalTarget: plan.originalTarget
@@ -432,18 +445,19 @@ export const AppProvider = ({ children }) => {
       completed: false,
       streak: 0,
       lastCompletedDate: null,
-      missedDays: 0
+      missedDays: 0,
+      lastActiveDate: TODAY()
     }));
 
-    const newG = { 
-      ...goal, 
-      id: goalId, 
+    const newG = {
+      ...goal,
+      id: goalId,
       startDate: TODAY(),
       daysCompleted: 0,
-      progress: 0, 
-      streak: 0, 
-      missedDays: 0, 
-      createdAt: TODAY(), 
+      progress: 0,
+      streak: 0,
+      missedDays: 0,
+      createdAt: TODAY(),
       lastActiveDate: TODAY(),
       habits: initialHabits
     };
@@ -482,21 +496,22 @@ export const AppProvider = ({ children }) => {
   const deleteGoal = id => { setGoals(prev => prev.filter(g => g.id !== id)); if (user) db.deleteGoalDb(id); };
 
   const addHabit = (goalId, habit) => {
-    const newH = { 
-      ...habit, 
-      id: Date.now().toString(), 
-      timeSpent: 0, 
-      currentCount: 0, 
+    const newH = {
+      ...habit,
+      id: Date.now().toString(),
+      timeSpent: 0,
+      currentCount: 0,
       completed: false,
       streak: 0,
       lastCompletedDate: null,
-      missedDays: 0
+      missedDays: 0,
+      lastActiveDate: TODAY()
     };
     setGoals(prev => prev.map(g => {
-      if (g.id === goalId) { 
+      if (g.id === goalId) {
         const updatedG = { ...g, habits: [...g.habits, newH] };
-        if (user) db.upsertHabit(user.id, goalId, newH); 
-        return updatedG; 
+        if (user) db.upsertHabit(user.id, goalId, newH);
+        return updatedG;
       }
       return g;
     }));
@@ -514,12 +529,12 @@ export const AppProvider = ({ children }) => {
       if (goal.id !== goalId) return goal;
       const today = TODAY();
       const yesterday = addDays(today, -1);
-      
+
       const updatedHabits = goal.habits.map(h => {
         if (h.id === habitId) {
           const newTime = (h.timeSpent || 0) + minutes;
           let updatedH = { ...h, timeSpent: newTime };
-          
+
           // Rule 3: Check if just completed
           if (newTime >= (h.targetTime || 15) && !h.completed) {
             updatedH.completed = true;
@@ -533,14 +548,29 @@ export const AppProvider = ({ children }) => {
             // Comeback detection
             if ((h.missedDays || 0) >= 2) recordComeback();
           }
-          
+
           if (user) db.upsertHabit(user.id, goalId, updatedH);
           return updatedH;
         }
         return h;
       });
-      
+
       const updatedGoal = { ...goal, habits: updatedHabits };
+
+      // Update Goal Streak if just completed
+      const isGoalDone = (goal.mode === 'ANY' && updatedHabits.some(h => h.lastCompletedDate === today)) ||
+        (goal.mode === 'ALL' && updatedHabits.every(h => h.lastCompletedDate === today)) ||
+        (goal.mode === 'CUSTOM' && updatedHabits.filter(h => h.lastCompletedDate === today).length >= (goal.minHabits || 1));
+
+      if (isGoalDone && updatedGoal.lastCompletedDate !== today) {
+        let newStreak = updatedGoal.streak || 0;
+        if (updatedGoal.lastCompletedDate === yesterday) newStreak += 1;
+        else newStreak = 1;
+        updatedGoal.streak = newStreak;
+        updatedGoal.lastCompletedDate = today;
+        updatedGoal.missedDays = 0;
+      }
+
       updatedGoal.progress = calculateOverallProgress(updatedGoal);
       if (user) db.upsertGoal(user.id, updatedGoal);
       return updatedGoal;
@@ -591,6 +621,21 @@ export const AppProvider = ({ children }) => {
       });
 
       const updatedGoal = { ...goal, habits: updatedHabits };
+
+      // Update Goal Streak if just completed
+      const isGoalDone = (goal.mode === 'ANY' && updatedHabits.some(h => h.lastCompletedDate === today)) ||
+        (goal.mode === 'ALL' && updatedHabits.every(h => h.lastCompletedDate === today)) ||
+        (goal.mode === 'CUSTOM' && updatedHabits.filter(h => h.lastCompletedDate === today).length >= (goal.minHabits || 1));
+
+      if (isGoalDone && updatedGoal.lastCompletedDate !== today) {
+        let newStreak = updatedGoal.streak || 0;
+        if (updatedGoal.lastCompletedDate === yesterday) newStreak += 1;
+        else newStreak = 1;
+        updatedGoal.streak = newStreak;
+        updatedGoal.lastCompletedDate = today;
+        updatedGoal.missedDays = 0;
+      }
+
       updatedGoal.progress = calculateOverallProgress(updatedGoal);
       if (user) db.upsertGoal(user.id, updatedGoal);
       return updatedGoal;
@@ -608,16 +653,16 @@ export const AppProvider = ({ children }) => {
           const newCount = Math.max(0, (h.currentCount || 0) + delta);
           let updatedH = { ...h, currentCount: newCount };
           if (newCount >= (h.targetCount || 10) && !h.completed) {
-             updatedH.completed = true;
-             if (h.lastCompletedDate === yesterday) updatedH.streak += 1;
-             else if (h.lastCompletedDate !== today) updatedH.streak = 1;
-             updatedH.lastCompletedDate = today;
-             updatedH.missedDays = 0;
-             // XP: Habit completed via count
-             awardXP(XP_SOURCES.HABIT_COMPLETE, `Completed: ${h.title}`);
-             incrementCompletions();
-             if ((h.missedDays || 0) >= 2) recordComeback();
-           } else if (newCount < (h.targetCount || 10)) {
+            updatedH.completed = true;
+            if (h.lastCompletedDate === yesterday) updatedH.streak += 1;
+            else if (h.lastCompletedDate !== today) updatedH.streak = 1;
+            updatedH.lastCompletedDate = today;
+            updatedH.missedDays = 0;
+            // XP: Habit completed via count
+            awardXP(XP_SOURCES.HABIT_COMPLETE, `Completed: ${h.title}`);
+            incrementCompletions();
+            if ((h.missedDays || 0) >= 2) recordComeback();
+          } else if (newCount < (h.targetCount || 10)) {
             updatedH.completed = false;
           }
           if (user) db.upsertHabit(user.id, goalId, updatedH);
@@ -627,22 +672,40 @@ export const AppProvider = ({ children }) => {
       });
 
       const updatedGoal = { ...goal, habits: updatedHabits };
+
+      // Update Goal Streak if just completed
+      const isGoalDone = (goal.mode === 'ANY' && updatedHabits.some(h => h.lastCompletedDate === today)) ||
+        (goal.mode === 'ALL' && updatedHabits.every(h => h.lastCompletedDate === today)) ||
+        (goal.mode === 'CUSTOM' && updatedHabits.filter(h => h.lastCompletedDate === today).length >= (goal.minHabits || 1));
+
+      if (isGoalDone && updatedGoal.lastCompletedDate !== today) {
+        let newStreak = updatedGoal.streak || 0;
+        if (updatedGoal.lastCompletedDate === yesterday) newStreak += 1;
+        else newStreak = 1;
+        updatedGoal.streak = newStreak;
+        updatedGoal.lastCompletedDate = today;
+        updatedGoal.missedDays = 0;
+      }
+
       updatedGoal.progress = calculateOverallProgress(updatedGoal);
       if (user) db.upsertGoal(user.id, updatedGoal);
       return updatedGoal;
     }));
   };
 
-  const addTask = (task) => { 
-    const newT = { 
-      ...task, 
-      id: Date.now().toString(), 
-      timeSpent: 0, 
+  const addTask = (task) => {
+    const newT = {
+      ...task,
+      id: Date.now().toString(),
+      timeSpent: 0,
       currentCount: 0,
-      completed: false
-    }; 
-    setTasks(prev => [newT, ...prev]); 
-    if (user) db.upsertTask(user.id, newT); 
+      completed: false,
+      currentStreak: 0,
+      missedDays: 0,
+      lastActiveDate: TODAY()
+    };
+    setTasks(prev => [newT, ...prev]);
+    if (user) db.upsertTask(user.id, newT);
   };
 
   const updateTask = (id, updates) => {
@@ -660,7 +723,7 @@ export const AppProvider = ({ children }) => {
         let isDone = false;
         let updated = { ...t };
         const cType = t.completionType || t.type || 'check';
-        
+
         if (cType === 'check') {
           updated.completed = !t.completed;
           isDone = updated.completed;
@@ -701,10 +764,10 @@ export const AppProvider = ({ children }) => {
       if (t.id !== taskId) return t;
       const newCount = Math.max(0, (t.currentCount || 0) + delta);
       let updated = { ...t, currentCount: newCount };
-      
+
       const isDaily = (t.schedule_type || t.type) === 'daily';
       const target = t.targetCount || 10;
-      
+
       if (newCount >= target && !t.completed) {
         updated.completed = true;
         if (isDaily) {
@@ -721,7 +784,7 @@ export const AppProvider = ({ children }) => {
       } else if (newCount < target) {
         updated.completed = false;
       }
-      
+
       if (user) db.upsertTask(user.id, updated);
       return updated;
     }));
@@ -733,7 +796,7 @@ export const AppProvider = ({ children }) => {
         const newTime = (t.timeSpent || 0) + mins;
         let updated = { ...t, timeSpent: newTime };
         const isDaily = (t.schedule_type || t.type) === 'daily';
-        
+
         if (newTime >= (t.targetTime || 15)) {
           if (!updated.completed && isDaily) {
             const todayStr = TODAY();
@@ -766,7 +829,8 @@ export const AppProvider = ({ children }) => {
 
   const addFocusTimeToHabit = (goalId, habitId, seconds) => {
     const mins = seconds / 60;
-    // logFocusTimeToHabit doesn't call addFocusTime because the timer calls it every second
+    // Always accumulate toward daily focus total
+    addFocusTime(seconds);
     if (goalId && habitId) {
       if (goalId === 'DAILY_TASK') logTaskTime(habitId, mins);
       else logHabitTime(goalId, habitId, mins);
@@ -777,12 +841,12 @@ export const AppProvider = ({ children }) => {
   useEffect(() => {
     if (!user || loading) return;
     const timer = setTimeout(() => {
-      db.upsertUserSettings(user.id, { 
-        theme: settings.theme, 
-        focusTimeToday: settings.focusTimeToday, 
-        lastReset: settings.lastActiveDate 
+      db.upsertUserSettings(user.id, {
+        theme: settings.theme,
+        focusTimeToday: settings.focusTimeToday,
+        lastReset: settings.lastActiveDate
       });
-    }, 15000); 
+    }, 15000);
     return () => clearTimeout(timer);
   }, [settings.focusTimeToday, settings.theme, user]);
 
@@ -848,8 +912,13 @@ export const AppProvider = ({ children }) => {
     const newBadges = getNewlyEarnedBadges(prev, currentlyEarnedBadges);
 
     if (newBadges.length > 0) {
-      // Show the first new badge as a toast (queue if multiple)
-      setBadgeUnlockEvent(newBadges[0]);
+      // Add all new badges to the queue
+      badgeQueueRef.current = [...badgeQueueRef.current, ...newBadges];
+      
+      // If no badge is currently showing, show the first one
+      if (!badgeUnlockEvent) {
+        setBadgeUnlockEvent(badgeQueueRef.current.shift());
+      }
 
       setXpData(prevData => {
         const now = new Date().toISOString();
@@ -864,11 +933,18 @@ export const AppProvider = ({ children }) => {
 
       prevBadgesRef.current = currentlyEarnedBadges;
     } else if (currentlyEarnedBadges.length !== prev.length) {
-      // Sync without event (e.g. on load)
       setXpData(prevData => ({ ...prevData, earnedBadges: currentlyEarnedBadges }));
       prevBadgesRef.current = currentlyEarnedBadges;
     }
-  }, [currentlyEarnedBadges]);
+  }, [currentlyEarnedBadges, badgeUnlockEvent]);
+
+  const dismissBadgeEvent = useCallback(() => {
+    if (badgeQueueRef.current.length > 0) {
+      setBadgeUnlockEvent(badgeQueueRef.current.shift());
+    } else {
+      setBadgeUnlockEvent(null);
+    }
+  }, []);
 
   // ── Gamification: Daily XP Checks (in daily reset) ─────
   // Perfect day check & streak milestone XP are awarded during daily reset.
@@ -918,7 +994,7 @@ export const AppProvider = ({ children }) => {
     // Gamification
     xpData, awardXP, incrementCompletions, awardFocusXP, recordComeback,
     currentLevelInfo, levelUpEvent, setLevelUpEvent,
-    badgeUnlockEvent, setBadgeUnlockEvent,
+    badgeUnlockEvent, setBadgeUnlockEvent, dismissBadgeEvent,
     currentlyEarnedBadges,
     aiInsights,
     recoveryStrategies,
