@@ -9,12 +9,13 @@ export const isHabitDoneToday = (h) => {
 };
 
 export const isGoalDoneToday = (goal) => {
-  if (!goal.habits || goal.habits.length === 0) return false;
-  const doneHabitsCount = goal.habits.filter(isHabitDoneToday).length;
+  const habits = goal?.habits || [];
+  if (habits.length === 0) return false;
+  const doneHabitsCount = habits.filter(isHabitDoneToday).length;
   
   if (goal.mode === 'ANY') return doneHabitsCount > 0;
   if (goal.mode === 'CUSTOM') return doneHabitsCount >= (goal.minHabits || 1);
-  return doneHabitsCount === goal.habits.length;
+  return doneHabitsCount === habits.length;
 };
 
 export const calculateGoalDailyProgress = (goal) => {
@@ -132,24 +133,28 @@ export const calculateWeeklyReport = (taskLogs) => {
   };
 };
 
-export const getSmartAlerts = (accuracy, goals, tasks, weeklyReport) => {
+export const getSmartAlerts = (accuracy, goals = [], tasks = [], weeklyReport = {}) => {
   const alerts = [];
-  const today = TODAY();
+  try {
+    // 1. Streak Alert
+    const streakAboutToBreak = goals.some(g => (g?.missedDays || 0) === 2) || 
+                               tasks.some(t => (t?.type === 'daily' || t?.schedule_type === 'daily') && (t?.missedDays || 0) === 2);
+    if (streakAboutToBreak) alerts.push({ type: 'warning', message: "⚠ You may break your streak today" });
 
-  // 1. Streak Alert
-  const streakAboutToBreak = goals.some(g => (g.missedDays || 0) === 2) || tasks.some(t => t.type === 'daily' && (t.missedDays || 0) === 2);
-  if (streakAboutToBreak) alerts.push({ type: 'warning', message: "⚠ You may break your streak today" });
+    // 2. Low Productivity Alert
+    if (accuracy < 50) alerts.push({ type: 'danger', message: "📉 Low productivity detected" });
 
-  // 2. Low Productivity Alert
-  if (accuracy < 50) alerts.push({ type: 'danger', message: "📉 Low productivity detected" });
+    // 3. Consistency Alert
+    const habitStreaks = goals.flatMap(g => (g?.habits || []).map(h => h?.streak || 0));
+    const taskStreaks = tasks.map(t => t?.currentStreak || 0);
+    const maxStreak = Math.max(0, ...habitStreaks, ...taskStreaks);
+    if (maxStreak >= 5) alerts.push({ type: 'success', message: "🔥 Great consistency!" });
 
-  // 3. Consistency Alert
-  const maxStreak = Math.max(0, ...goals.flatMap(g => g.habits.map(h => h.streak || 0)), ...tasks.map(t => t.currentStreak || 0));
-  if (maxStreak >= 5) alerts.push({ type: 'success', message: "🔥 Great consistency!" });
-
-  // 4. Improvement Alert
-  if (weeklyReport.improvement > 5) alerts.push({ type: 'info', message: "📈 You're improving" });
-
+    // 4. Improvement Alert
+    if (weeklyReport?.improvement > 5) alerts.push({ type: 'info', message: "📈 You're improving" });
+  } catch (e) {
+    console.error("[Alerts] Error generating alerts:", e);
+  }
   return alerts;
 };
 
