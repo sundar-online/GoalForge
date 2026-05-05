@@ -86,6 +86,7 @@ export const AppProvider = ({ children }) => {
   // AI Insights State
   const [aiInsights, setAiInsights] = useState([]);
   const [recoveryStrategies, setRecoveryStrategies] = useState([]);
+  const [smartSuggestions, setSmartSuggestions] = useState(null);
 
   const theme = settings.theme || 'dark';
   const focusTime = settings.focusTimeToday || 0;
@@ -416,20 +417,28 @@ export const AppProvider = ({ children }) => {
 
     const insights = analyzeUserBehavior(goals, tasks, taskLogs, focusTime);
     const strategies = generateRecoveryStrategies(goals, tasks);
+    const suggestion = getSmartSuggestions(new Date(), tasks, accuracy);
 
-    // Filter out dismissed insights
+    // Dismissed IDs are date-stamped (e.g. 'peak_performance__2026-05-05')
+    // so the same insight-type can re-appear the next day with fresh data.
+    const todayKey = TODAY();
     const dismissed = settings.dismissedInsights || [];
-    const filteredInsights = insights.filter(i => !dismissed.includes(i.id));
-    const filteredStrategies = strategies.filter(s => !dismissed.includes(s.id));
+    const filteredInsights = insights.filter(i => !dismissed.includes(`${i.id}__${todayKey}`));
+    const filteredStrategies = strategies.filter(s => !dismissed.includes(`${s.id}__${todayKey}`));
 
     setAiInsights(filteredInsights);
     setRecoveryStrategies(filteredStrategies);
-  }, [goals, tasks, taskLogs, focusTime, settings.dismissedInsights, loading]);
+    setSmartSuggestions(suggestion);
+  }, [goals, tasks, taskLogs, focusTime, accuracy, settings.dismissedInsights, loading]);
 
   const dismissInsight = (id) => {
+    // Store with today's date so it auto-resets the next day
+    const todayKey = TODAY();
+    const stampedId = id.includes('__') ? id : `${id}__${todayKey}`;
     setSettings(prev => ({
       ...prev,
-      dismissedInsights: [...(prev.dismissedInsights || []), id]
+      // Keep only last 30 dismissals to avoid bloat
+      dismissedInsights: [...(prev.dismissedInsights || []).slice(-29), stampedId]
     }));
   };
 
@@ -1007,12 +1016,12 @@ export const AppProvider = ({ children }) => {
     recoveryStrategies,
     dismissInsight,
     applyRecoveryPlan,
-    smartSuggestions: getSmartSuggestions(new Date(), tasks, accuracy)
+    smartSuggestions,
   }), [
     goals, tasks, taskLogs, notes, settings, loading, syncError,
     accuracy, alerts, weeklyReport, disciplineScore, userLevel,
     xpData, levelUpEvent, badgeUnlockEvent, currentlyEarnedBadges,
-    aiInsights, recoveryStrategies,
+    aiInsights, recoveryStrategies, smartSuggestions,
     totalItems, completedItems, todayTasks, allHabits
   ]);
 
