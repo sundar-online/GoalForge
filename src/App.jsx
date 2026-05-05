@@ -9,12 +9,18 @@ import { FocusMode } from './components/FocusMode';
 import { NotesPage } from './components/NotesPage';
 import { AuthPage } from './components/AuthPage';
 import { ProfilePage } from './components/ProfilePage';
+import { WeeklyPlan } from './components/WeeklyPlan';
 import { LevelUpModal } from './components/LevelUpModal';
 import { BadgeToast } from './components/BadgeToast';
+import { registerServiceWorker } from './utils/notificationUtils';
 
 function AppInner() {
   const { user, loading } = useAuth();
   const [currentView, setCurrentView] = useState('dashboard');
+
+  React.useEffect(() => {
+    registerServiceWorker();
+  }, []);
 
   if (loading) {
     return (
@@ -75,6 +81,7 @@ function AppInner() {
       case 'tasks':     return <DailyTasks />;
       case 'notes':     return <NotesPage />;
       case 'focus':     return <FocusMode />;
+      case 'weeklyplan':return <WeeklyPlan />;
       case 'profile':   return <ProfilePage />;
       default:          return <Dashboard setView={setCurrentView} />;
     }

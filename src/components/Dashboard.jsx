@@ -3,7 +3,7 @@ import { useAppContext } from '../context/AppContext';
 import { calculateGoalDailyProgress, isHabitDoneToday } from '../utils/calculationUtils';
 import { BADGE_DEFINITIONS } from '../utils/gamificationEngine';
 import { useAuth } from '../context/AuthContext';
-import { AlertTriangle, AlertCircle, TrendingUp, TrendingDown, CheckCircle2, Clock, Zap, LogOut, Moon, Sun, Sparkles, Trophy, ChevronRight, Target, Award } from 'lucide-react';
+import { AlertTriangle, AlertCircle, TrendingUp, TrendingDown, CheckCircle2, Clock, Zap, LogOut, Moon, Sun, Sparkles, Trophy, ChevronRight, Target, Award, CalendarDays } from 'lucide-react';
 import { WeeklyHeatmap } from './WeeklyHeatmap';
 import { WeeklyReportCard } from './WeeklyReportCard';
 import { SkeletonLoader } from './SkeletonLoader';
@@ -103,6 +103,9 @@ export const Dashboard = ({ setView }) => {
           <p className="text-sm text-text-muted font-medium italic opacity-80">{quote}</p>
         </div>
         <div className="flex items-center gap-3">
+          <button onClick={() => setView('weeklyplan')} className="hidden sm:flex px-4 py-2.5 rounded-xl bg-purple-500/10 text-purple-400 font-black text-sm items-center gap-2 hover:bg-purple-500/20 transition-all border border-purple-500/20 shadow-sm">
+            <CalendarDays size={16} /> Plan Week
+          </button>
           <button onClick={toggleTheme} className="w-11 h-11 rounded-xl bg-bg-card border border-border-light flex items-center justify-center text-text-main hover:bg-bg-input transition-all active:scale-90 shadow-sm">
             {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
           </button>

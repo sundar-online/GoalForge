@@ -1,8 +1,55 @@
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Target, Plus, ChevronDown, ChevronUp, Trash2, Clock, Check, Layers, Calendar, History } from 'lucide-react';
-import { isGoalDoneToday, calculateGoalDailyProgress } from '../utils/calculationUtils';
+import { isGoalDoneToday, calculateGoalDailyProgress, isHabitScheduledToday } from '../utils/calculationUtils';
 import { addDays } from '../utils/dateUtils';
+
+// ── Day Picker ──────────────────────────────────────────────
+const ALL_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+const DayPicker = ({ value, onChange }) => {
+  const selected = value || []; // [] means every day
+  const toggle = (day) => {
+    if (selected.includes(day)) {
+      const next = selected.filter(d => d !== day);
+      onChange(next); // if empty after removal, back to "every day"
+    } else {
+      onChange([...selected, day]);
+    }
+  };
+  const isEveryDay = selected.length === 0;
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <p className="text-[10px] font-black text-text-muted uppercase tracking-[0.15em]">Schedule</p>
+        {!isEveryDay && (
+          <button type="button" onClick={() => onChange([])} className="text-[10px] font-bold text-accent-blue hover:underline">Every day</button>
+        )}
+      </div>
+      <div className="flex gap-1.5 flex-wrap">
+        {ALL_DAYS.map(day => {
+          const active = isEveryDay || selected.includes(day);
+          return (
+            <button
+              key={day} type="button"
+              onClick={() => toggle(day)}
+              className={`px-2.5 py-1.5 rounded-lg text-[11px] font-black transition-all border ${
+                active
+                  ? 'bg-accent-blue border-accent-blue text-white shadow-sm'
+                  : 'bg-bg-input border-border-light text-text-muted hover:border-border-med'
+              }`}
+            >
+              {day}
+            </button>
+          );
+        })}
+      </div>
+      <p className="text-[10px] font-medium text-text-muted">
+        {isEveryDay ? '📅 Active every day' : `📅 Active on: ${selected.join(', ')}`}
+      </p>
+    </div>
+  );
+};
 
 
 const TAG_COLORS = {
@@ -95,7 +142,10 @@ const HabitRow = ({ habit, goalId, logHabitTime, deleteHabit, toggleHabitCheck, 
   const [showLog, setShowLog] = useState(false);
   const isCheck = habit.type === 'check';
   const isCount = habit.type === 'count';
-  
+
+  const scheduledToday = isHabitScheduledToday(habit);
+  const hasSchedule = habit.scheduleDays && habit.scheduleDays.length > 0;
+
   let done = false;
   if (isCheck) done = habit.completed;
   else if (isCount) done = (habit.currentCount || 0) >= (habit.targetCount || 10);
@@ -106,6 +156,21 @@ const HabitRow = ({ habit, goalId, logHabitTime, deleteHabit, toggleHabitCheck, 
   const pct = Math.min(100, Math.round((current / (target || 1)) * 100));
 
   const Icon = isCheck ? Check : (isCount ? Layers : Clock);
+
+  // If not scheduled today, show a greyed-out rest-day card
+  if (!scheduledToday) {
+    return (
+      <div className="p-4 rounded-2xl border border-dashed border-border-light bg-bg-input/30 flex items-center gap-3 opacity-50">
+        <div className="w-9 h-9 shrink-0 rounded-xl border-2 border-border-light bg-bg-card flex items-center justify-center">
+          <Calendar size={14} className="text-text-muted" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-black text-text-muted truncate">{habit.title}</p>
+          <p className="text-[10px] font-bold text-text-muted uppercase tracking-widest">Rest Day · {habit.scheduleDays?.join(', ')}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -132,6 +197,7 @@ const HabitRow = ({ habit, goalId, logHabitTime, deleteHabit, toggleHabitCheck, 
                   {isCheck ? (done ? 'Completed' : 'Pending') : `${current}/${target} ${isCount ? 'units' : 'mins'}`}
                 </p>
                 {habit.streak > 0 && <span className="text-[10px] font-black text-orange-500 bg-orange-500/10 px-1.5 py-0.5 rounded-md">🔥 {habit.streak}d</span>}
+                {hasSchedule && <span className="text-[10px] font-bold text-accent-blue/70 bg-accent-blue/10 px-1.5 py-0.5 rounded-md">{habit.scheduleDays.join('·')}</span>}
               </div>
             </div>
           </div>
@@ -172,7 +238,7 @@ export const GoalsPage = () => {
     minHabits: 1, 
     habits: [{ id: Date.now(), title: '', type: 'time', targetTime: 15, targetCount: 10 }]
   });
-  const [newHabit, setNewHabit] = useState({ title: '', type: 'time', targetTime: 15, targetCount: 10 });
+  const [newHabit, setNewHabit] = useState({ title: '', type: 'time', targetTime: 15, targetCount: 10, scheduleDays: [] });
 
   const doneGoals = goals.filter(g => g.progress === 100).length;
   const activeGoals = goals.length - doneGoals;
@@ -184,18 +250,18 @@ export const GoalsPage = () => {
     if (newGoal.habits.length === 0) return alert('Add at least one daily habit!');
     if (newGoal.habits.some(h => !h.title.trim())) return alert('Give all your habits a name!');
 
-    addGoal({ 
-      ...newGoal, 
-      mode: newGoal.mode || 'ANY', 
-      minHabits: newGoal.mode === 'CUSTOM' ? parseInt(newGoal.minHabits, 10) : 1 
+    addGoal({
+      ...newGoal,
+      mode: newGoal.mode || 'ANY',
+      minHabits: newGoal.mode === 'CUSTOM' ? parseInt(newGoal.minHabits, 10) : 1
     });
-    setNewGoal({ 
-      title: '', 
-      tag: 'General', 
-      deadline: '', 
-      mode: 'ANY', 
-      minHabits: 1, 
-      habits: [{ id: Date.now(), title: '', type: 'time', targetTime: 15, targetCount: 10 }]
+    setNewGoal({
+      title: '',
+      tag: 'General',
+      deadline: '',
+      mode: 'ANY',
+      minHabits: 1,
+      habits: [{ id: Date.now(), title: '', type: 'time', targetTime: 15, targetCount: 10, scheduleDays: [] }]
     });
     setShowAddGoal(false);
   };
@@ -210,7 +276,7 @@ export const GoalsPage = () => {
   const addStagingHabit = () => {
     setNewGoal(prev => ({
       ...prev,
-      habits: [...prev.habits, { id: Date.now(), title: '', type: 'time', targetTime: 15, targetCount: 10 }]
+      habits: [...prev.habits, { id: Date.now(), title: '', type: 'time', targetTime: 15, targetCount: 10, scheduleDays: [] }]
     }));
   };
 
@@ -228,8 +294,14 @@ export const GoalsPage = () => {
   const submitHabit = (e, goalId) => {
     e.preventDefault();
     if (!newHabit.title.trim()) return;
-    addHabit(goalId, { title: newHabit.title, type: newHabit.type, targetTime: Number(newHabit.targetTime), targetCount: Number(newHabit.targetCount) });
-    setNewHabit({ title: '', type: 'time', targetTime: 15, targetCount: 10 });
+    addHabit(goalId, {
+      title: newHabit.title,
+      type: newHabit.type,
+      targetTime: Number(newHabit.targetTime),
+      targetCount: Number(newHabit.targetCount),
+      scheduleDays: newHabit.scheduleDays || []
+    });
+    setNewHabit({ title: '', type: 'time', targetTime: 15, targetCount: 10, scheduleDays: [] });
     setShowAddHabit(null);
   };
 
@@ -358,6 +430,10 @@ export const GoalsPage = () => {
                         </div>
                       )}
                    </div>
+                   <DayPicker
+                     value={h.scheduleDays || []}
+                     onChange={days => updateStagingHabit(h.id, { scheduleDays: days })}
+                   />
                 </div>
               ))}
             </div>
@@ -457,6 +533,10 @@ export const GoalsPage = () => {
                         </select>
                         <input type="number" min="1" value={newHabit.type === 'count' ? newHabit.targetCount : newHabit.targetTime} onChange={e => setNewHabit(h => ({ ...h, [h.type === 'count' ? 'targetCount' : 'targetTime']: e.target.value }))} className="w-20 bg-bg-card rounded-xl px-4 py-3 text-sm font-black text-accent-blue shadow-sm border-none" />
                       </div>
+                      <DayPicker
+                        value={newHabit.scheduleDays || []}
+                        onChange={days => setNewHabit(h => ({ ...h, scheduleDays: days }))}
+                      />
                       <div className="flex gap-3 pt-2">
                         <button type="submit" className="flex-1 py-3.5 rounded-xl bg-accent-blue text-white font-black text-sm shadow-md active:scale-95 transition-all">Add Daily Habit</button>
                         <button type="button" onClick={() => setShowAddHabit(null)} className="px-6 py-3.5 rounded-xl bg-bg-input text-text-muted font-black text-sm hover:bg-bg-input/80 transition-colors">Cancel</button>

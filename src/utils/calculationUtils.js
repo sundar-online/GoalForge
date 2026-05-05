@@ -1,5 +1,17 @@
 import { TODAY } from './dateUtils';
 
+// Day abbreviations match the picker: ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
+const DAY_ABBRS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+/**
+ * Returns true if the habit is scheduled for today (or has no schedule = every day).
+ */
+export const isHabitScheduledToday = (h) => {
+  if (!h.scheduleDays || h.scheduleDays.length === 0) return true; // no schedule = every day
+  const todayAbbr = DAY_ABBRS[new Date().getDay()];
+  return h.scheduleDays.includes(todayAbbr);
+};
+
 export const isHabitDoneToday = (h) => {
   const today = TODAY();
   if (h.lastCompletedDate !== today) return false;
@@ -11,19 +23,24 @@ export const isHabitDoneToday = (h) => {
 export const isGoalDoneToday = (goal) => {
   const habits = goal?.habits || [];
   if (habits.length === 0) return false;
-  const doneHabitsCount = habits.filter(isHabitDoneToday).length;
-  
+  // Only count habits scheduled for today
+  const scheduledHabits = habits.filter(isHabitScheduledToday);
+  if (scheduledHabits.length === 0) return true; // nothing due today = goal is satisfied
+  const doneHabitsCount = scheduledHabits.filter(isHabitDoneToday).length;
+
   if (goal.mode === 'ANY') return doneHabitsCount > 0;
   if (goal.mode === 'CUSTOM') return doneHabitsCount >= (goal.minHabits || 1);
-  return doneHabitsCount === habits.length;
+  return doneHabitsCount === scheduledHabits.length;
 };
 
 export const calculateGoalDailyProgress = (goal) => {
   if (!goal.habits || goal.habits.length === 0) return 0;
-  const habitsDone = goal.habits.filter(isHabitDoneToday).length;
-  
+  const scheduledHabits = goal.habits.filter(isHabitScheduledToday);
+  if (scheduledHabits.length === 0) return 100; // rest day = nothing due
+  const habitsDone = scheduledHabits.filter(isHabitDoneToday).length;
+
   if (goal.mode === 'ANY') return habitsDone > 0 ? 100 : 0;
-  const target = goal.mode === 'CUSTOM' ? (goal.minHabits || 1) : goal.habits.length;
+  const target = goal.mode === 'CUSTOM' ? (goal.minHabits || 1) : scheduledHabits.length;
   return Math.min(100, Math.round((habitsDone / target) * 100));
 };
 

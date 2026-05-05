@@ -10,9 +10,11 @@ import {
   getUserLevel,
   getInsights,
   calculateWeeklyReport,
-  getSmartAlerts
+  getSmartAlerts,
+  isHabitScheduledToday
 } from '../utils/calculationUtils';
 import { XP_SOURCES, getLevelFromXP, evaluateBadges, getNewlyEarnedBadges } from '../utils/gamificationEngine';
+import { scheduleLocalNotification } from '../utils/notificationUtils';
 import {
   analyzeUserBehavior,
   generateRecoveryStrategies,
@@ -80,7 +82,9 @@ export const AppProvider = ({ children }) => {
     focusTimeToday: 0,
     lastActiveDate: '',
     focusHistory: {},
-    dismissedInsights: []
+    dismissedInsights: [],
+    weeklyIntentions: {},
+    lastPushDate: ''
   }));
 
   // AI Insights State
@@ -235,9 +239,25 @@ export const AppProvider = ({ children }) => {
     const itv = setInterval(() => {
       const now = TODAY();
       if (now !== currentDate) setCurrentDate(now);
+
+      // ── Smart Notifications (Local Push) ──
+      const dateObj = new Date();
+      const hours = dateObj.getHours();
+      const mins = dateObj.getMinutes();
+      
+      // Trigger evening reminder at 8:00 PM if accuracy is < 100 and haven't pushed today
+      if (hours === 20 && mins === 0 && accuracy < 100) {
+        if (settings.lastPushDate !== now) {
+          scheduleLocalNotification("GoalForge Evening Review", {
+            body: `You still have pending tasks/habits today. Your accuracy is ${accuracy}%. Finish strong!`,
+          });
+          setSettings(prev => ({ ...prev, lastPushDate: now }));
+          if (user) db.upsertUserSettings(user.id, { ...settings, lastPushDate: now });
+        }
+      }
     }, 60000);
     return () => clearInterval(itv);
-  }, [currentDate]);
+  }, [currentDate, accuracy, settings, user]);
 
   const toggleTheme = () => {
     const newTheme = settings.theme === 'light' ? 'dark' : 'light';
@@ -268,25 +288,37 @@ export const AppProvider = ({ children }) => {
 
       const updatedHabits = (goal.habits || []).map(h => {
         let updatedH = { ...h };
-        const wasDone = updatedH.completed || 
+        const wasDone = updatedH.completed ||
                         (updatedH.type === 'time' && (updatedH.timeSpent || 0) >= (updatedH.targetTime || 15)) ||
                         (updatedH.type === 'count' && (updatedH.currentCount || 0) >= (updatedH.targetCount || 10));
 
-        if (!wasDone) {
+        // Check if yesterday (gLastActive) was a scheduled day for this habit
+        const lastActiveDay = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date(gLastActive).getDay()];
+        const wasScheduled = !h.scheduleDays || h.scheduleDays.length === 0 || h.scheduleDays.includes(lastActiveDay);
+
+        if (!wasScheduled) {
+          // Rest day — no miss, no streak impact
+        } else if (!wasDone) {
           updatedH.missedDays = (updatedH.missedDays || 0) + 1;
         } else {
           updatedH.missedDays = 0;
         }
 
-        // Handle multi-day gaps where app wasn't opened
+        // Handle multi-day gaps: count only scheduled days in the gap
         if (daysDiff > 1) {
-          updatedH.missedDays += (daysDiff - 1);
+          for (let gap = 1; gap < daysDiff; gap++) {
+            const gapDate = new Date(gLastActive);
+            gapDate.setDate(gapDate.getDate() + gap);
+            const gapDay = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][gapDate.getDay()];
+            const gapScheduled = !h.scheduleDays || h.scheduleDays.length === 0 || h.scheduleDays.includes(gapDay);
+            if (gapScheduled) updatedH.missedDays += 1;
+          }
         }
 
         // Apply 3-day failure rule
         if (updatedH.missedDays >= 3) {
           updatedH.streak = 0;
-          updatedH.missedDays = Math.min(3, updatedH.missedDays); // Cap at 3 for logic stability
+          updatedH.missedDays = Math.min(3, updatedH.missedDays);
         }
 
         return { ...updatedH, timeSpent: 0, completed: false, currentCount: 0, lastActiveDate: todayStr };
@@ -995,7 +1027,18 @@ export const AppProvider = ({ children }) => {
     setXpData(prev => ({ ...prev, lastXPDate: today }));
   }, [loading, taskLogs, goals, tasks]);
 
-  // Performance Optimization: Memoize the context value to prevent 
+  // ── Weekly Intentions ──────────────────────────────────────────
+  const saveWeeklyIntention = useCallback((weekKey, intentionText) => {
+    setSettings(prev => ({
+      ...prev,
+      weeklyIntentions: {
+        ...(prev.weeklyIntentions || {}),
+        [weekKey]: intentionText
+      }
+    }));
+  }, []);
+
+  // Performance Optimization: Memoize the context value to prevent
   // unnecessary re-renders across the entire app on every state change.
   const value = useMemo(() => ({
     goals, addGoal, updateGoal, deleteGoal, extendGoalDeadline,
@@ -1017,12 +1060,15 @@ export const AppProvider = ({ children }) => {
     dismissInsight,
     applyRecoveryPlan,
     smartSuggestions,
+    settings,
+    saveWeeklyIntention
   }), [
     goals, tasks, taskLogs, notes, settings, loading, syncError,
     accuracy, alerts, weeklyReport, disciplineScore, userLevel,
     xpData, levelUpEvent, badgeUnlockEvent, currentlyEarnedBadges,
     aiInsights, recoveryStrategies, smartSuggestions,
-    totalItems, completedItems, todayTasks, allHabits
+    totalItems, completedItems, todayTasks, allHabits,
+    settings, saveWeeklyIntention
   ]);
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

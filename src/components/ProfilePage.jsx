@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { BADGE_DEFINITIONS, LEVEL_THRESHOLDS, getLevelFromXP } from '../utils/gamificationEngine';
-import { Award, Zap, Target, Clock, Flame, TrendingUp, Star, Lock, ChevronRight } from 'lucide-react';
+import { Award, Zap, Target, Clock, Flame, TrendingUp, Star, Lock, ChevronRight, Bell, BellOff } from 'lucide-react';
+import { requestNotificationPermission, checkNotificationPermission } from '../utils/notificationUtils';
 
 export const ProfilePage = () => {
   const {
@@ -12,6 +13,19 @@ export const ProfilePage = () => {
   } = useAppContext();
   const { displayName, user } = useAuth();
   const [selectedBadge, setSelectedBadge] = useState(null);
+  const [pushPerm, setPushPerm] = useState(checkNotificationPermission());
+
+  const handleToggleNotifications = async () => {
+    if (pushPerm === 'granted') {
+      alert('Notifications are already granted. You must disable them from your browser settings if you wish to turn them off.');
+      return;
+    }
+    const perm = await requestNotificationPermission();
+    setPushPerm(perm);
+    if (perm === 'granted') {
+      alert('Smart notifications enabled! We will remind you to crush your goals.');
+    }
+  };
 
   const xpData = rawXpData || { totalXP: 0, earnedBadges: [], badgeUnlockDates: {}, xpHistory: [], totalCompletions: 0, perfectDays: 0, comebackCount: 0 };
   const { totalXP, earnedBadges = [], badgeUnlockDates = {}, xpHistory = [] } = xpData;
@@ -290,6 +304,27 @@ export const ProfilePage = () => {
             <p className="text-5xl font-black text-white tracking-tighter leading-none mb-2">{disciplineScore}</p>
             <p className="text-xs font-bold text-white/40">Today's Performance</p>
           </div>
+
+          {/* App Settings */}
+          <section className="bg-bg-card rounded-[32px] p-6 shadow-sm border border-border-light">
+            <div className="flex items-center gap-2 mb-5">
+              <Bell size={18} className="text-accent-blue" />
+              <h3 className="text-[10px] font-black text-text-muted uppercase tracking-[0.15em]">App Settings</h3>
+            </div>
+            
+            <div className="flex items-center justify-between p-4 bg-bg-input rounded-2xl border border-border-light">
+              <div>
+                <p className="text-sm font-black text-text-main">Smart Notifications</p>
+                <p className="text-[10px] font-bold text-text-muted mt-0.5 max-w-[200px]">Get daily PWA pushes if you're falling behind on goals.</p>
+              </div>
+              <button 
+                onClick={handleToggleNotifications}
+                className={`w-12 h-6 rounded-full relative transition-colors ${pushPerm === 'granted' ? 'bg-accent-blue' : 'bg-border-med'}`}
+              >
+                <div className={`w-4 h-4 rounded-full bg-white absolute top-1 transition-transform ${pushPerm === 'granted' ? 'translate-x-7' : 'translate-x-1'}`} />
+              </button>
+            </div>
+          </section>
         </div>
       </div>
 
