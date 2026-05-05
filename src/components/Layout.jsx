@@ -7,7 +7,6 @@ const NAV = [
   { id: 'tasks',     icon: CalendarCheck, label: 'Tasks'  },
   { id: 'notes',     icon: StickyNote,    label: 'Notes'  },
   { id: 'focus',     icon: Timer,         label: 'Focus'  },
-  { id: 'profile',   icon: Award,         label: 'Profile'},
 ];
 
 export const Layout = ({ children, currentView, setView }) => {

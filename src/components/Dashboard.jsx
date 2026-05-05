@@ -103,8 +103,8 @@ export const Dashboard = ({ setView }) => {
           <p className="text-sm text-text-muted font-medium italic opacity-80">{quote}</p>
         </div>
         <div className="flex items-center gap-3">
-          <button onClick={() => setView('weeklyplan')} className="hidden sm:flex px-4 py-2.5 rounded-xl bg-purple-500/10 text-purple-400 font-black text-sm items-center gap-2 hover:bg-purple-500/20 transition-all border border-purple-500/20 shadow-sm">
-            <CalendarDays size={16} /> Plan Week
+          <button onClick={() => setView('weeklyplan')} className="flex px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-purple-500/10 text-purple-400 font-black text-xs sm:text-sm items-center gap-1.5 sm:gap-2 hover:bg-purple-500/20 transition-all border border-purple-500/20 shadow-sm">
+            <CalendarDays size={16} className="w-4 h-4" /> <span className="whitespace-nowrap">Plan</span><span className="hidden sm:inline">&nbsp;Week</span>
           </button>
           <button onClick={toggleTheme} className="w-11 h-11 rounded-xl bg-bg-card border border-border-light flex items-center justify-center text-text-main hover:bg-bg-input transition-all active:scale-90 shadow-sm">
             {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
@@ -119,6 +119,9 @@ export const Dashboard = ({ setView }) => {
                   <p className="text-xs font-black text-text-main">{displayName}</p>
                   <p className="text-[10px] font-bold text-text-muted truncate">{user?.email}</p>
                 </div>
+                <button onClick={() => { setView('profile'); setShowSignOut(false); }} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-text-main hover:bg-bg-input transition-colors font-bold text-sm mb-1">
+                  <Award size={16} /> Profile
+                </button>
                 <button onClick={signOut} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-500 hover:bg-red-500/10 transition-colors font-bold text-sm">
                   <LogOut size={16} /> Sign Out
                 </button>
