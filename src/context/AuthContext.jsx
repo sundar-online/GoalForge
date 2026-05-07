@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { auth, googleProvider, githubProvider } from '../lib/firebase';
+import { auth, googleProvider } from '../lib/firebase';
 import {
   onAuthStateChanged,
   createUserWithEmailAndPassword,
@@ -82,16 +82,6 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // ── GitHub Sign-In ────────────────────────────────────
-  const signInWithGithub = async () => {
-    try {
-      const result = await signInWithPopup(auth, githubProvider);
-      return { data: result, error: null };
-    } catch (error) {
-      return { data: null, error: { message: getFirebaseErrorMessage(error.code) } };
-    }
-  };
-
   // ── Password Reset ────────────────────────────────────
   const resetPassword = async (email) => {
     try {
@@ -116,7 +106,6 @@ export const AuthProvider = ({ children }) => {
       signUp,
       signIn,
       signInWithGoogle,
-      signInWithGithub,
       resetPassword,
       signOut,
       displayName
