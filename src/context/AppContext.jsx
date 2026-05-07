@@ -13,7 +13,8 @@ import {
   getInsights,
   calculateWeeklyReport,
   getSmartAlerts,
-  isHabitScheduledToday
+  isHabitScheduledToday,
+  calculateStreakFromHistory
 } from '../utils/calculationUtils';
 import { XP_SOURCES, getLevelFromXP, evaluateBadges, getNewlyEarnedBadges } from '../utils/gamificationEngine';
 import { scheduleLocalNotification } from '../utils/notificationUtils';
@@ -78,6 +79,7 @@ export const AppProvider = ({ children }) => {
   useEffect(() => { tasksRef.current = tasks; }, [tasks]);
   useEffect(() => { notesRef.current = notes; }, [notes]);
   useEffect(() => { goalsRef.current = goals; }, [goals]);
+  const habitsListeners = useRef({});
 
   // Gamification state
   const [xpData, setXpData] = useState(() => ({ ...DEFAULT_XP_DATA, ...safeParse(STORAGE_KEYS.XP, DEFAULT_XP_DATA) }));
@@ -233,6 +235,7 @@ export const AppProvider = ({ children }) => {
             startDate: t.start_date || null,
             endDate: t.end_date || null,
             currentStreak: t.current_streak || 0,
+            completedDates: t.completed_dates || [],
             missedDays: t.missed_days || 0,
             lastCompletedDate: t.last_completed_date || null,
             lastActiveDate: t.last_active_date || null,
@@ -309,39 +312,13 @@ export const AppProvider = ({ children }) => {
       });
       unsubscribes.push(unsubNotes);
 
-      // 3. Subscribe to Goals & nested habits
-      let activeGoalSnapshotId = 0;
+      // 3. Subscribe to Goals with Reactive Habits Listener
       const goalsQuery = query(collection(fireDb, 'users', user.id, 'goals'), orderBy('created_at', 'desc'));
-      const unsubGoals = onSnapshot(goalsQuery, { includeMetadataChanges: true }, async (snapshot) => {
-        const currentId = ++activeGoalSnapshotId;
-        const goalsList = [];
-
-        for (const goalDoc of snapshot.docs) {
-          const g = goalDoc.data();
-          const habitsSnap = await getDocs(collection(goalDoc.ref, 'habits'));
-          const habits = habitsSnap.docs.map(h => {
-            const hd = h.data();
-            return {
-              id: h.id,
-              title: hd.title,
-              type: hd.type || 'time',
-              timeSpent: hd.time_spent || 0,
-              targetTime: hd.target_time || 15,
-              targetCount: hd.target_count || 10,
-              currentCount: hd.current_count || 0,
-              completed: hd.completed || false,
-              streak: hd.streak || 0,
-              lastCompletedDate: hd.last_completed_date || null,
-              missedDays: hd.missed_days || 0,
-              scheduleDays: hd.schedule_days || [],
-              lastActiveDate: hd.last_active_date || null,
-              isRecovering: hd.is_recovering || false,
-              originalTarget: hd.original_target || null,
-            };
-          });
-
-          goalsList.push({
-            id: goalDoc.id,
+      const unsubGoals = onSnapshot(goalsQuery, { includeMetadataChanges: true }, (snapshot) => {
+        const goalsList = snapshot.docs.map(docSnap => {
+          const g = docSnap.data();
+          return {
+            id: docSnap.id,
             title: g.title,
             description: g.description || '',
             mode: g.mode || 'ALL',
@@ -350,6 +327,7 @@ export const AppProvider = ({ children }) => {
             deadline: g.deadline || null,
             progress: g.progress || 0,
             streak: g.streak || 0,
+            completedDates: g.completed_dates || [],
             missedDays: g.missed_days || 0,
             lastActiveDate: g.last_active_date || null,
             lastCompletedDate: g.last_completed_date || null,
@@ -357,27 +335,98 @@ export const AppProvider = ({ children }) => {
             startDate: g.start_date || null,
             createdAt: g.created_at,
             extensions: g.extensions || [],
-            habits,
-            syncPending: goalDoc.metadata.hasPendingWrites,
-          });
+            syncPending: docSnap.metadata.hasPendingWrites,
+            habits: [] // Will be populated in real-time by nested listeners below
+          };
+        });
+
+        // Push new goals notifications
+        if (!isInitialGoalsLoad.current) {
+          const prevIds = new Set(goalsRef.current.map(g => g.id));
+          const newlySynced = goalsList.filter(g => !prevIds.has(g.id));
+          if (newlySynced.length > 0) {
+            newlySynced.forEach(g => {
+              scheduleLocalNotification("🎯 New Goal Sync", {
+                body: `"${g.title}" has been synchronized across devices.`,
+              });
+            });
+          }
+        } else {
+          isInitialGoalsLoad.current = false;
         }
 
-        if (currentId === activeGoalSnapshotId) {
-          if (!isInitialGoalsLoad.current) {
-            const prevIds = new Set(goalsRef.current.map(g => g.id));
-            const newlySynced = goalsList.filter(g => !prevIds.has(g.id));
-            if (newlySynced.length > 0) {
-              newlySynced.forEach(g => {
-                scheduleLocalNotification("🎯 New Goal Sync", {
-                  body: `"${g.title}" has been synchronized across devices.`,
-                });
+        // Initialize or merge goals preservation in state
+        setGoals(prev => {
+          return goalsList.map(g => {
+            const existing = prev.find(p => p.id === g.id);
+            return {
+              ...g,
+              habits: existing ? existing.habits : []
+            };
+          });
+        });
+
+        // Initialize/verify active habits sub-collection listeners for each goal
+        goalsList.forEach(goal => {
+          if (!habitsListeners.current[goal.id]) {
+            const habitsQuery = query(collection(fireDb, 'users', user.id, 'goals', goal.id, 'habits'));
+            const unsubHabit = onSnapshot(habitsQuery, { includeMetadataChanges: true }, (habitsSnapshot) => {
+              const habitsList = habitsSnapshot.docs.map(hDoc => {
+                const hd = hDoc.data();
+                return {
+                  id: hDoc.id,
+                  title: hd.title,
+                  type: hd.type || 'time',
+                  timeSpent: hd.time_spent || 0,
+                  targetTime: hd.target_time || 15,
+                  targetCount: hd.target_count || 10,
+                  currentCount: hd.current_count || 0,
+                  completed: hd.completed || false,
+                  streak: hd.streak || 0,
+                  lastCompletedDate: hd.last_completed_date || null,
+                  completedDates: hd.completed_dates || [],
+                  missedDays: hd.missed_days || 0,
+                  scheduleDays: hd.schedule_days || [],
+                  lastActiveDate: hd.last_active_date || null,
+                  isRecovering: hd.is_recovering || false,
+                  originalTarget: hd.original_target || null,
+                  syncPending: hDoc.metadata.hasPendingWrites,
+                };
               });
-            }
-          } else {
-            isInitialGoalsLoad.current = false;
+
+              // Merge these habits instantly into their goal's state
+              setGoals(prev => prev.map(g => {
+                if (g.id === goal.id) {
+                  // Guard: Prevent initial empty snapshot from wiping out staged habits during creation/sync
+                  if (habitsList.length === 0 && g.habits && g.habits.length > 0) {
+                    if (g.syncPending || habitsSnapshot.metadata.hasPendingWrites || habitsSnapshot.metadata.fromCache) {
+                      return g;
+                    }
+                  }
+                  return {
+                    ...g,
+                    habits: habitsList
+                  };
+                }
+                return g;
+              }));
+            }, (error) => {
+              console.error(`[Realtime Sync] Error in nested habits subscription for goal ${goal.id}:`, error);
+            });
+
+            habitsListeners.current[goal.id] = unsubHabit;
           }
-          setGoals(goalsList);
-        }
+        });
+
+        // Clean up listeners for any goals that have been deleted
+        const activeGoalIds = new Set(goalsList.map(g => g.id));
+        Object.keys(habitsListeners.current).forEach(gId => {
+          if (!activeGoalIds.has(gId)) {
+            habitsListeners.current[gId](); // Unsubscribe
+            delete habitsListeners.current[gId];
+          }
+        });
+
       }, (error) => {
         console.error('[Realtime Sync] Error in Goals subscription:', error);
       });
@@ -463,6 +512,8 @@ export const AppProvider = ({ children }) => {
 
     return () => {
       unsubscribes.forEach(unsub => unsub());
+      Object.values(habitsListeners.current).forEach(unsub => unsub());
+      habitsListeners.current = {};
     };
   }, [user]);
 
@@ -749,7 +800,7 @@ export const AppProvider = ({ children }) => {
   };
 
   // ── Actions ──────────────────────────────────────────────
-  const addGoal = (goal) => {
+  const addGoal = async (goal) => {
     const goalId = Date.now().toString();
     const initialHabits = (goal.habits || []).map(h => ({
       ...h,
@@ -775,10 +826,20 @@ export const AppProvider = ({ children }) => {
       lastActiveDate: TODAY(),
       habits: initialHabits
     };
+
     setGoals(prev => [newG, ...prev]);
+
     if (user) {
-      db.upsertGoal(user.id, newG);
-      initialHabits.forEach(h => db.upsertHabit(user.id, goalId, h));
+      try {
+        // Ensure Goal document is fully created and goalId is available first
+        await db.upsertGoal(user.id, newG);
+        
+        // Immediately create pending habits using the new goalId
+        const habitPromises = initialHabits.map(h => db.upsertHabit(user.id, goalId, h));
+        await Promise.all(habitPromises);
+      } catch (err) {
+        console.error('[Realtime Sync] Failed to create goal and habits sequentially:', err);
+      }
     }
   };
 
@@ -810,6 +871,11 @@ export const AppProvider = ({ children }) => {
   const deleteGoal = id => { setGoals(prev => prev.filter(g => g.id !== id)); if (user) db.deleteGoalDb(user.id, id); };
 
   const addHabit = (goalId, habit) => {
+    const targetGoal = goals.find(g => g.id === goalId);
+    if (!targetGoal) {
+      console.warn(`[Habit Creator] Cannot create habit; parent Goal ID "${goalId}" does not exist.`);
+      return;
+    }
     const newH = {
       ...habit,
       id: Date.now().toString(),
@@ -818,14 +884,47 @@ export const AppProvider = ({ children }) => {
       completed: false,
       streak: 0,
       lastCompletedDate: null,
+      completedDates: [],
       missedDays: 0,
       lastActiveDate: TODAY()
     };
+    
     setGoals(prev => prev.map(g => {
       if (g.id === goalId) {
-        const updatedG = { ...g, habits: [...g.habits, newH] };
         if (user) db.upsertHabit(user.id, goalId, newH);
-        return updatedG;
+        const updatedHabits = [...(g.habits || []), newH];
+        const updatedGoal = { ...g, habits: updatedHabits };
+
+        // Recalculate Goal progress, today's status, and streak
+        const today = TODAY();
+        const isGoalDone = isGoalDoneToday(updatedGoal);
+        let updatedGoalDates = g.completedDates ? [...g.completedDates] : [];
+        if (g.lastCompletedDate && !updatedGoalDates.includes(g.lastCompletedDate)) {
+          updatedGoalDates.push(g.lastCompletedDate);
+        }
+
+        if (isGoalDone) {
+          if (!updatedGoalDates.includes(today)) {
+            updatedGoalDates.push(today);
+          }
+        } else {
+          updatedGoalDates = updatedGoalDates.filter(d => d !== today);
+        }
+
+        const newGoalStreak = calculateStreakFromHistory(updatedGoalDates, []);
+        const sortedGoalDates = [...updatedGoalDates].sort((a, b) => b.localeCompare(a));
+        const newGoalLastCompleted = sortedGoalDates.length > 0 ? sortedGoalDates[0] : null;
+
+        updatedGoal.completedDates = updatedGoalDates;
+        updatedGoal.streak = newGoalStreak;
+        updatedGoal.lastCompletedDate = newGoalLastCompleted;
+        if (isGoalDone) {
+          updatedGoal.missedDays = 0;
+        }
+
+        updatedGoal.progress = calculateOverallProgress(updatedGoal);
+        if (user) db.upsertGoal(user.id, updatedGoal);
+        return updatedGoal;
       }
       return g;
     }));
@@ -833,7 +932,42 @@ export const AppProvider = ({ children }) => {
 
   const deleteHabit = (goalId, habitId) => {
     setGoals(prev => prev.map(g => {
-      if (g.id === goalId) { if (user) db.deleteHabitDb(user.id, goalId, habitId); return { ...g, habits: g.habits.filter(h => h.id !== habitId) }; }
+      if (g.id === goalId) {
+        if (user) db.deleteHabitDb(user.id, goalId, habitId);
+        const updatedHabits = g.habits.filter(h => h.id !== habitId);
+        const updatedGoal = { ...g, habits: updatedHabits };
+
+        // Recalculate Goal progress, today's status, and streak
+        const today = TODAY();
+        const isGoalDone = isGoalDoneToday(updatedGoal);
+        let updatedGoalDates = g.completedDates ? [...g.completedDates] : [];
+        if (g.lastCompletedDate && !updatedGoalDates.includes(g.lastCompletedDate)) {
+          updatedGoalDates.push(g.lastCompletedDate);
+        }
+
+        if (isGoalDone) {
+          if (!updatedGoalDates.includes(today)) {
+            updatedGoalDates.push(today);
+          }
+        } else {
+          updatedGoalDates = updatedGoalDates.filter(d => d !== today);
+        }
+
+        const newGoalStreak = calculateStreakFromHistory(updatedGoalDates, []);
+        const sortedGoalDates = [...updatedGoalDates].sort((a, b) => b.localeCompare(a));
+        const newGoalLastCompleted = sortedGoalDates.length > 0 ? sortedGoalDates[0] : null;
+
+        updatedGoal.completedDates = updatedGoalDates;
+        updatedGoal.streak = newGoalStreak;
+        updatedGoal.lastCompletedDate = newGoalLastCompleted;
+        if (isGoalDone) {
+          updatedGoal.missedDays = 0;
+        }
+
+        updatedGoal.progress = calculateOverallProgress(updatedGoal);
+        if (user) db.upsertGoal(user.id, updatedGoal);
+        return updatedGoal;
+      }
       return g;
     }));
   };
@@ -842,20 +976,42 @@ export const AppProvider = ({ children }) => {
     setGoals(prev => prev.map(goal => {
       if (goal.id !== goalId) return goal;
       const today = TODAY();
-      const yesterday = addDays(today, -1);
 
       const updatedHabits = goal.habits.map(h => {
         if (h.id === habitId) {
-          const newTime = (h.timeSpent || 0) + minutes;
-          let updatedH = { ...h, timeSpent: newTime };
+          const newTime = Math.max(0, (h.timeSpent || 0) + minutes);
+          const wasCompleted = h.completed;
+          const target = h.targetTime || 15;
+          const isDone = newTime >= target;
 
-          // Rule 3: Check if just completed
-          if (newTime >= (h.targetTime || 15) && !h.completed) {
-            updatedH.completed = true;
-            if (h.lastCompletedDate === yesterday) updatedH.streak += 1;
-            else if (h.lastCompletedDate !== today) updatedH.streak = 1;
-            updatedH.lastCompletedDate = today;
-            updatedH.missedDays = 0;
+          let updatedDates = h.completedDates ? [...h.completedDates] : [];
+          if (h.lastCompletedDate && !updatedDates.includes(h.lastCompletedDate)) {
+            updatedDates.push(h.lastCompletedDate);
+          }
+
+          if (isDone) {
+            if (!updatedDates.includes(today)) {
+              updatedDates.push(today);
+            }
+          } else {
+            updatedDates = updatedDates.filter(d => d !== today);
+          }
+
+          const newStreak = calculateStreakFromHistory(updatedDates, h.scheduleDays || []);
+          const sortedDates = [...updatedDates].sort((a, b) => b.localeCompare(a));
+          const newLastCompleted = sortedDates.length > 0 ? sortedDates[0] : null;
+
+          let updatedH = {
+            ...h,
+            timeSpent: newTime,
+            completed: isDone,
+            completedDates: updatedDates,
+            streak: newStreak,
+            lastCompletedDate: newLastCompleted,
+            missedDays: isDone ? 0 : h.missedDays,
+          };
+
+          if (isDone && !wasCompleted) {
             // XP: Habit completed via time
             awardXP(XP_SOURCES.HABIT_COMPLETE, `Completed: ${h.title}`);
             incrementCompletions();
@@ -871,17 +1027,29 @@ export const AppProvider = ({ children }) => {
 
       const updatedGoal = { ...goal, habits: updatedHabits };
 
-      // Update Goal Streak if just completed
-      const isGoalDone = (goal.mode === 'ANY' && updatedHabits.some(h => h.lastCompletedDate === today)) ||
-        (goal.mode === 'ALL' && updatedHabits.every(h => h.lastCompletedDate === today)) ||
-        (goal.mode === 'CUSTOM' && updatedHabits.filter(h => h.lastCompletedDate === today).length >= (goal.minHabits || 1));
+      // Goal-level streak recalculation
+      const isGoalDone = isGoalDoneToday(updatedGoal);
+      let updatedGoalDates = goal.completedDates ? [...goal.completedDates] : [];
+      if (goal.lastCompletedDate && !updatedGoalDates.includes(goal.lastCompletedDate)) {
+        updatedGoalDates.push(goal.lastCompletedDate);
+      }
 
-      if (isGoalDone && updatedGoal.lastCompletedDate !== today) {
-        let newStreak = updatedGoal.streak || 0;
-        if (updatedGoal.lastCompletedDate === yesterday) newStreak += 1;
-        else newStreak = 1;
-        updatedGoal.streak = newStreak;
-        updatedGoal.lastCompletedDate = today;
+      if (isGoalDone) {
+        if (!updatedGoalDates.includes(today)) {
+          updatedGoalDates.push(today);
+        }
+      } else {
+        updatedGoalDates = updatedGoalDates.filter(d => d !== today);
+      }
+
+      const newGoalStreak = calculateStreakFromHistory(updatedGoalDates, []);
+      const sortedGoalDates = [...updatedGoalDates].sort((a, b) => b.localeCompare(a));
+      const newGoalLastCompleted = sortedGoalDates.length > 0 ? sortedGoalDates[0] : null;
+
+      updatedGoal.completedDates = updatedGoalDates;
+      updatedGoal.streak = newGoalStreak;
+      updatedGoal.lastCompletedDate = newGoalLastCompleted;
+      if (isGoalDone) {
         updatedGoal.missedDays = 0;
       }
 
@@ -901,12 +1069,13 @@ export const AppProvider = ({ children }) => {
     setGoals(prev => prev.map(goal => {
       if (goal.id !== goalId) return goal;
       const today = TODAY();
-      const yesterday = addDays(today, -1);
 
       const updatedHabits = goal.habits.map(h => {
         if (h.id === habitId) {
           let updatedH = { ...h };
           let isDone = false;
+          let wasCompleted = h.completed;
+
           if (h.type === 'check') {
             updatedH.completed = !h.completed;
             isDone = updatedH.completed;
@@ -922,12 +1091,36 @@ export const AppProvider = ({ children }) => {
             isDone = updatedH.completed;
           }
 
-          if (isDone && h.lastCompletedDate !== today) {
-            if (h.lastCompletedDate === yesterday) updatedH.streak += 1;
-            else updatedH.streak = 1;
-            updatedH.lastCompletedDate = today;
+          let updatedDates = h.completedDates ? [...h.completedDates] : [];
+          if (h.lastCompletedDate && !updatedDates.includes(h.lastCompletedDate)) {
+            updatedDates.push(h.lastCompletedDate);
+          }
+
+          if (isDone) {
+            if (!updatedDates.includes(today)) {
+              updatedDates.push(today);
+            }
+          } else {
+            updatedDates = updatedDates.filter(d => d !== today);
+          }
+
+          const newStreak = calculateStreakFromHistory(updatedDates, h.scheduleDays || []);
+          const sortedDates = [...updatedDates].sort((a, b) => b.localeCompare(a));
+          const newLastCompleted = sortedDates.length > 0 ? sortedDates[0] : null;
+
+          updatedH.completedDates = updatedDates;
+          updatedH.streak = newStreak;
+          updatedH.lastCompletedDate = newLastCompleted;
+          if (isDone) {
             updatedH.missedDays = 0;
           }
+
+          if (isDone && !wasCompleted) {
+            awardXP(XP_SOURCES.HABIT_COMPLETE, `Completed: ${h.title}`);
+            incrementCompletions();
+            if ((h.missedDays || 0) >= 2) recordComeback();
+          }
+
           if (user) db.upsertHabit(user.id, goalId, updatedH);
           return updatedH;
         }
@@ -936,17 +1129,29 @@ export const AppProvider = ({ children }) => {
 
       const updatedGoal = { ...goal, habits: updatedHabits };
 
-      // Update Goal Streak if just completed
-      const isGoalDone = (goal.mode === 'ANY' && updatedHabits.some(h => h.lastCompletedDate === today)) ||
-        (goal.mode === 'ALL' && updatedHabits.every(h => h.lastCompletedDate === today)) ||
-        (goal.mode === 'CUSTOM' && updatedHabits.filter(h => h.lastCompletedDate === today).length >= (goal.minHabits || 1));
+      // Goal-level streak recalculation
+      const isGoalDone = isGoalDoneToday(updatedGoal);
+      let updatedGoalDates = goal.completedDates ? [...goal.completedDates] : [];
+      if (goal.lastCompletedDate && !updatedGoalDates.includes(goal.lastCompletedDate)) {
+        updatedGoalDates.push(goal.lastCompletedDate);
+      }
 
-      if (isGoalDone && updatedGoal.lastCompletedDate !== today) {
-        let newStreak = updatedGoal.streak || 0;
-        if (updatedGoal.lastCompletedDate === yesterday) newStreak += 1;
-        else newStreak = 1;
-        updatedGoal.streak = newStreak;
-        updatedGoal.lastCompletedDate = today;
+      if (isGoalDone) {
+        if (!updatedGoalDates.includes(today)) {
+          updatedGoalDates.push(today);
+        }
+      } else {
+        updatedGoalDates = updatedGoalDates.filter(d => d !== today);
+      }
+
+      const newGoalStreak = calculateStreakFromHistory(updatedGoalDates, []);
+      const sortedGoalDates = [...updatedGoalDates].sort((a, b) => b.localeCompare(a));
+      const newGoalLastCompleted = sortedGoalDates.length > 0 ? sortedGoalDates[0] : null;
+
+      updatedGoal.completedDates = updatedGoalDates;
+      updatedGoal.streak = newGoalStreak;
+      updatedGoal.lastCompletedDate = newGoalLastCompleted;
+      if (isGoalDone) {
         updatedGoal.missedDays = 0;
       }
 
@@ -960,25 +1165,47 @@ export const AppProvider = ({ children }) => {
     setGoals(prev => prev.map(goal => {
       if (goal.id !== goalId) return goal;
       const today = TODAY();
-      const yesterday = addDays(today, -1);
 
       const updatedHabits = goal.habits.map(h => {
         if (h.id === habitId) {
           const newCount = Math.max(0, (h.currentCount || 0) + delta);
-          let updatedH = { ...h, currentCount: newCount };
-          if (newCount >= (h.targetCount || 10) && !h.completed) {
-            updatedH.completed = true;
-            if (h.lastCompletedDate === yesterday) updatedH.streak += 1;
-            else if (h.lastCompletedDate !== today) updatedH.streak = 1;
-            updatedH.lastCompletedDate = today;
-            updatedH.missedDays = 0;
-            // XP: Habit completed via count
+          const wasCompleted = h.completed;
+          const target = h.targetCount || 10;
+          const isDone = newCount >= target;
+
+          let updatedDates = h.completedDates ? [...h.completedDates] : [];
+          if (h.lastCompletedDate && !updatedDates.includes(h.lastCompletedDate)) {
+            updatedDates.push(h.lastCompletedDate);
+          }
+
+          if (isDone) {
+            if (!updatedDates.includes(today)) {
+              updatedDates.push(today);
+            }
+          } else {
+            updatedDates = updatedDates.filter(d => d !== today);
+          }
+
+          const newStreak = calculateStreakFromHistory(updatedDates, h.scheduleDays || []);
+          const sortedDates = [...updatedDates].sort((a, b) => b.localeCompare(a));
+          const newLastCompleted = sortedDates.length > 0 ? sortedDates[0] : null;
+
+          let updatedH = {
+            ...h,
+            currentCount: newCount,
+            completed: isDone,
+            completedDates: updatedDates,
+            streak: newStreak,
+            lastCompletedDate: newLastCompleted,
+            missedDays: isDone ? 0 : h.missedDays,
+          };
+
+          if (isDone && !wasCompleted) {
             awardXP(XP_SOURCES.HABIT_COMPLETE, `Completed: ${h.title}`);
             incrementCompletions();
             if ((h.missedDays || 0) >= 2) recordComeback();
-          } else if (newCount < (h.targetCount || 10)) {
-            updatedH.completed = false;
           }
+
           if (user) db.upsertHabit(user.id, goalId, updatedH);
           return updatedH;
         }
@@ -987,17 +1214,29 @@ export const AppProvider = ({ children }) => {
 
       const updatedGoal = { ...goal, habits: updatedHabits };
 
-      // Update Goal Streak if just completed
-      const isGoalDone = (goal.mode === 'ANY' && updatedHabits.some(h => h.lastCompletedDate === today)) ||
-        (goal.mode === 'ALL' && updatedHabits.every(h => h.lastCompletedDate === today)) ||
-        (goal.mode === 'CUSTOM' && updatedHabits.filter(h => h.lastCompletedDate === today).length >= (goal.minHabits || 1));
+      // Goal-level streak recalculation
+      const isGoalDone = isGoalDoneToday(updatedGoal);
+      let updatedGoalDates = goal.completedDates ? [...goal.completedDates] : [];
+      if (goal.lastCompletedDate && !updatedGoalDates.includes(goal.lastCompletedDate)) {
+        updatedGoalDates.push(goal.lastCompletedDate);
+      }
 
-      if (isGoalDone && updatedGoal.lastCompletedDate !== today) {
-        let newStreak = updatedGoal.streak || 0;
-        if (updatedGoal.lastCompletedDate === yesterday) newStreak += 1;
-        else newStreak = 1;
-        updatedGoal.streak = newStreak;
-        updatedGoal.lastCompletedDate = today;
+      if (isGoalDone) {
+        if (!updatedGoalDates.includes(today)) {
+          updatedGoalDates.push(today);
+        }
+      } else {
+        updatedGoalDates = updatedGoalDates.filter(d => d !== today);
+      }
+
+      const newGoalStreak = calculateStreakFromHistory(updatedGoalDates, []);
+      const sortedGoalDates = [...updatedGoalDates].sort((a, b) => b.localeCompare(a));
+      const newGoalLastCompleted = sortedGoalDates.length > 0 ? sortedGoalDates[0] : null;
+
+      updatedGoal.completedDates = updatedGoalDates;
+      updatedGoal.streak = newGoalStreak;
+      updatedGoal.lastCompletedDate = newGoalLastCompleted;
+      if (isGoalDone) {
         updatedGoal.missedDays = 0;
       }
 
@@ -1060,7 +1299,9 @@ export const AppProvider = ({ children }) => {
     const t = tasks.find(item => item.id === taskId);
     if (!t) return;
 
+    const today = TODAY();
     let isDone = false;
+    let wasCompleted = t.completed;
     let updated = { ...t };
     const cType = t.completionType || t.type || 'check';
 
@@ -1079,20 +1320,38 @@ export const AppProvider = ({ children }) => {
       isDone = updated.completed;
     }
 
-    if (isDone && (t.schedule_type || t.type) === 'daily') {
-      const todayStr = TODAY();
-      const yesterdayStr = addDays(todayStr, -1);
-      let newStreak = t.currentStreak || 0;
-      if (t.lastCompletedDate === yesterdayStr) newStreak += 1;
-      else if (t.lastCompletedDate !== todayStr) newStreak = 1;
-      updated = { ...updated, currentStreak: newStreak, lastCompletedDate: todayStr, missedDays: 0 };
+    const isDaily = (t.schedule_type || t.type) === 'daily';
+    let updatedDates = t.completedDates ? [...t.completedDates] : [];
+    if (t.lastCompletedDate && !updatedDates.includes(t.lastCompletedDate)) {
+      updatedDates.push(t.lastCompletedDate);
+    }
+
+    if (isDone) {
+      if (!updatedDates.includes(today)) {
+        updatedDates.push(today);
+      }
+    } else {
+      updatedDates = updatedDates.filter(d => d !== today);
+    }
+
+    const newStreak = isDaily ? calculateStreakFromHistory(updatedDates, []) : 0;
+    const sortedDates = [...updatedDates].sort((a, b) => b.localeCompare(a));
+    const newLastCompleted = sortedDates.length > 0 ? sortedDates[0] : null;
+
+    updated.completedDates = updatedDates;
+    updated.currentStreak = newStreak;
+    updated.lastCompletedDate = newLastCompleted;
+    if (isDone) {
+      updated.missedDays = 0;
     }
 
     // XP: Task completed via toggle
-    if (isDone) {
+    if (isDone && !wasCompleted) {
       awardXP(XP_SOURCES.TASK_COMPLETE, `Completed: ${t.title}`);
       incrementCompletions();
     }
+
+    setTasks(prev => prev.map(item => item.id === taskId ? updated : item));
 
     if (user) {
       try {
@@ -1100,8 +1359,6 @@ export const AppProvider = ({ children }) => {
       } catch (err) {
         console.error('[Firestore Sync] Failed to toggle task complete:', err);
       }
-    } else {
-      setTasks(prev => prev.map(item => item.id === taskId ? updated : item));
     }
   };
 
@@ -1109,28 +1366,45 @@ export const AppProvider = ({ children }) => {
     const t = tasks.find(item => item.id === taskId);
     if (!t) return;
 
+    const today = TODAY();
     const newCount = Math.max(0, (t.currentCount || 0) + delta);
-    let updated = { ...t, currentCount: newCount };
-
-    const isDaily = (t.schedule_type || t.type) === 'daily';
+    const wasCompleted = t.completed;
     const target = t.targetCount || 10;
+    const isDone = newCount >= target;
 
-    if (newCount >= target && !t.completed) {
-      updated.completed = true;
-      if (isDaily) {
-        const todayStr = TODAY();
-        const yesterdayStr = addDays(todayStr, -1);
-        let newStreak = t.currentStreak || 0;
-        if (t.lastCompletedDate === yesterdayStr) newStreak += 1;
-        else if (t.lastCompletedDate !== todayStr) newStreak = 1;
-        updated = { ...updated, currentStreak: newStreak, lastCompletedDate: todayStr, missedDays: 0 };
+    let updated = { ...t, currentCount: newCount, completed: isDone };
+    const isDaily = (t.schedule_type || t.type) === 'daily';
+
+    let updatedDates = t.completedDates ? [...t.completedDates] : [];
+    if (t.lastCompletedDate && !updatedDates.includes(t.lastCompletedDate)) {
+      updatedDates.push(t.lastCompletedDate);
+    }
+
+    if (isDone) {
+      if (!updatedDates.includes(today)) {
+        updatedDates.push(today);
       }
-      // XP: Task completed via count
+    } else {
+      updatedDates = updatedDates.filter(d => d !== today);
+    }
+
+    const newStreak = isDaily ? calculateStreakFromHistory(updatedDates, []) : 0;
+    const sortedDates = [...updatedDates].sort((a, b) => b.localeCompare(a));
+    const newLastCompleted = sortedDates.length > 0 ? sortedDates[0] : null;
+
+    updated.completedDates = updatedDates;
+    updated.currentStreak = newStreak;
+    updated.lastCompletedDate = newLastCompleted;
+    if (isDone) {
+      updated.missedDays = 0;
+    }
+
+    if (isDone && !wasCompleted) {
       awardXP(XP_SOURCES.TASK_COMPLETE, `Completed: ${t.title}`);
       incrementCompletions();
-    } else if (newCount < target) {
-      updated.completed = false;
     }
+
+    setTasks(prev => prev.map(item => item.id === taskId ? updated : item));
 
     if (user) {
       try {
@@ -1138,8 +1412,6 @@ export const AppProvider = ({ children }) => {
       } catch (err) {
         console.error('[Firestore Sync] Failed to update task count:', err);
       }
-    } else {
-      setTasks(prev => prev.map(item => item.id === taskId ? updated : item));
     }
   };
 
@@ -1147,26 +1419,45 @@ export const AppProvider = ({ children }) => {
     const t = tasks.find(item => item.id === id);
     if (!t) return;
 
-    const newTime = (t.timeSpent || 0) + mins;
-    let updated = { ...t, timeSpent: newTime };
+    const today = TODAY();
+    const newTime = Math.max(0, (t.timeSpent || 0) + mins);
+    const wasCompleted = t.completed;
+    const target = t.targetTime || 15;
+    const isDone = newTime >= target;
+
+    let updated = { ...t, timeSpent: newTime, completed: isDone };
     const isDaily = (t.schedule_type || t.type) === 'daily';
 
-    if (newTime >= (t.targetTime || 15)) {
-      if (!updated.completed && isDaily) {
-        const todayStr = TODAY();
-        const yesterdayStr = addDays(todayStr, -1);
-        let newStreak = t.currentStreak || 0;
-        if (t.lastCompletedDate === yesterdayStr) newStreak += 1;
-        else if (t.lastCompletedDate !== todayStr) newStreak = 1;
-        updated = { ...updated, currentStreak: newStreak, lastCompletedDate: todayStr, missedDays: 0 };
-      }
-      // XP: Task completed via time
-      if (!updated.completed) {
-        awardXP(XP_SOURCES.TASK_COMPLETE, `Completed: ${t.title}`);
-        incrementCompletions();
-      }
-      updated.completed = true;
+    let updatedDates = t.completedDates ? [...t.completedDates] : [];
+    if (t.lastCompletedDate && !updatedDates.includes(t.lastCompletedDate)) {
+      updatedDates.push(t.lastCompletedDate);
     }
+
+    if (isDone) {
+      if (!updatedDates.includes(today)) {
+        updatedDates.push(today);
+      }
+    } else {
+      updatedDates = updatedDates.filter(d => d !== today);
+    }
+
+    const newStreak = isDaily ? calculateStreakFromHistory(updatedDates, []) : 0;
+    const sortedDates = [...updatedDates].sort((a, b) => b.localeCompare(a));
+    const newLastCompleted = sortedDates.length > 0 ? sortedDates[0] : null;
+
+    updated.completedDates = updatedDates;
+    updated.currentStreak = newStreak;
+    updated.lastCompletedDate = newLastCompleted;
+    if (isDone) {
+      updated.missedDays = 0;
+    }
+
+    if (isDone && !wasCompleted) {
+      awardXP(XP_SOURCES.TASK_COMPLETE, `Completed: ${t.title}`);
+      incrementCompletions();
+    }
+
+    setTasks(prev => prev.map(item => item.id === id ? updated : item));
 
     if (user) {
       try {
@@ -1174,8 +1465,6 @@ export const AppProvider = ({ children }) => {
       } catch (err) {
         console.error('[Firestore Sync] Failed to log task time:', err);
       }
-    } else {
-      setTasks(prev => prev.map(item => item.id === id ? updated : item));
     }
   };
 

@@ -1,4 +1,4 @@
-import { TODAY } from './dateUtils';
+import { TODAY, addDays } from './dateUtils';
 
 // Day abbreviations match the picker: ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
 const DAY_ABBRS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -29,7 +29,7 @@ export const isGoalDoneToday = (goal) => {
   const doneHabitsCount = scheduledHabits.filter(isHabitDoneToday).length;
 
   if (goal.mode === 'ANY') return doneHabitsCount > 0;
-  if (goal.mode === 'CUSTOM') return doneHabitsCount >= (goal.minHabits || 1);
+  if (goal.mode === 'CUSTOM') return doneHabitsCount >= Math.min(goal.minHabits || 1, scheduledHabits.length);
   return doneHabitsCount === scheduledHabits.length;
 };
 
@@ -40,7 +40,7 @@ export const calculateGoalDailyProgress = (goal) => {
   const habitsDone = scheduledHabits.filter(isHabitDoneToday).length;
 
   if (goal.mode === 'ANY') return habitsDone > 0 ? 100 : 0;
-  const target = goal.mode === 'CUSTOM' ? (goal.minHabits || 1) : scheduledHabits.length;
+  const target = goal.mode === 'CUSTOM' ? Math.min(goal.minHabits || 1, scheduledHabits.length) : scheduledHabits.length;
   return Math.min(100, Math.round((habitsDone / target) * 100));
 };
 
@@ -173,5 +173,39 @@ export const getSmartAlerts = (accuracy, goals = [], tasks = [], weeklyReport = 
     console.error("[Alerts] Error generating alerts:", e);
   }
   return alerts;
+};
+
+export const calculateStreakFromHistory = (completedDates, scheduleDays = []) => {
+  if (!completedDates || completedDates.length === 0) return 0;
+
+  const completedSet = new Set(completedDates);
+  const todayStr = TODAY();
+  
+  let streak = 0;
+  let currentDateStr = todayStr;
+  
+  for (let i = 0; i < 365; i++) {
+    const isCompleted = completedSet.has(currentDateStr);
+    
+    // Check if scheduled
+    const [y, m, d] = currentDateStr.split('-').map(Number);
+    const dateObj = new Date(y, m - 1, d);
+    const dayName = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dateObj.getDay()];
+    const isScheduled = scheduleDays.length === 0 || scheduleDays.includes(dayName);
+    
+    if (isCompleted) {
+      streak++;
+    } else if (isScheduled) {
+      // Today being uncompleted does not break the streak.
+      // But if any previous scheduled day was missed, the streak breaks.
+      if (currentDateStr !== todayStr) {
+        break;
+      }
+    }
+    // Go to previous day
+    currentDateStr = addDays(currentDateStr, -1);
+  }
+  
+  return streak;
 };
 

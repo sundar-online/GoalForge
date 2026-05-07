@@ -181,11 +181,10 @@ const HabitRow = ({ habit, goalId, logHabitTime, deleteHabit, toggleHabitCheck, 
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 flex-1 min-w-0">
             <button
-               onClick={() => { if (isCheck) toggleHabitCheck(goalId, habit.id); }}
+               onClick={() => toggleHabitCheck(goalId, habit.id)}
                className={`
                  w-9 h-9 shrink-0 rounded-xl border-2 flex items-center justify-center transition-all duration-200
                  ${done ? 'bg-emerald-500 border-emerald-500 scale-95' : 'bg-bg-card border-border-med cursor-pointer hover:border-accent-blue'}
-                 ${!isCheck && !done ? 'cursor-default' : ''}
                `}
             >
               {done ? <Check size={18} className="text-white" strokeWidth={3} /> : (isCheck ? null : <Icon size={16} className="text-text-muted" />)}
@@ -250,8 +249,16 @@ export const GoalsPage = () => {
     if (newGoal.habits.length === 0) return alert('Add at least one daily habit!');
     if (newGoal.habits.some(h => !h.title.trim())) return alert('Give all your habits a name!');
 
+    const cleanedHabits = newGoal.habits.map(h => ({
+      ...h,
+      targetTime: Number(h.targetTime || 15),
+      targetCount: Number(h.targetCount || 10),
+      scheduleDays: h.scheduleDays || []
+    }));
+
     addGoal({
       ...newGoal,
+      habits: cleanedHabits,
       mode: newGoal.mode || 'ANY',
       minHabits: newGoal.mode === 'CUSTOM' ? parseInt(newGoal.minHabits, 10) : 1
     });
@@ -425,7 +432,13 @@ export const GoalsPage = () => {
                       </select>
                       {h.type !== 'check' && (
                         <div className="flex items-center gap-2 bg-bg-card px-4 py-2 rounded-xl shadow-sm border border-border-light/50">
-                           <input type="number" min="1" value={h.type === 'count' ? h.targetCount : h.targetTime} onChange={e => updateStagingHabit(h.id, { [h.type === 'count' ? 'targetCount' : 'targetTime']: e.target.value })} className="w-12 bg-transparent text-center font-black text-accent-blue outline-none" />
+                           <input type="number" min="1" value={h.type === 'count' ? h.targetCount : h.targetTime} 
+                             onChange={e => {
+                               const val = parseInt(e.target.value, 10) || 1;
+                               updateStagingHabit(h.id, { [h.type === 'count' ? 'targetCount' : 'targetTime']: val });
+                             }} 
+                             className="w-12 bg-transparent text-center font-black text-accent-blue outline-none" 
+                           />
                            <span className="text-[10px] font-black text-text-muted uppercase tracking-widest">{h.type === 'count' ? 'units' : 'mins'}</span>
                         </div>
                       )}
@@ -531,7 +544,15 @@ export const GoalsPage = () => {
                           <option value="check">✅ Check</option>
                           <option value="count">🔢 Count</option>
                         </select>
-                        <input type="number" min="1" value={newHabit.type === 'count' ? newHabit.targetCount : newHabit.targetTime} onChange={e => setNewHabit(h => ({ ...h, [h.type === 'count' ? 'targetCount' : 'targetTime']: e.target.value }))} className="w-20 bg-bg-card rounded-xl px-4 py-3 text-sm font-black text-accent-blue shadow-sm border-none" />
+                        {newHabit.type !== 'check' && (
+                          <input type="number" min="1" value={newHabit.type === 'count' ? newHabit.targetCount : newHabit.targetTime} 
+                            onChange={e => {
+                              const val = parseInt(e.target.value, 10) || 1;
+                              setNewHabit(h => ({ ...h, [h.type === 'count' ? 'targetCount' : 'targetTime']: val }));
+                            }} 
+                            className="w-20 bg-bg-card rounded-xl px-4 py-3 text-sm font-black text-accent-blue shadow-sm border-none" 
+                          />
+                        )}
                       </div>
                       <DayPicker
                         value={newHabit.scheduleDays || []}

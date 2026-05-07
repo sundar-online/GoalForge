@@ -19,13 +19,29 @@ export const WeeklyHeatmap = ({ taskLogs, accuracy }) => {
 
       <div className="grid grid-cols-10 gap-2 sm:grid-cols-15 md:grid-cols-30 md:gap-1.5">
         {cells.map((cell) => {
-          const color = getIntensity(cell.key, taskLogs);
+          let color = getIntensity(cell.key, taskLogs);
+          
+          if (cell.active) {
+            // Live-bind today's cell color instantly to Today's Real-Time Accuracy prop
+            if (accuracy >= 99) color = '#22c55e'; // Green
+            else if (accuracy >= 50) color = 'var(--accent-blue)'; // Blue
+            else if (accuracy > 0) color = '#faba2c'; // Gold
+            else color = 'var(--bg-input)'; // Grey
+          }
+
+          const summary = taskLogs?.[cell.key];
+          const displayTitle = cell.active
+            ? `${cell.key} (Today): ${accuracy}% Accuracy`
+            : summary 
+              ? `${cell.key}: ${summary.completed_tasks}/${summary.total_tasks} Tasks Completed`
+              : `${cell.key}: No Activity`;
+
           return (
             <div
               key={cell.key}
               className={`aspect-square rounded-sm transition-all duration-500 hover:scale-110 cursor-help ${cell.active ? 'ring-2 ring-accent-blue/30 scale-105' : ''}`}
               style={{ backgroundColor: color }}
-              title={`${cell.key}: ${color}`}
+              title={displayTitle}
             />
           );
         })}

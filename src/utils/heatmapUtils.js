@@ -1,3 +1,5 @@
+import { TODAY, addDays } from './dateUtils';
+
 export const getIntensity = (dateStr, taskLogs) => {
   const summary = taskLogs?.[dateStr];
   if (!summary || !summary.total_tasks) return 'var(--bg-input)';
@@ -14,14 +16,13 @@ export const getIntensity = (dateStr, taskLogs) => {
 };
 
 export const generateHeatmapData = (daysCount = 30) => {
-  const today = new Date();
+  const todayLocal = TODAY();
   return [...Array(daysCount)].map((_, i) => {
-    const d = new Date();
-    d.setDate(today.getDate() - (daysCount - 1 - i));
-    const key = d.toISOString().split('T')[0];
+    const offset = -(daysCount - 1 - i);
+    const key = addDays(todayLocal, offset);
     return { 
       key, 
-      active: key === today.toISOString().split('T')[0] 
+      active: key === todayLocal 
     };
   });
 };
