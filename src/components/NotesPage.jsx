@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useAppContext } from '../context/AppContext';
 import {
   Plus, ArrowLeft, Trash2, CheckSquare, Square, Check,
-  FileText, ListChecks, MoreVertical, Search, X, Clock
+  FileText, ListChecks, MoreVertical, Search, X, Clock, Pin,
+  Folder, FolderPlus, ChevronDown
 } from 'lucide-react';
 
 // -- Helpers --
@@ -40,12 +41,26 @@ export const NotesPage = () => {
   // ── New Note State ────────────────────────────────────
   const [newTitle, setNewTitle] = useState('');
   const [newType, setNewType] = useState('text'); // 'text' | 'checklist'
+  const [newNoteFolder, setNewNoteFolder] = useState('');
 
-  // Filter notes
-  const filtered = notes.filter(n =>
-    n.title.toLowerCase().includes(search.toLowerCase()) ||
-    (n.content || '').toLowerCase().includes(search.toLowerCase())
-  );
+  // ── Folder States ─────────────────────────────────────
+  const [selectedFolder, setSelectedFolder] = useState('');
+  const [activeFolderDropdown, setActiveFolderDropdown] = useState(false);
+  const [typedFolderName, setTypedFolderName] = useState('');
+  const [isTypingNewFolder, setIsTypingNewFolder] = useState(false);
+
+  // Extract all unique folder names dynamically
+  const allFolders = Array.from(new Set(notes.map(n => n.folder).filter(Boolean)));
+
+  // Filter notes by search query and folder
+  const filtered = notes.filter(n => {
+    const matchesSearch = n.title.toLowerCase().includes(search.toLowerCase()) ||
+      (n.content || '').toLowerCase().includes(search.toLowerCase());
+    const matchesFolder = selectedFolder ? n.folder === selectedFolder : true;
+    return matchesSearch && matchesFolder;
+  });
+  const pinnedNotes = filtered.filter(n => n.pinned);
+  const otherNotes = filtered.filter(n => !n.pinned);
 
   // ── Handlers ──────────────────────────────────────────
   const handleCreateNote = () => {
@@ -54,10 +69,12 @@ export const NotesPage = () => {
       title: newTitle.trim(),
       content: '',
       checklist: newType === 'checklist' ? [] : null,
+      folder: newNoteFolder.trim() || '',
     };
     const created = addNote(note);
     setNewTitle('');
     setNewType('text');
+    setNewNoteFolder('');
     setActiveNote(created);
     setView('detail');
   };
@@ -75,6 +92,15 @@ export const NotesPage = () => {
       setView('list');
       setActiveNote(null);
     }
+  };
+
+  const handleTogglePin = (note) => {
+    const pinned = !note.pinned;
+    const updated = { ...note, pinned, updated_at: new Date().toISOString() };
+    if (activeNote && activeNote.id === note.id) {
+      setActiveNote(updated);
+    }
+    updateNote(note.id, { pinned, updated_at: updated.updated_at });
   };
 
   const handleUpdateTitle = (title) => {
@@ -193,6 +219,51 @@ export const NotesPage = () => {
             </div>
           </div>
 
+          <div className="space-y-3">
+            <label className="text-[10px] font-black text-text-muted uppercase tracking-widest px-1">Folder (Optional)</label>
+            
+            {allFolders.length > 0 ? (
+              <div className="flex flex-col gap-2">
+                <div className="flex flex-wrap gap-1.5">
+                  {allFolders.map(folder => (
+                    <button
+                      key={folder}
+                      type="button"
+                      onClick={() => setNewNoteFolder(newNoteFolder === folder ? '' : folder)}
+                      className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition-all flex items-center gap-1.5 ${
+                        newNoteFolder === folder
+                          ? 'bg-accent-blue/10 border-accent-blue text-accent-blue'
+                          : 'bg-bg-input border-border-med text-text-muted hover:border-border-light'
+                      }`}
+                    >
+                      <Folder size={12} /> {folder}
+                    </button>
+                  ))}
+                </div>
+                
+                <div className="relative mt-1">
+                  <input
+                    value={newNoteFolder}
+                    onChange={e => setNewNoteFolder(e.target.value)}
+                    placeholder="Or type a new folder name..."
+                    className="w-full bg-bg-input border border-border-med rounded-xl pl-4 pr-10 py-2.5 text-xs font-bold text-text-main outline-hidden focus:border-accent-blue transition-colors"
+                  />
+                  <FolderPlus size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-text-muted" />
+                </div>
+              </div>
+            ) : (
+              <div className="relative">
+                <input
+                  value={newNoteFolder}
+                  onChange={e => setNewNoteFolder(e.target.value)}
+                  placeholder="e.g. Work, Ideas, Fitness..."
+                  className="w-full bg-bg-input border border-border-med rounded-xl pl-4 pr-10 py-3 text-sm font-bold text-text-main outline-hidden focus:border-accent-blue transition-colors"
+                />
+                <FolderPlus size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-text-muted" />
+              </div>
+            )}
+          </div>
+
           <button 
             onClick={handleCreateNote}
             className="w-full py-4 rounded-2xl bg-accent-blue text-white font-black text-sm hover:opacity-90 transition-opacity"
@@ -226,10 +297,122 @@ export const NotesPage = () => {
               className="w-full bg-transparent border-none text-2xl font-black text-text-main outline-hidden p-0 tracking-tight"
               placeholder="Untitled System"
             />
-            <p className="text-[10px] font-black text-text-muted uppercase tracking-widest flex items-center gap-1.5 mt-1">
-              <Clock size={10} /> {fmtDate(activeNote.updated_at || activeNote.created_at)}
-            </p>
+            <div className="flex flex-wrap items-center gap-2 mt-1.5">
+              <p className="text-[10px] font-black text-text-muted uppercase tracking-widest flex items-center gap-1.5">
+                <Clock size={10} /> {fmtDate(activeNote.updated_at || activeNote.created_at)}
+              </p>
+              
+              {/* Folder badge / toggle */}
+              <div className="relative inline-block">
+                <button
+                  onClick={() => setActiveFolderDropdown(!activeFolderDropdown)}
+                  className={`flex items-center gap-1 px-2 py-0.5 rounded-md border text-[9px] font-black tracking-wider uppercase transition-all ${
+                    activeNote.folder
+                      ? 'bg-accent-blue/10 border-accent-blue/20 text-accent-blue'
+                      : 'bg-bg-input border-border-med text-text-muted hover:text-text-main hover:border-border-light'
+                  }`}
+                >
+                  <Folder size={9} />
+                  {activeNote.folder || 'Add to Folder'}
+                  <ChevronDown size={8} />
+                </button>
+
+                {activeFolderDropdown && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => { setActiveFolderDropdown(false); setIsTypingNewFolder(false); }} />
+                    <div className="absolute left-0 mt-1.5 w-48 bg-bg-card border border-border-med rounded-xl shadow-xl z-50 p-2 flex flex-col gap-1 text-xs normal-case">
+                      <p className="text-[9px] font-black text-text-muted uppercase tracking-widest px-2 py-1 border-b border-border-light mb-1">Select Folder</p>
+                      
+                      <button
+                        onClick={() => {
+                          updateNote(activeNote.id, { folder: '' });
+                          setActiveNote(prev => ({ ...prev, folder: '' }));
+                          setActiveFolderDropdown(false);
+                        }}
+                        className={`w-full text-left px-2 py-1.5 rounded-lg font-bold flex items-center gap-2 transition-all ${
+                          !activeNote.folder ? 'bg-accent-blue/10 text-accent-blue' : 'hover:bg-bg-input text-text-main'
+                        }`}
+                      >
+                        <X size={10} /> None
+                      </button>
+
+                      {allFolders.map(folder => (
+                        <button
+                          key={folder}
+                          onClick={() => {
+                            updateNote(activeNote.id, { folder });
+                            setActiveNote(prev => ({ ...prev, folder }));
+                            setActiveFolderDropdown(false);
+                          }}
+                          className={`w-full text-left px-2 py-1.5 rounded-lg font-bold flex items-center gap-2 truncate transition-all ${
+                            activeNote.folder === folder ? 'bg-accent-blue/10 text-accent-blue' : 'hover:bg-bg-input text-text-muted hover:text-text-main'
+                          }`}
+                        >
+                          <Folder size={10} /> {folder}
+                        </button>
+                      ))}
+
+                      {isTypingNewFolder ? (
+                        <div className="p-1 mt-1 border-t border-border-light pt-2 flex flex-col gap-1.5">
+                          <input
+                            autoFocus
+                            value={typedFolderName}
+                            onChange={e => setTypedFolderName(e.target.value)}
+                            placeholder="New folder name..."
+                            className="w-full bg-bg-input border border-border-med rounded-lg px-2 py-1 text-xs font-bold text-text-main outline-hidden"
+                            onKeyDown={e => {
+                              if (e.key === 'Enter' && typedFolderName.trim()) {
+                                const folder = typedFolderName.trim();
+                                updateNote(activeNote.id, { folder });
+                                setActiveNote(prev => ({ ...prev, folder }));
+                                setTypedFolderName('');
+                                setIsTypingNewFolder(false);
+                                setActiveFolderDropdown(false);
+                              }
+                            }}
+                          />
+                          <div className="flex gap-1">
+                            <button
+                              onClick={() => {
+                                if (typedFolderName.trim()) {
+                                  const folder = typedFolderName.trim();
+                                  updateNote(activeNote.id, { folder });
+                                  setActiveNote(prev => ({ ...prev, folder }));
+                                  setTypedFolderName('');
+                                  setIsTypingNewFolder(false);
+                                  setActiveFolderDropdown(false);
+                                }
+                              }}
+                              className="flex-1 py-1 bg-accent-blue text-white rounded-md text-[10px] font-black text-center"
+                            >
+                              Add
+                            </button>
+                            <button
+                              onClick={() => { setIsTypingNewFolder(false); setTypedFolderName(''); }}
+                              className="px-2 py-1 bg-bg-input border border-border-med text-text-muted rounded-md text-[10px] font-black text-center"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setIsTypingNewFolder(true)}
+                          className="w-full text-left px-2 py-1.5 rounded-lg font-bold flex items-center gap-2 text-accent-blue hover:bg-accent-blue/5 border-t border-border-light mt-1 transition-all"
+                        >
+                          <Plus size={10} /> Create New...
+                        </button>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
           </div>
+          <button onClick={() => handleTogglePin(activeNote)}
+            className={`w-11 h-11 rounded-xl border flex items-center justify-center transition-all active:scale-90 flex-shrink-0 ${activeNote.pinned ? 'bg-accent-blue/10 border-accent-blue/20 text-accent-blue' : 'bg-bg-card border-border-light text-text-muted hover:bg-bg-input'}`}>
+            <Pin size={18} className={activeNote.pinned ? 'fill-current' : 'rotate-45'} />
+          </button>
           <button onClick={() => handleDeleteNote(activeNote.id)}
             className="w-11 h-11 rounded-xl bg-red-500/10 hover:bg-red-500/20 flex items-center justify-center text-red-500 transition-all active:scale-90 flex-shrink-0">
             <Trash2 size={18} />
@@ -339,6 +522,109 @@ export const NotesPage = () => {
     );
   }
 
+  // -- Helper to render a Note Card --
+  const renderNoteCard = (note) => {
+    const isChecklist = Array.isArray(note.checklist);
+    const doneCount = isChecklist ? note.checklist.filter(c => c.completed).length : 0;
+    const totalCount = isChecklist ? note.checklist.length : 0;
+    const progressPct = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;
+
+    return (
+      <div
+        key={note.id}
+        onClick={() => openNote(note)}
+        className={`bg-bg-card border p-5 rounded-2xl shadow-xs hover:shadow-md transition-all cursor-pointer group active:scale-[0.99] relative ${
+          note.pinned 
+            ? 'border-accent-blue/30 bg-gradient-to-br from-bg-card to-accent-blue/[0.02]' 
+            : 'border-border-light hover:border-accent-blue/30'
+        }`}
+      >
+        <div className="flex justify-between items-start gap-4">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-3 mb-2">
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${isChecklist ? 'bg-purple-500/10 text-purple-500' : 'bg-accent-blue/10 text-accent-blue'}`}>
+                {isChecklist ? <ListChecks size={16} strokeWidth={2.5} /> : <FileText size={16} strokeWidth={2.5} />}
+              </div>
+              <h3 className="font-black text-text-main tracking-tight truncate flex items-center gap-2">
+                {note.title}
+                {note.pinned && (
+                  <Pin size={10} className="text-accent-blue fill-current rotate-45 flex-shrink-0" />
+                )}
+              </h3>
+            </div>
+            <p className="text-xs font-bold text-text-muted line-clamp-1 pl-11">
+              {getPreview(note)}
+            </p>
+          </div>
+
+          <div className="flex flex-col items-end gap-1.5 shrink-0">
+            <span className="text-[9px] font-black text-text-muted uppercase tracking-widest">
+              {fmtDate(note.updated_at || note.created_at)}
+            </span>
+            {note.folder && (
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-accent-blue/5 border border-accent-blue/10 text-[9px] font-black tracking-wider uppercase text-accent-blue">
+                <Folder size={8} /> {note.folder}
+              </span>
+            )}
+            <div className="flex items-center gap-1">
+              <button
+                onClick={(e) => { e.stopPropagation(); handleTogglePin(note); }}
+                className={`p-1.5 rounded-lg transition-all ${
+                  note.pinned 
+                    ? 'text-accent-blue bg-accent-blue/10' 
+                    : 'text-text-muted opacity-30 hover:opacity-100 hover:bg-bg-input hover:text-text-main'
+                }`}
+              >
+                <Pin size={12} className={note.pinned ? 'fill-current' : 'rotate-45'} />
+              </button>
+              <div className="relative">
+                <button
+                  onClick={(e) => { e.stopPropagation(); setMenuId(menuId === note.id ? null : note.id); }}
+                  className="p-1.5 rounded-lg text-text-muted hover:bg-bg-input hover:text-text-main transition-colors"
+                >
+                  <MoreVertical size={14} />
+                </button>
+                
+                {menuId === note.id && (
+                  <div className="absolute top-10 right-0 w-40 bg-bg-card border border-border-light rounded-xl shadow-float z-50 p-1 animate-in fade-in zoom-in-95">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleTogglePin(note); setMenuId(null); }}
+                      className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-text-main hover:bg-bg-input text-xs font-black transition-colors"
+                    >
+                      <Pin size={14} className="rotate-45" /> {note.pinned ? 'Unpin' : 'Pin'}
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleDeleteNote(note.id); }}
+                      className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-red-500 hover:bg-red-500/10 text-xs font-black transition-colors"
+                    >
+                      <Trash2 size={14} /> Delete
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {isChecklist && totalCount > 0 && (
+          <div className="mt-4 pl-11">
+            <div className="flex items-center gap-3">
+              <div className="flex-1 h-1.5 bg-bg-input rounded-full overflow-hidden">
+                <div 
+                  className={`h-full rounded-full transition-all duration-500 ${progressPct === 100 ? 'bg-emerald-500' : 'bg-accent-blue'}`}
+                  style={{ width: `${progressPct}%` }}
+                />
+              </div>
+              <span className={`text-[10px] font-black ${progressPct === 100 ? 'text-emerald-500' : 'text-text-muted'}`}>
+                {doneCount}/{totalCount}
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   // -- RENDER: Notes List --
   return (
     <div className="flex flex-col gap-6 pb-24">
@@ -371,6 +657,37 @@ export const NotesPage = () => {
         </div>
       )}
 
+      {/* Folder Filters — Only When Needed! */}
+      {allFolders.length > 0 && (
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 -mt-1 scrollbar-none">
+          <button
+            onClick={() => setSelectedFolder('')}
+            className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider flex-shrink-0 border transition-all ${
+              selectedFolder === ''
+                ? 'bg-accent-blue/10 border-accent-blue/20 text-accent-blue shadow-xs'
+                : 'bg-bg-card border-border-light text-text-muted hover:border-border-med hover:text-text-main'
+            }`}
+          >
+            All Logs
+          </button>
+          
+          {allFolders.map(folder => (
+            <button
+              key={folder}
+              onClick={() => setSelectedFolder(folder)}
+              className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider flex-shrink-0 border transition-all flex items-center gap-1.5 ${
+                selectedFolder === folder
+                  ? 'bg-accent-blue/10 border-accent-blue/20 text-accent-blue shadow-xs'
+                  : 'bg-bg-card border-border-light text-text-muted hover:border-border-med hover:text-text-main'
+              }`}
+            >
+              <Folder size={11} className={selectedFolder === folder ? 'fill-current' : ''} />
+              {folder}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Notes Grid */}
       {filtered.length === 0 ? (
         <div className="bg-bg-card border border-border-light p-12 rounded-[32px] flex flex-col items-center text-center gap-4 shadow-sm">
@@ -392,78 +709,31 @@ export const NotesPage = () => {
           )}
         </div>
       ) : (
-        <div className="flex flex-col gap-3">
-          {filtered.map(note => {
-            const isChecklist = Array.isArray(note.checklist);
-            const doneCount = isChecklist ? note.checklist.filter(c => c.completed).length : 0;
-            const totalCount = isChecklist ? note.checklist.length : 0;
-            const progressPct = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;
-
-            return (
-              <div
-                key={note.id}
-                onClick={() => openNote(note)}
-                className="bg-bg-card border border-border-light p-5 rounded-2xl shadow-xs hover:shadow-md hover:border-accent-blue/30 transition-all cursor-pointer group active:scale-[0.99]"
-              >
-                <div className="flex justify-between items-start gap-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-3 mb-2">
-                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${isChecklist ? 'bg-purple-500/10 text-purple-500' : 'bg-accent-blue/10 text-accent-blue'}`}>
-                        {isChecklist ? <ListChecks size={16} strokeWidth={2.5} /> : <FileText size={16} strokeWidth={2.5} />}
-                      </div>
-                      <h3 className="font-black text-text-main tracking-tight truncate">
-                        {note.title}
-                      </h3>
-                    </div>
-                    <p className="text-xs font-bold text-text-muted line-clamp-1 pl-11">
-                      {getPreview(note)}
-                    </p>
-                  </div>
-
-                  <div className="flex flex-col items-end gap-2 shrink-0">
-                    <span className="text-[9px] font-black text-text-muted uppercase tracking-widest">
-                      {fmtDate(note.updated_at || note.created_at)}
-                    </span>
-                    <div className="relative">
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setMenuId(menuId === note.id ? null : note.id); }}
-                        className="p-1.5 rounded-lg text-text-muted hover:bg-bg-input hover:text-text-main transition-colors"
-                      >
-                        <MoreVertical size={14} />
-                      </button>
-                      
-                      {menuId === note.id && (
-                        <div className="absolute top-10 right-0 w-40 bg-bg-card border border-border-light rounded-xl shadow-float z-50 p-1 animate-in fade-in zoom-in-95">
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleDeleteNote(note.id); }}
-                            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-red-500 hover:bg-red-500/10 text-xs font-black transition-colors"
-                          >
-                            <Trash2 size={14} /> Delete
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {isChecklist && totalCount > 0 && (
-                  <div className="mt-4 pl-11">
-                    <div className="flex items-center gap-3">
-                      <div className="flex-1 h-1.5 bg-bg-input rounded-full overflow-hidden">
-                        <div 
-                          className={`h-full rounded-full transition-all duration-500 ${progressPct === 100 ? 'bg-emerald-500' : 'bg-accent-blue'}`}
-                          style={{ width: `${progressPct}%` }}
-                        />
-                      </div>
-                      <span className={`text-[10px] font-black ${progressPct === 100 ? 'text-emerald-500' : 'text-text-muted'}`}>
-                        {doneCount}/{totalCount}
-                      </span>
-                    </div>
-                  </div>
-                )}
+        <div className="space-y-6">
+          {pinnedNotes.length > 0 && (
+            <div className="space-y-3 animate-in fade-in slide-in-from-top-4 duration-300">
+              <div className="flex items-center gap-1.5 px-1">
+                <Pin size={12} className="text-accent-blue rotate-45 fill-current" />
+                <span className="text-[10px] font-black text-text-muted uppercase tracking-[0.15em]">Pinned Logs</span>
               </div>
-            );
-          })}
+              <div className="flex flex-col gap-3">
+                {pinnedNotes.map(note => renderNoteCard(note))}
+              </div>
+            </div>
+          )}
+
+          {otherNotes.length > 0 && (
+            <div className="space-y-3">
+              {pinnedNotes.length > 0 && (
+                <div className="flex items-center gap-1.5 px-1 pt-2">
+                  <span className="text-[10px] font-black text-text-muted uppercase tracking-[0.15em]">All Logs</span>
+                </div>
+              )}
+              <div className="flex flex-col gap-3">
+                {otherNotes.map(note => renderNoteCard(note))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

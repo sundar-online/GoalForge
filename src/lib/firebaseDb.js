@@ -347,7 +347,9 @@ export async function fetchNotes(userId) {
         content: n.content || '',
         tags: n.tags || [],
         color: n.color || '',
+        checklist: n.checklist || null,
         pinned: n.pinned || false,
+        folder: n.folder || '',
         created_at: n.created_at,
         updated_at: n.updated_at,
       };
@@ -365,7 +367,9 @@ export async function upsertNote(userId, note) {
       content: note.content || '',
       tags: note.tags || [],
       color: note.color || '',
+      checklist: note.checklist || null,
       pinned: note.pinned || false,
+      folder: note.folder || '',
       created_at: note.created_at || new Date().toISOString(),
       updated_at: note.updated_at || new Date().toISOString(),
     }, { merge: true });

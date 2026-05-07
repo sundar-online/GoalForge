@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { BADGE_DEFINITIONS, LEVEL_THRESHOLDS, getLevelFromXP } from '../utils/gamificationEngine';
@@ -13,17 +13,27 @@ export const ProfilePage = () => {
   } = useAppContext();
   const { displayName, user } = useAuth();
   const [selectedBadge, setSelectedBadge] = useState(null);
-  const [pushPerm, setPushPerm] = useState(checkNotificationPermission());
+  const [pushPerm, setPushPerm] = useState('default');
+
+  useEffect(() => {
+    const fetchPerm = async () => {
+      const perm = await checkNotificationPermission();
+      setPushPerm(perm);
+    };
+    fetchPerm();
+  }, []);
 
   const handleToggleNotifications = async () => {
     if (pushPerm === 'granted') {
-      alert('Notifications are already granted. You must disable them from your browser settings if you wish to turn them off.');
+      alert('Notifications are already granted. You must disable them from your device settings if you wish to turn them off.');
       return;
     }
     const perm = await requestNotificationPermission();
     setPushPerm(perm);
     if (perm === 'granted') {
       alert('Smart notifications enabled! We will remind you to crush your goals.');
+    } else if (perm === 'denied') {
+      alert('Notification permission was denied. You can enable them manually in your device settings.');
     }
   };
 

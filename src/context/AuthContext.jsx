@@ -18,22 +18,33 @@ const AuthContext = createContext(null);
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [authError, setAuthError] = useState(null);
+  const [signingIn, setSigningIn] = useState(false);
 
   useEffect(() => {
-    // Process redirect results (useful on Android WebView)
+    // Set a timeout to prevent infinite loading (safety net)
+    const loadingTimeout = setTimeout(() => {
+      if (loading) {
+        console.warn('[Auth] Loading timeout - setting loading to false');
+        setLoading(false);
+      }
+    }, 5000); // 5 second timeout
+
+    // Process redirect results IMMEDIATELY (don't await)
     getRedirectResult(auth)
       .then((result) => {
         if (result) {
-          console.log('Successfully completed Google Redirect sign-in:', result.user);
+          console.log('✓ Successfully completed Google Redirect sign-in:', result.user);
         }
       })
       .catch((error) => {
-        console.error('Error during Google Redirect sign-in:', error);
+        console.error('✗ Error during Google Redirect sign-in:', error);
+        // Don't block loading on redirect errors
       });
 
+    // Listen for auth state changes
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       if (firebaseUser) {
-        // Normalize the user object so the rest of the app gets a consistent shape
         const normalizedUser = {
           id: firebaseUser.uid,
           uid: firebaseUser.uid,
@@ -46,80 +57,127 @@ export const AuthProvider = ({ children }) => {
         };
         setUser(normalizedUser);
 
-        // Sync profile to Firestore (fire-and-forget)
+        // Sync profile in background (fire-and-forget, non-blocking)
         upsertUserProfile(firebaseUser.uid, {
           displayName: normalizedUser.displayName,
           email: firebaseUser.email,
           photoURL: firebaseUser.photoURL,
-        });
+        }).catch(err => console.warn('[Auth] Profile sync failed:', err));
       } else {
         setUser(null);
       }
+      
+      clearTimeout(loadingTimeout);
       setLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribe();
+      clearTimeout(loadingTimeout);
+    };
   }, []);
 
   // ── Email / Password Sign Up ──────────────────────────
   const signUp = async (email, password, fullName) => {
     try {
+      setAuthError(null);
       const result = await createUserWithEmailAndPassword(auth, email, password);
-      // Set the display name
       if (fullName) {
         await updateProfile(result.user, { displayName: fullName });
       }
       return { data: result, error: null };
     } catch (error) {
-      return { data: null, error: { message: getFirebaseErrorMessage(error.code) } };
+      const message = getFirebaseErrorMessage(error.code);
+      setAuthError(message);
+      return { data: null, error: { message } };
     }
   };
 
   // ── Email / Password Sign In ──────────────────────────
   const signIn = async (email, password) => {
     try {
+      setAuthError(null);
       const result = await signInWithEmailAndPassword(auth, email, password);
       return { data: result, error: null };
     } catch (error) {
-      return { data: null, error: { message: getFirebaseErrorMessage(error.code) } };
+      const message = getFirebaseErrorMessage(error.code);
+      setAuthError(message);
+      return { data: null, error: { message } };
     }
   };
 
-  // ── Google Sign-In ────────────────────────────────────
+  // ── Google Sign-In (OPTIMIZED FOR MOBILE) ──────────────────────────────────
   const signInWithGoogle = async () => {
     try {
+      setAuthError(null);
+      setSigningIn(true);
+
       const isAndroidAPK = typeof window !== 'undefined' && (
         !!window.Capacitor || 
         navigator.userAgent.includes('wv') || 
         (navigator.userAgent.includes('Android') && !navigator.userAgent.includes('Chrome'))
       );
 
+      console.log('[Auth] Google Sign-In detected as:', isAndroidAPK ? 'Android APK' : 'Web');
+
       if (isAndroidAPK) {
-        // Use redirect on Android APK / WebView to avoid popup blocks
+        // ✅ MOBILE: Use redirect (doesn't block on slow networks)
+        // The page will reload automatically when redirect completes
+        console.log('[Auth] Using signInWithRedirect for mobile...');
         await signInWithRedirect(auth, googleProvider);
-        return { data: null, error: null }; // Will reload the page
+        // Don't await completion - redirect will reload the page
+        return { data: null, error: null };
       } else {
-        const result = await signInWithPopup(auth, googleProvider);
-        return { data: result, error: null };
+        // ✅ WEB: Use popup with timeout
+        console.log('[Auth] Using signInWithPopup for web...');
+        const signInPromise = signInWithPopup(auth, googleProvider);
+        
+        // Race against a 15-second timeout
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('auth/timeout')), 15000);
+        });
+
+        try {
+          const result = await Promise.race([signInPromise, timeoutPromise]);
+          setSigningIn(false);
+          return { data: result, error: null };
+        } catch (error) {
+          if (error.message === 'auth/timeout') {
+            setAuthError('Sign-in took too long. Please try again.');
+            console.error('[Auth] Google Sign-In timeout after 15 seconds');
+          }
+          throw error;
+        }
       }
     } catch (error) {
-      return { data: null, error: { message: getFirebaseErrorMessage(error.code) } };
+      setSigningIn(false);
+      const message = getFirebaseErrorMessage(error.code || error.message);
+      setAuthError(message);
+      console.error('[Auth] Google Sign-In error:', error);
+      return { data: null, error: { message } };
     }
   };
 
   // ── Password Reset ────────────────────────────────────
   const resetPassword = async (email) => {
     try {
+      setAuthError(null);
       await sendPasswordResetEmail(auth, email);
       return { error: null };
     } catch (error) {
-      return { error: { message: getFirebaseErrorMessage(error.code) } };
+      const message = getFirebaseErrorMessage(error.code);
+      setAuthError(message);
+      return { error: { message } };
     }
   };
 
   // ── Sign Out ──────────────────────────────────────────
   const signOut = async () => {
-    await firebaseSignOut(auth);
+    try {
+      await firebaseSignOut(auth);
+    } catch (error) {
+      console.error('[Auth] Sign-out error:', error);
+    }
   };
 
   const displayName = user?.displayName || user?.email?.split('@')[0] || 'User';
@@ -128,6 +186,8 @@ export const AuthProvider = ({ children }) => {
     <AuthContext.Provider value={{
       user,
       loading,
+      signingIn,
+      authError,
       signUp,
       signIn,
       signInWithGoogle,
@@ -161,6 +221,7 @@ function getFirebaseErrorMessage(code) {
     'auth/account-exists-with-different-credential': 'An account already exists with this email but using a different sign-in method.',
     'auth/invalid-credential': 'Invalid email or password. Please check and try again.',
     'auth/network-request-failed': 'Network error. Please check your connection.',
+    'auth/timeout': 'Sign-in timed out. Please try again.',
   };
   return messages[code] || 'An unexpected error occurred. Please try again.';
 }
