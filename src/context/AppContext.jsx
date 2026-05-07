@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import * as db from '../lib/firebaseDb';
+import { fireDb } from '../lib/firebase';
+import { onSnapshot, query, collection, doc, orderBy, getDocs } from 'firebase/firestore';
 import { useAuth } from './AuthContext';
 import { TODAY, addDays, diffDays } from '../utils/dateUtils';
 import {
@@ -68,6 +70,14 @@ export const AppProvider = ({ children }) => {
   const [tasks, setTasks] = useState(() => safeParse(STORAGE_KEYS.TASKS, []));
   const [taskLogs, setTaskLogs] = useState(() => safeParse(STORAGE_KEYS.LOGS, {}));
   const [notes, setNotes] = useState(() => safeParse(STORAGE_KEYS.NOTES, []));
+
+  const tasksRef = useRef([]);
+  const notesRef = useRef([]);
+  const goalsRef = useRef([]);
+
+  useEffect(() => { tasksRef.current = tasks; }, [tasks]);
+  useEffect(() => { notesRef.current = notes; }, [notes]);
+  useEffect(() => { goalsRef.current = goals; }, [goals]);
 
   // Gamification state
   const [xpData, setXpData] = useState(() => ({ ...DEFAULT_XP_DATA, ...safeParse(STORAGE_KEYS.XP, DEFAULT_XP_DATA) }));
@@ -184,70 +194,276 @@ export const AppProvider = ({ children }) => {
     document.documentElement.setAttribute('data-theme', settings.theme || 'dark');
   }, [settings]);
 
-  // Secondary Firebase Load (Optional / Background)
+  // ── Firebase Real-time Subscription Model ─────────────────
+  const isInitialTasksLoad = useRef(true);
+  const isInitialNotesLoad = useRef(true);
+  const isInitialGoalsLoad = useRef(true);
+
+  // Expose syncFromCloud as a no-op or status logger
   const syncFromCloud = async () => {
-    if (!user) { setLoading(false); return; }
-    try {
-      setSyncError(null);
-      const [g, t, f, l, s, n, x] = await Promise.all([
-        db.fetchGoals(user.id),
-        db.fetchTasks(user.id),
-        db.fetchFocusHistory(user.id),
-        db.fetchTaskLogs(user.id),
-        db.fetchUserSettings(user.id),
-        db.fetchNotes(user.id),
-        db.fetchXpData(user.id)
-      ]);
-
-      // Smart Merge: Merge cloud data with local data by ID to prevent overwriting new local items
-      setGoals(prev => {
-        const localIds = new Set(prev.map(i => i.id));
-        const cloudGoals = (g || []).filter(i => !localIds.has(i.id));
-        return [...prev, ...cloudGoals];
-      });
-
-      setTasks(prev => {
-        const localIds = new Set(prev.map(i => i.id));
-        const cloudTasks = (t || []).filter(i => !localIds.has(i.id));
-        return [...prev, ...cloudTasks];
-      });
-
-      setNotes(prev => {
-        const localIds = new Set(prev.map(i => i.id));
-        const cloudNotes = (n || []).filter(i => !localIds.has(i.id));
-        return [...prev, ...cloudNotes];
-      });
-
-      if (x) {
-        setXpData(prev => {
-          if ((x.totalXP || 0) > (prev.totalXP || 0)) {
-            return x;
-          }
-          return prev;
-        });
-      }
-
-      if (l) setTaskLogs(prev => ({ ...l, ...prev }));
-
-      if (s || f) {
-        setSettings(prev => ({
-          ...prev,
-          theme: s?.theme || prev.theme,
-          focusTimeToday: s?.focusTimeToday || prev.focusTimeToday,
-          lastActiveDate: s?.lastReset || prev.lastActiveDate,
-          focusHistory: f || prev.focusHistory
-        }));
-      }
-    } catch (err) {
-      setSyncError('Cloud sync interrupted. Your data is safe locally.');
-      console.warn('[Firebase] Offline mode or sync failed.', err);
-    } finally {
-      setLoading(false);
-    }
+    console.log('[Realtime Sync] Real-time engine is active and syncing continuously.');
   };
 
   useEffect(() => {
-    syncFromCloud();
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setSyncError(null);
+
+    const unsubscribes = [];
+
+    try {
+      // 1. Subscribe to Tasks Collection
+      const tasksQuery = query(collection(fireDb, 'users', user.id, 'tasks'), orderBy('created_at', 'desc'));
+      const unsubTasks = onSnapshot(tasksQuery, { includeMetadataChanges: true }, (snapshot) => {
+        const updatedTasks = snapshot.docs.map(doc => {
+          const t = doc.data();
+          return {
+            id: doc.id,
+            title: t.title,
+            type: t.type || 'daily',
+            completionType: t.completion_type || 'time',
+            targetTime: t.target_time || 15,
+            timeSpent: t.time_spent || 0,
+            completed: t.completed || false,
+            targetDate: t.target_date || null,
+            startDate: t.start_date || null,
+            endDate: t.end_date || null,
+            currentStreak: t.current_streak || 0,
+            missedDays: t.missed_days || 0,
+            lastCompletedDate: t.last_completed_date || null,
+            lastActiveDate: t.last_active_date || null,
+            priority: t.priority || 'Medium',
+            targetCount: t.target_count || 10,
+            currentCount: t.current_count || 0,
+            isRecovering: t.is_recovering || false,
+            originalTarget: t.original_target || null,
+            createdAt: t.created_at,
+            syncPending: doc.metadata.hasPendingWrites,
+          };
+        });
+
+        if (!isInitialTasksLoad.current) {
+          // Identify tasks added from other devices
+          const prevIds = new Set(tasksRef.current.map(t => t.id));
+          const newlySynced = updatedTasks.filter(t => !prevIds.has(t.id));
+          if (newlySynced.length > 0) {
+            newlySynced.forEach(t => {
+              scheduleLocalNotification("📝 New Task Added", {
+                body: `"${t.title}" was added from another device.`,
+              });
+            });
+          }
+        } else {
+          isInitialTasksLoad.current = false;
+        }
+
+        setTasks(updatedTasks);
+        setLoading(false);
+      }, (error) => {
+        console.error('[Realtime Sync] Error in Tasks subscription:', error);
+        setSyncError('Real-time task synchronization paused.');
+      });
+      unsubscribes.push(unsubTasks);
+
+      // 2. Subscribe to Notes Collection
+      const notesQuery = query(collection(fireDb, 'users', user.id, 'notes'), orderBy('created_at', 'desc'));
+      const unsubNotes = onSnapshot(notesQuery, { includeMetadataChanges: true }, (snapshot) => {
+        const updatedNotes = snapshot.docs.map(doc => {
+          const n = doc.data();
+          return {
+            id: doc.id,
+            title: n.title || '',
+            content: n.content || '',
+            tags: n.tags || [],
+            color: n.color || '',
+            checklist: n.checklist || null,
+            pinned: n.pinned || false,
+            folder: n.folder || '',
+            created_at: n.created_at,
+            updated_at: n.updated_at,
+            syncPending: doc.metadata.hasPendingWrites,
+          };
+        });
+
+        if (!isInitialNotesLoad.current) {
+          const prevIds = new Set(notesRef.current.map(n => n.id));
+          const newlySynced = updatedNotes.filter(n => !prevIds.has(n.id));
+          if (newlySynced.length > 0) {
+            newlySynced.forEach(n => {
+              scheduleLocalNotification("📓 New Note Added", {
+                body: `"${n.title || 'Untitled'}" was synchronized from the cloud.`,
+              });
+            });
+          }
+        } else {
+          isInitialNotesLoad.current = false;
+        }
+
+        setNotes(updatedNotes);
+      }, (error) => {
+        console.error('[Realtime Sync] Error in Notes subscription:', error);
+      });
+      unsubscribes.push(unsubNotes);
+
+      // 3. Subscribe to Goals & nested habits
+      let activeGoalSnapshotId = 0;
+      const goalsQuery = query(collection(fireDb, 'users', user.id, 'goals'), orderBy('created_at', 'desc'));
+      const unsubGoals = onSnapshot(goalsQuery, { includeMetadataChanges: true }, async (snapshot) => {
+        const currentId = ++activeGoalSnapshotId;
+        const goalsList = [];
+
+        for (const goalDoc of snapshot.docs) {
+          const g = goalDoc.data();
+          const habitsSnap = await getDocs(collection(goalDoc.ref, 'habits'));
+          const habits = habitsSnap.docs.map(h => {
+            const hd = h.data();
+            return {
+              id: h.id,
+              title: hd.title,
+              type: hd.type || 'time',
+              timeSpent: hd.time_spent || 0,
+              targetTime: hd.target_time || 15,
+              targetCount: hd.target_count || 10,
+              currentCount: hd.current_count || 0,
+              completed: hd.completed || false,
+              streak: hd.streak || 0,
+              lastCompletedDate: hd.last_completed_date || null,
+              missedDays: hd.missed_days || 0,
+              scheduleDays: hd.schedule_days || [],
+              lastActiveDate: hd.last_active_date || null,
+              isRecovering: hd.is_recovering || false,
+              originalTarget: hd.original_target || null,
+            };
+          });
+
+          goalsList.push({
+            id: goalDoc.id,
+            title: g.title,
+            description: g.description || '',
+            mode: g.mode || 'ALL',
+            minHabits: g.min_habits || 1,
+            tag: g.tag || 'General',
+            deadline: g.deadline || null,
+            progress: g.progress || 0,
+            streak: g.streak || 0,
+            missedDays: g.missed_days || 0,
+            lastActiveDate: g.last_active_date || null,
+            lastCompletedDate: g.last_completed_date || null,
+            daysCompleted: g.days_completed || 0,
+            startDate: g.start_date || null,
+            createdAt: g.created_at,
+            extensions: g.extensions || [],
+            habits,
+            syncPending: goalDoc.metadata.hasPendingWrites,
+          });
+        }
+
+        if (currentId === activeGoalSnapshotId) {
+          if (!isInitialGoalsLoad.current) {
+            const prevIds = new Set(goalsRef.current.map(g => g.id));
+            const newlySynced = goalsList.filter(g => !prevIds.has(g.id));
+            if (newlySynced.length > 0) {
+              newlySynced.forEach(g => {
+                scheduleLocalNotification("🎯 New Goal Sync", {
+                  body: `"${g.title}" has been synchronized across devices.`,
+                });
+              });
+            }
+          } else {
+            isInitialGoalsLoad.current = false;
+          }
+          setGoals(goalsList);
+        }
+      }, (error) => {
+        console.error('[Realtime Sync] Error in Goals subscription:', error);
+      });
+      unsubscribes.push(unsubGoals);
+
+      // 4. Subscribe to Task Logs Collection
+      const logsQuery = query(collection(fireDb, 'users', user.id, 'task_logs'), orderBy('date', 'desc'));
+      const unsubLogs = onSnapshot(logsQuery, (snapshot) => {
+        const logs = {};
+        snapshot.docs.forEach(doc => {
+          const row = doc.data();
+          logs[row.date] = {
+            date: row.date,
+            total_tasks: row.total_tasks || 0,
+            completed_tasks: row.completed_tasks || 0,
+            time_spent: row.time_spent || 0,
+            auto_completed: row.auto_completed || false,
+          };
+        });
+        setTaskLogs(logs);
+      }, (error) => {
+        console.error('[Realtime Sync] Error in Task Logs subscription:', error);
+      });
+      unsubscribes.push(unsubLogs);
+
+      // 5. Subscribe to Focus History Collection
+      const focusQuery = collection(fireDb, 'users', user.id, 'focus_history');
+      const unsubFocus = onSnapshot(focusQuery, (snapshot) => {
+        const history = {};
+        snapshot.docs.forEach(doc => {
+          history[doc.id] = doc.data().seconds;
+        });
+        setSettings(prev => ({ ...prev, focusHistory: history }));
+      }, (error) => {
+        console.error('[Realtime Sync] Error in Focus History subscription:', error);
+      });
+      unsubscribes.push(unsubFocus);
+
+      // 6. Subscribe to User Settings document
+      const settingsDocRef = doc(fireDb, 'users', user.id, 'settings', 'preferences');
+      const unsubSettings = onSnapshot(settingsDocRef, (docSnap) => {
+        if (docSnap.exists()) {
+          const s = docSnap.data();
+          setSettings(prev => ({
+            ...prev,
+            theme: s.theme || prev.theme,
+            focusTimeToday: s.focus_time_today || prev.focusTimeToday,
+            lastActiveDate: s.last_reset || prev.lastActiveDate,
+          }));
+        }
+      }, (error) => {
+        console.error('[Realtime Sync] Error in Settings subscription:', error);
+      });
+      unsubscribes.push(unsubSettings);
+
+      // 7. Subscribe to XP profile
+      const xpDocRef = doc(fireDb, 'users', user.id, 'xp', 'profile');
+      const unsubXp = onSnapshot(xpDocRef, (docSnap) => {
+        if (docSnap.exists()) {
+          const x = docSnap.data();
+          setXpData({
+            totalXP: x.total_xp || 0,
+            level: x.level || 1,
+            earnedBadges: x.earned_badges || [],
+            badgeUnlockDates: x.badge_unlock_dates || {},
+            perfectDays: x.perfect_days || 0,
+            comebackCount: x.comeback_count || 0,
+            totalCompletions: x.total_completions || 0,
+            lastXPDate: x.last_xp_date || '',
+            xpHistory: x.xp_history || [],
+          });
+        }
+      }, (error) => {
+        console.error('[Realtime Sync] Error in XP subscription:', error);
+      });
+      unsubscribes.push(unsubXp);
+
+    } catch (err) {
+      console.error('[Realtime Sync] Error mounting realtime listeners:', err);
+      setSyncError('Offline-first fallback active.');
+      setLoading(false);
+    }
+
+    return () => {
+      unsubscribes.forEach(unsub => unsub());
+    };
   }, [user]);
 
   const [currentDate, setCurrentDate] = useState(TODAY());
@@ -791,7 +1007,7 @@ export const AppProvider = ({ children }) => {
     }));
   };
 
-  const addTask = (task) => {
+  const addTask = async (task) => {
     const newT = {
       ...task,
       id: Date.now().toString(),
@@ -802,120 +1018,165 @@ export const AppProvider = ({ children }) => {
       missedDays: 0,
       lastActiveDate: TODAY()
     };
-    setTasks(prev => [newT, ...prev]);
-    if (user) db.upsertTask(user.id, newT);
-  };
-
-  const updateTask = (id, updates) => {
-    setTasks(prev => prev.map(t => {
-      if (t.id === id) { const updated = { ...t, ...updates }; if (user) db.upsertTask(user.id, updated); return updated; }
-      return t;
-    }));
-  };
-
-  const deleteTask = id => { setTasks(prev => prev.filter(t => t.id !== id)); if (user) db.deleteTaskDb(user.id, id); };
-
-  const toggleTaskComplete = (taskId) => {
-    setTasks(prev => prev.map(t => {
-      if (t.id === taskId) {
-        let isDone = false;
-        let updated = { ...t };
-        const cType = t.completionType || t.type || 'check';
-
-        if (cType === 'check') {
-          updated.completed = !t.completed;
-          isDone = updated.completed;
-        } else if (cType === 'count') {
-          const target = t.targetCount || 10;
-          updated.currentCount = (t.currentCount >= target) ? 0 : target;
-          updated.completed = updated.currentCount >= target;
-          isDone = updated.completed;
-        } else {
-          const target = t.targetTime || 30;
-          updated.timeSpent = (t.timeSpent >= target) ? 0 : target;
-          updated.completed = updated.timeSpent >= target;
-          isDone = updated.completed;
-        }
-
-        if (isDone && (t.schedule_type || t.type) === 'daily') {
-          const todayStr = TODAY();
-          const yesterdayStr = addDays(todayStr, -1);
-          let newStreak = t.currentStreak || 0;
-          if (t.lastCompletedDate === yesterdayStr) newStreak += 1;
-          else if (t.lastCompletedDate !== todayStr) newStreak = 1;
-          updated = { ...updated, currentStreak: newStreak, lastCompletedDate: todayStr, missedDays: 0 };
-        }
-        // XP: Task completed via toggle
-        if (isDone) {
-          awardXP(XP_SOURCES.TASK_COMPLETE, `Completed: ${t.title}`);
-          incrementCompletions();
-        }
-        if (user) db.upsertTask(user.id, updated);
-        return updated;
+    if (user) {
+      try {
+        await db.upsertTask(user.id, newT);
+      } catch (err) {
+        console.error('[Firestore Sync] Failed to add task:', err);
       }
-      return t;
-    }));
+    } else {
+      setTasks(prev => [newT, ...prev]);
+    }
   };
 
-  const updateTaskCount = (taskId, delta) => {
-    setTasks(prev => prev.map(t => {
-      if (t.id !== taskId) return t;
-      const newCount = Math.max(0, (t.currentCount || 0) + delta);
-      let updated = { ...t, currentCount: newCount };
+  const updateTask = async (id, updates) => {
+    const t = tasks.find(item => item.id === id);
+    if (!t) return;
+    const updated = { ...t, ...updates };
+    if (user) {
+      try {
+        await db.upsertTask(user.id, updated);
+      } catch (err) {
+        console.error('[Firestore Sync] Failed to update task:', err);
+      }
+    } else {
+      setTasks(prev => prev.map(item => item.id === id ? updated : item));
+    }
+  };
 
-      const isDaily = (t.schedule_type || t.type) === 'daily';
+  const deleteTask = async (id) => {
+    if (user) {
+      try {
+        await db.deleteTaskDb(user.id, id);
+      } catch (err) {
+        console.error('[Firestore Sync] Failed to delete task:', err);
+      }
+    } else {
+      setTasks(prev => prev.filter(t => t.id !== id));
+    }
+  };
+
+  const toggleTaskComplete = async (taskId) => {
+    const t = tasks.find(item => item.id === taskId);
+    if (!t) return;
+
+    let isDone = false;
+    let updated = { ...t };
+    const cType = t.completionType || t.type || 'check';
+
+    if (cType === 'check') {
+      updated.completed = !t.completed;
+      isDone = updated.completed;
+    } else if (cType === 'count') {
       const target = t.targetCount || 10;
+      updated.currentCount = (t.currentCount >= target) ? 0 : target;
+      updated.completed = updated.currentCount >= target;
+      isDone = updated.completed;
+    } else {
+      const target = t.targetTime || 30;
+      updated.timeSpent = (t.timeSpent >= target) ? 0 : target;
+      updated.completed = updated.timeSpent >= target;
+      isDone = updated.completed;
+    }
 
-      if (newCount >= target && !t.completed) {
-        updated.completed = true;
-        if (isDaily) {
-          const todayStr = TODAY();
-          const yesterdayStr = addDays(todayStr, -1);
-          let newStreak = t.currentStreak || 0;
-          if (t.lastCompletedDate === yesterdayStr) newStreak += 1;
-          else if (t.lastCompletedDate !== todayStr) newStreak = 1;
-          updated = { ...updated, currentStreak: newStreak, lastCompletedDate: todayStr, missedDays: 0 };
-        }
-        // XP: Task completed via count
+    if (isDone && (t.schedule_type || t.type) === 'daily') {
+      const todayStr = TODAY();
+      const yesterdayStr = addDays(todayStr, -1);
+      let newStreak = t.currentStreak || 0;
+      if (t.lastCompletedDate === yesterdayStr) newStreak += 1;
+      else if (t.lastCompletedDate !== todayStr) newStreak = 1;
+      updated = { ...updated, currentStreak: newStreak, lastCompletedDate: todayStr, missedDays: 0 };
+    }
+
+    // XP: Task completed via toggle
+    if (isDone) {
+      awardXP(XP_SOURCES.TASK_COMPLETE, `Completed: ${t.title}`);
+      incrementCompletions();
+    }
+
+    if (user) {
+      try {
+        await db.upsertTask(user.id, updated);
+      } catch (err) {
+        console.error('[Firestore Sync] Failed to toggle task complete:', err);
+      }
+    } else {
+      setTasks(prev => prev.map(item => item.id === taskId ? updated : item));
+    }
+  };
+
+  const updateTaskCount = async (taskId, delta) => {
+    const t = tasks.find(item => item.id === taskId);
+    if (!t) return;
+
+    const newCount = Math.max(0, (t.currentCount || 0) + delta);
+    let updated = { ...t, currentCount: newCount };
+
+    const isDaily = (t.schedule_type || t.type) === 'daily';
+    const target = t.targetCount || 10;
+
+    if (newCount >= target && !t.completed) {
+      updated.completed = true;
+      if (isDaily) {
+        const todayStr = TODAY();
+        const yesterdayStr = addDays(todayStr, -1);
+        let newStreak = t.currentStreak || 0;
+        if (t.lastCompletedDate === yesterdayStr) newStreak += 1;
+        else if (t.lastCompletedDate !== todayStr) newStreak = 1;
+        updated = { ...updated, currentStreak: newStreak, lastCompletedDate: todayStr, missedDays: 0 };
+      }
+      // XP: Task completed via count
+      awardXP(XP_SOURCES.TASK_COMPLETE, `Completed: ${t.title}`);
+      incrementCompletions();
+    } else if (newCount < target) {
+      updated.completed = false;
+    }
+
+    if (user) {
+      try {
+        await db.upsertTask(user.id, updated);
+      } catch (err) {
+        console.error('[Firestore Sync] Failed to update task count:', err);
+      }
+    } else {
+      setTasks(prev => prev.map(item => item.id === taskId ? updated : item));
+    }
+  };
+
+  const logTaskTime = async (id, mins) => {
+    const t = tasks.find(item => item.id === id);
+    if (!t) return;
+
+    const newTime = (t.timeSpent || 0) + mins;
+    let updated = { ...t, timeSpent: newTime };
+    const isDaily = (t.schedule_type || t.type) === 'daily';
+
+    if (newTime >= (t.targetTime || 15)) {
+      if (!updated.completed && isDaily) {
+        const todayStr = TODAY();
+        const yesterdayStr = addDays(todayStr, -1);
+        let newStreak = t.currentStreak || 0;
+        if (t.lastCompletedDate === yesterdayStr) newStreak += 1;
+        else if (t.lastCompletedDate !== todayStr) newStreak = 1;
+        updated = { ...updated, currentStreak: newStreak, lastCompletedDate: todayStr, missedDays: 0 };
+      }
+      // XP: Task completed via time
+      if (!updated.completed) {
         awardXP(XP_SOURCES.TASK_COMPLETE, `Completed: ${t.title}`);
         incrementCompletions();
-      } else if (newCount < target) {
-        updated.completed = false;
       }
+      updated.completed = true;
+    }
 
-      if (user) db.upsertTask(user.id, updated);
-      return updated;
-    }));
-  };
-
-  const logTaskTime = (id, mins) => {
-    setTasks(prev => prev.map(t => {
-      if (t.id === id) {
-        const newTime = (t.timeSpent || 0) + mins;
-        let updated = { ...t, timeSpent: newTime };
-        const isDaily = (t.schedule_type || t.type) === 'daily';
-
-        if (newTime >= (t.targetTime || 15)) {
-          if (!updated.completed && isDaily) {
-            const todayStr = TODAY();
-            const yesterdayStr = addDays(todayStr, -1);
-            let newStreak = t.currentStreak || 0;
-            if (t.lastCompletedDate === yesterdayStr) newStreak += 1;
-            else if (t.lastCompletedDate !== todayStr) newStreak = 1;
-            updated = { ...updated, currentStreak: newStreak, lastCompletedDate: todayStr, missedDays: 0 };
-          }
-          // XP: Task completed via time
-          if (!updated.completed) {
-            awardXP(XP_SOURCES.TASK_COMPLETE, `Completed: ${t.title}`);
-            incrementCompletions();
-          }
-          updated.completed = true;
-        }
-        if (user) db.upsertTask(user.id, updated);
-        return updated;
+    if (user) {
+      try {
+        await db.upsertTask(user.id, updated);
+      } catch (err) {
+        console.error('[Firestore Sync] Failed to log task time:', err);
       }
-      return t;
-    }));
+    } else {
+      setTasks(prev => prev.map(item => item.id === id ? updated : item));
+    }
   };
 
   const addFocusTime = (seconds) => {
@@ -948,24 +1209,46 @@ export const AppProvider = ({ children }) => {
     return () => clearTimeout(timer);
   }, [settings.focusTimeToday, settings.theme, user]);
 
-  const addNote = note => {
+  const addNote = async note => {
     const now = new Date().toISOString();
     const newN = { ...note, id: Date.now().toString(), created_at: now, updated_at: now };
-    setNotes(prev => [newN, ...prev]);
-    if (user) db.upsertNote(user.id, newN);
+    if (user) {
+      try {
+        await db.upsertNote(user.id, newN);
+      } catch (err) {
+        console.error('[Firestore Sync] Failed to add note:', err);
+      }
+    } else {
+      setNotes(prev => [newN, ...prev]);
+    }
     return newN;
   };
-  const updateNote = (id, updates) => setNotes(prev => prev.map(n => {
-    if (n.id === id) {
-      const updated = { ...n, ...updates, updated_at: new Date().toISOString() };
-      if (user) db.upsertNote(user.id, updated);
-      return updated;
+
+  const updateNote = async (id, updates) => {
+    const n = notes.find(item => item.id === id);
+    if (!n) return;
+    const updated = { ...n, ...updates, updated_at: new Date().toISOString() };
+    if (user) {
+      try {
+        await db.upsertNote(user.id, updated);
+      } catch (err) {
+        console.error('[Firestore Sync] Failed to update note:', err);
+      }
+    } else {
+      setNotes(prev => prev.map(item => item.id === id ? updated : item));
     }
-    return n;
-  }));
-  const deleteNote = id => {
-    setNotes(prev => prev.filter(n => n.id !== id));
-    if (user) db.deleteNoteDb(user.id, id);
+  };
+
+  const deleteNote = async id => {
+    if (user) {
+      try {
+        await db.deleteNoteDb(user.id, id);
+      } catch (err) {
+        console.error('[Firestore Sync] Failed to delete note:', err);
+      }
+    } else {
+      setNotes(prev => prev.filter(n => n.id !== id));
+    }
   };
 
   // Sync XP data to DB on change (debounced)

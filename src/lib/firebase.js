@@ -3,7 +3,7 @@
 // ═══════════════════════════════════════════════════════
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
 
 const firebaseConfig = {
   apiKey: "AIzaSyD59ewUm8tQYj4Vg_a-vPEmJ3Rd5khVwtY",
@@ -23,6 +23,10 @@ export const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: 'select_account' });
 
 // Firestore
-export const fireDb = getFirestore(app);
+export const fireDb = initializeFirestore(app, {
+  localCache: persistentLocalCache({
+    tabManager: persistentMultipleTabManager()
+  })
+});
 
 export default app;

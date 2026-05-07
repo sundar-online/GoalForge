@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAppContext } from '../context/AppContext';
-import { CalendarCheck, Plus, Clock, Trash2, Check, CalendarRange, Calendar } from 'lucide-react';
+import { CalendarCheck, Plus, Clock, Trash2, Check, CalendarRange, Calendar, Cloud } from 'lucide-react';
 import { isTaskDone } from '../utils/calculationUtils';
 import { TODAY } from '../utils/dateUtils';
 
@@ -55,8 +55,19 @@ export const DailyTasks = () => {
   const [newTask, setNewTask] = useState(defaultTask);
   const [isAdding, setIsAdding] = useState(false);
   const [showLog, setShowLog] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+  const [completedLimit, setCompletedLimit] = useState(5);
 
   const { tasks, addTask, deleteTask, logTaskTime, toggleTaskComplete, updateTaskCount } = useAppContext();
+
+  // Debounce search input
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedQuery(searchQuery);
+    }, 250);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
 
   const todayStr = TODAY();
   const todayTasks = tasks.filter(t => {
@@ -70,6 +81,16 @@ export const DailyTasks = () => {
   const doneCount = todayTasks.filter(isTaskDone).length;
   const total = todayTasks.length;
   const accuracy = total === 0 ? 100 : Math.round((doneCount / total) * 100);
+
+  // Filter tasks based on search query
+  const filteredTasks = todayTasks.filter(t => {
+    if (!debouncedQuery.trim()) return true;
+    return t.title.toLowerCase().includes(debouncedQuery.toLowerCase());
+  });
+
+  const activeTasks = filteredTasks.filter(t => !isTaskDone(t));
+  const completedTasks = filteredTasks.filter(t => isTaskDone(t));
+  const visibleCompletedTasks = completedTasks.slice(0, completedLimit);
 
   const submit = (e) => {
     e.preventDefault();
@@ -191,80 +212,178 @@ export const DailyTasks = () => {
         )}
       </AnimatePresence>
 
+      {/* Search Bar */}
+      {todayTasks.length > 0 && (
+        <div className="relative">
+          <input 
+            type="text" 
+            value={searchQuery} 
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder="Search tasks instantly..."
+            className="w-full text-sm font-black text-text-main bg-bg-card border border-border-light hover:border-border-med focus:border-accent-blue/30 p-4 pl-12 rounded-2xl outline-none transition-all placeholder:text-text-muted/40"
+          />
+          <div className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted/50">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
+          {searchQuery && (
+            <button 
+              onClick={() => setSearchQuery('')}
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-text-muted/50 hover:text-rose-500 font-bold text-xs"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Task List */}
       <div className="flex flex-col gap-4">
+        {filteredTasks.length === 0 && todayTasks.length > 0 && (
+          <div className="py-12 text-center text-text-muted font-bold">
+            No tasks match your search criteria.
+          </div>
+        )}
+
         <AnimatePresence initial={false}>
-          {todayTasks
-            .slice().sort((a,b) => isTaskDone(a) - isTaskDone(b))
-              .map(task => {
-                const tDone = isTaskDone(task);
-                const cType = task.completionType || task.type || 'check';
-                const isTime = cType === 'time';
-                const isCount = cType === 'count';
-                const isCheck = cType === 'check';
+          {/* Active / Uncompleted Tasks */}
+          {activeTasks.map(task => {
+            const tDone = false;
+            const cType = task.completionType || task.type || 'check';
+            const isTime = cType === 'time';
+            const isCount = cType === 'count';
+            const isCheck = cType === 'check';
 
-                const target = isCount ? (task.targetCount || 10) : (task.targetTime || 30);
-                const current = isCount ? (task.currentCount || 0) : (task.timeSpent || 0);
-                const pct = isCheck ? 0 : Math.min(100, Math.round((current / (target || 1)) * 100));
-                const sType = task.type || 'daily';
+            const target = isCount ? (task.targetCount || 10) : (task.targetTime || 30);
+            const current = isCount ? (task.currentCount || 0) : (task.timeSpent || 0);
+            const pct = isCheck ? 0 : Math.min(100, Math.round((current / (target || 1)) * 100));
+            const sType = task.type || 'daily';
 
-                return (
-                  <motion.div layout key={task.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }}
-                    className={`
-                      bg-bg-card rounded-[28px] p-5 border transition-all duration-300 flex flex-col gap-4
-                      ${tDone ? 'border-emerald-500/30 bg-emerald-500/5 opacity-70' : 'border-border-light shadow-sm hover:border-border-med'}
-                    `}
+            return (
+              <motion.div layout key={task.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }}
+                className="bg-bg-card rounded-[28px] p-5 border border-border-light shadow-sm hover:border-border-med transition-all duration-300 flex flex-col gap-4"
+              >
+                <div className="flex items-center gap-4">
+                  <button onClick={() => toggleTaskComplete(task.id)} 
+                    className="w-10 h-10 shrink-0 rounded-xl border-2 flex items-center justify-center bg-bg-input border-border-med hover:border-accent-blue transition-all duration-200"
                   >
-                    <div className="flex items-center gap-4">
-                      <button onClick={() => toggleTaskComplete(task.id)} 
-                        className={`
-                          w-10 h-10 shrink-0 rounded-xl border-2 flex items-center justify-center transition-all duration-200
-                          ${tDone ? 'bg-emerald-500 border-emerald-500 scale-95' : 'bg-bg-input border-border-med hover:border-accent-blue'}
-                        `}
-                      >
-                        {tDone ? <Check size={20} className="text-white" strokeWidth={3} /> : (isCheck ? null : <div className="w-2 h-2 rounded-full bg-text-muted/20" />)}
-                      </button>
+                    {isCheck ? null : <div className="w-2 h-2 rounded-full bg-text-muted/20" />}
+                  </button>
 
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-[9px] font-black uppercase tracking-widest bg-accent-blue-light text-accent-blue px-2 py-0.5 rounded-md flex items-center gap-1.5">
-                            {SCHEDULE_ICONS[sType]} {SCHEDULE_LABELS[sType]}
-                          </span>
-                          {task.currentStreak > 0 && <span className="text-[9px] font-black text-orange-500 bg-orange-500/10 px-2 py-0.5 rounded-md">🔥 {task.currentStreak}d</span>}
-                        </div>
-                        <p className={`text-base font-black tracking-tight truncate ${tDone ? 'text-emerald-600 line-through' : 'text-text-main'}`}>{task.title}</p>
-                        <p className="text-[11px] font-bold text-text-muted uppercase tracking-wide mt-0.5">
-                          {isCheck ? (tDone ? 'Completed' : 'Priority Task') : `${current} / ${target} ${isCount ? 'units' : 'mins'}`}
-                        </p>
-                      </div>
-
-                      <div className="flex gap-2 items-center">
-                        {isCount ? (
-                          <div className="flex bg-bg-input rounded-xl border border-border-light overflow-hidden">
-                            <button onClick={() => updateTaskCount(task.id, -1)} className="px-3 py-1.5 text-text-main font-black hover:bg-border-light">−</button>
-                            <button onClick={() => updateTaskCount(task.id, 1)} className="px-3 py-1.5 text-accent-blue font-black border-l border-border-light hover:bg-border-light transition-colors">+</button>
-                          </div>
-                        ) : (isTime && !tDone) && (
-                          <button onClick={() => setShowLog(task)} className="px-4 py-2 rounded-xl bg-accent-blue text-white text-[11px] font-black shadow-md shadow-accent-blue/20 active:scale-95 transition-all">+ Log</button>
-                        )}
-                        <button onClick={() => deleteTask(task.id)} className="w-9 h-9 rounded-xl text-text-muted hover:text-rose-500 hover:bg-rose-500/10 transition-all flex items-center justify-center"><Trash2 size={18} /></button>
-                      </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center flex-wrap gap-2 mb-1">
+                      <span className="text-[9px] font-black uppercase tracking-widest bg-accent-blue-light text-accent-blue px-2 py-0.5 rounded-md flex items-center gap-1.5">
+                        {SCHEDULE_ICONS[sType]} {SCHEDULE_LABELS[sType]}
+                      </span>
+                      {task.currentStreak > 0 && <span className="text-[9px] font-black text-orange-500 bg-orange-500/10 px-2 py-0.5 rounded-md">🔥 {task.currentStreak}d</span>}
+                      {task.syncPending && (
+                        <span className="text-[9px] font-black uppercase tracking-widest bg-amber-500/10 text-amber-500 px-2 py-0.5 rounded-md flex items-center gap-1 animate-pulse">
+                          <Cloud size={10} /> Syncing
+                        </span>
+                      )}
                     </div>
-                    
-                    {!isCheck && (
-                      <div className="bg-bg-input rounded-full h-1.5 overflow-hidden">
-                        <div className={`h-full transition-all duration-700 ${tDone ? 'bg-emerald-500' : 'bg-accent-blue'}`} style={{ width: `${pct}%` }} />
+                    <p className="text-base font-black tracking-tight truncate text-text-main">{task.title}</p>
+                    <p className="text-[11px] font-bold text-text-muted uppercase tracking-wide mt-0.5">
+                      {isCheck ? 'Priority Task' : `${current} / ${target} ${isCount ? 'units' : 'mins'}`}
+                    </p>
+                  </div>
+
+                  <div className="flex gap-2 items-center">
+                    {isCount ? (
+                      <div className="flex bg-bg-input rounded-xl border border-border-light overflow-hidden">
+                        <button onClick={() => updateTaskCount(task.id, -1)} className="px-3 py-1.5 text-text-main font-black hover:bg-border-light">−</button>
+                        <button onClick={() => updateTaskCount(task.id, 1)} className="px-3 py-1.5 text-accent-blue font-black border-l border-border-light hover:bg-border-light transition-colors">+</button>
                       </div>
+                    ) : (isTime && !tDone) && (
+                      <button onClick={() => setShowLog(task)} className="px-4 py-2 rounded-xl bg-accent-blue text-white text-[11px] font-black shadow-md shadow-accent-blue/20 active:scale-95 transition-all">+ Log</button>
                     )}
-                  </motion.div>
-                );
-              })}
+                    <button onClick={() => deleteTask(task.id)} className="w-9 h-9 rounded-xl text-text-muted hover:text-rose-500 hover:bg-rose-500/10 transition-all flex items-center justify-center"><Trash2 size={18} /></button>
+                  </div>
+                </div>
+                
+                {!isCheck && (
+                  <div className="bg-bg-input rounded-full h-1.5 overflow-hidden">
+                    <div className="h-full transition-all duration-700 bg-accent-blue" style={{ width: `${pct}%` }} />
+                  </div>
+                )}
+              </motion.div>
+            );
+          })}
+
+          {/* Completed / Done Tasks (Lazy Loaded / Windowed) */}
+          {visibleCompletedTasks.map(task => {
+            const tDone = true;
+            const cType = task.completionType || task.type || 'check';
+            const isTime = cType === 'time';
+            const isCount = cType === 'count';
+            const isCheck = cType === 'check';
+
+            const target = isCount ? (task.targetCount || 10) : (task.targetTime || 30);
+            const current = isCount ? (task.currentCount || 0) : (task.timeSpent || 0);
+            const pct = isCheck ? 0 : Math.min(100, Math.round((current / (target || 1)) * 100));
+            const sType = task.type || 'daily';
+
+            return (
+              <motion.div layout key={task.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }}
+                className="bg-emerald-500/5 rounded-[28px] p-5 border border-emerald-500/30 opacity-70 transition-all duration-300 flex flex-col gap-4"
+              >
+                <div className="flex items-center gap-4">
+                  <button onClick={() => toggleTaskComplete(task.id)} 
+                    className="w-10 h-10 shrink-0 rounded-xl border-2 flex items-center justify-center bg-emerald-500 border-emerald-500 scale-95 transition-all duration-200"
+                  >
+                    <Check size={20} className="text-white" strokeWidth={3} />
+                  </button>
+
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center flex-wrap gap-2 mb-1">
+                      <span className="text-[9px] font-black uppercase tracking-widest bg-accent-blue-light text-accent-blue px-2 py-0.5 rounded-md flex items-center gap-1.5">
+                        {SCHEDULE_ICONS[sType]} {SCHEDULE_LABELS[sType]}
+                      </span>
+                      {task.currentStreak > 0 && <span className="text-[9px] font-black text-orange-500 bg-orange-500/10 px-2 py-0.5 rounded-md">🔥 {task.currentStreak}d</span>}
+                      {task.syncPending && (
+                        <span className="text-[9px] font-black uppercase tracking-widest bg-amber-500/10 text-amber-500 px-2 py-0.5 rounded-md flex items-center gap-1 animate-pulse">
+                          <Cloud size={10} /> Syncing
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-base font-black tracking-tight truncate text-emerald-600 line-through">{task.title}</p>
+                    <p className="text-[11px] font-bold text-text-muted uppercase tracking-wide mt-0.5">
+                      Completed
+                    </p>
+                  </div>
+
+                  <div className="flex gap-2 items-center">
+                    <button onClick={() => deleteTask(task.id)} className="w-9 h-9 rounded-xl text-text-muted hover:text-rose-500 hover:bg-rose-500/10 transition-all flex items-center justify-center"><Trash2 size={18} /></button>
+                  </div>
+                </div>
+                
+                {!isCheck && (
+                  <div className="bg-bg-input rounded-full h-1.5 overflow-hidden">
+                    <div className="h-full transition-all duration-700 bg-emerald-500" style={{ width: `${pct}%` }} />
+                  </div>
+                )}
+              </motion.div>
+            );
+          })}
         </AnimatePresence>
+
+        {/* Lazy Loading Load More Button */}
+        {completedTasks.length > completedLimit && (
+          <button 
+            type="button"
+            onClick={() => setCompletedLimit(prev => prev + 10)}
+            className="w-full py-4 rounded-2xl bg-bg-card border border-border-light hover:border-border-med text-text-muted hover:text-text-main text-xs font-black tracking-wider uppercase transition-all flex items-center justify-center gap-2 mt-2"
+          >
+            <span>Show {completedTasks.length - completedLimit} More Completed Tasks</span>
+            <span className="bg-emerald-500/10 text-emerald-500 px-2 py-0.5 rounded-md text-[10px]">+{completedTasks.length - completedLimit}</span>
+          </button>
+        )}
         
         {todayTasks.length === 0 && !isAdding && (
           <div className="py-24 flex flex-col items-center justify-center text-center">
              <div className="w-20 h-20 rounded-full bg-bg-input flex items-center justify-center mb-6">
-               <CalendarCheck size={32} className="text-text-muted/30" />
+                <CalendarCheck size={32} className="text-text-muted/30" />
              </div>
              <p className="text-lg font-black text-text-muted tracking-tight">Your forge is silent.</p>
              <p className="text-sm font-bold text-text-muted/50 mt-1">Add a task to start crushing your day.</p>
