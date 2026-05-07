@@ -1,4 +1,4 @@
-import { TODAY, addDays } from './dateUtils';
+import { TODAY, addDays, diffDays } from './dateUtils';
 
 // Day abbreviations match the picker: ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
 const DAY_ABBRS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -181,10 +181,17 @@ export const calculateStreakFromHistory = (completedDates, scheduleDays = []) =>
   const completedSet = new Set(completedDates);
   const todayStr = TODAY();
   
+  // Find the earliest date to set a dynamic simulation window
+  const sorted = [...completedDates].sort();
+  const earliestDate = sorted[0];
+  const diff = diffDays(todayStr, earliestDate);
+  const startDaysAgo = Math.min(1000, Math.max(365, diff));
+
   let streak = 0;
-  let currentDateStr = todayStr;
-  
-  for (let i = 0; i < 365; i++) {
+  let consecutiveMissedDays = 0;
+
+  for (let i = startDaysAgo; i >= 0; i--) {
+    const currentDateStr = addDays(todayStr, -i);
     const isCompleted = completedSet.has(currentDateStr);
     
     // Check if scheduled
@@ -192,20 +199,30 @@ export const calculateStreakFromHistory = (completedDates, scheduleDays = []) =>
     const dateObj = new Date(y, m - 1, d);
     const dayName = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dateObj.getDay()];
     const isScheduled = scheduleDays.length === 0 || scheduleDays.includes(dayName);
-    
-    if (isCompleted) {
-      streak++;
-    } else if (isScheduled) {
-      // Today being uncompleted does not break the streak.
-      // But if any previous scheduled day was missed, the streak breaks.
-      if (currentDateStr !== todayStr) {
-        break;
+
+    if (isScheduled) {
+      if (isCompleted) {
+        // Resume/increment streak
+        streak++;
+        consecutiveMissedDays = 0;
+      } else {
+        // Today itself (TODAY()) does not count as missed if not completed yet (since it's ongoing)
+        if (currentDateStr !== todayStr) {
+          consecutiveMissedDays++;
+          // Apply gradual decay rules:
+          // - missing 1 or 2 days -> streak remains protected
+          // - after 3 consecutive missed days -> streak decreases by 1
+          // - every additional 2 missed consecutive days -> streak decreases by another 1
+          if (consecutiveMissedDays >= 3) {
+            if ((consecutiveMissedDays - 3) % 2 === 0) {
+              streak = Math.max(0, streak - 1);
+            }
+          }
+        }
       }
     }
-    // Go to previous day
-    currentDateStr = addDays(currentDateStr, -1);
   }
-  
+
   return streak;
 };
 
