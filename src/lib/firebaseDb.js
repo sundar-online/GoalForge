@@ -77,7 +77,7 @@ export async function fetchGoals(userId) {
 
 export async function upsertGoal(userId, goal) {
   try {
-    await setDoc(userDoc(userId, 'goals', goal.id), {
+    await setDoc(userDoc(userId, 'goals', String(goal.id)), {
       title: goal.title,
       description: goal.description || '',
       mode: goal.mode || 'ALL',
@@ -104,10 +104,10 @@ export async function upsertGoal(userId, goal) {
 export async function deleteGoalDb(userId, goalId) {
   try {
     // Delete all habits in sub-collection first
-    const habitsSnap = await getDocs(collection(fireDb, 'users', userId, 'goals', goalId, 'habits'));
+    const habitsSnap = await getDocs(collection(fireDb, 'users', userId, 'goals', String(goalId), 'habits'));
     const batch = writeBatch(fireDb);
     habitsSnap.docs.forEach(h => batch.delete(h.ref));
-    batch.delete(userDoc(userId, 'goals', goalId));
+    batch.delete(userDoc(userId, 'goals', String(goalId)));
     await batch.commit();
   } catch (err) {
     log('deleteGoal', err);
@@ -117,7 +117,7 @@ export async function deleteGoalDb(userId, goalId) {
 // ── Habits ─────────────────────────────────────────────
 export async function upsertHabit(userId, goalId, habit) {
   try {
-    const habitRef = doc(fireDb, 'users', userId, 'goals', goalId, 'habits', habit.id);
+    const habitRef = doc(fireDb, 'users', userId, 'goals', String(goalId), 'habits', String(habit.id));
     await setDoc(habitRef, {
       title: habit.title,
       type: habit.type || 'time',
@@ -143,7 +143,7 @@ export async function upsertHabit(userId, goalId, habit) {
 
 export async function deleteHabitDb(userId, goalId, habitId) {
   try {
-    await deleteDoc(doc(fireDb, 'users', userId, 'goals', goalId, 'habits', habitId));
+    await deleteDoc(doc(fireDb, 'users', userId, 'goals', String(goalId), 'habits', String(habitId)));
   } catch (err) {
     log('deleteHabit', err);
   }

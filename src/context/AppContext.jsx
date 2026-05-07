@@ -804,7 +804,7 @@ export const AppProvider = ({ children }) => {
     const goalId = Date.now().toString();
     const initialHabits = (goal.habits || []).map(h => ({
       ...h,
-      id: h.id || (Date.now() + Math.random()).toString(),
+      id: String(h.id || (Date.now() + Math.random())),
       timeSpent: 0,
       currentCount: 0,
       completed: false,
