@@ -1,10 +1,9 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { auth, googleProvider } from '../lib/firebase';
+import { auth } from '../lib/firebase';
 import {
   onAuthStateChanged,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
-  signInWithPopup,
   signOut as firebaseSignOut,
   updateProfile,
   sendPasswordResetEmail
@@ -72,16 +71,6 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // ── Google Sign-In ────────────────────────────────────
-  const signInWithGoogle = async () => {
-    try {
-      const result = await signInWithPopup(auth, googleProvider);
-      return { data: result, error: null };
-    } catch (error) {
-      return { data: null, error: { message: getFirebaseErrorMessage(error.code) } };
-    }
-  };
-
   // ── Password Reset ────────────────────────────────────
   const resetPassword = async (email) => {
     try {
@@ -105,7 +94,6 @@ export const AuthProvider = ({ children }) => {
       loading,
       signUp,
       signIn,
-      signInWithGoogle,
       resetPassword,
       signOut,
       displayName
@@ -131,8 +119,6 @@ function getFirebaseErrorMessage(code) {
     'auth/wrong-password': 'Incorrect password. Please try again.',
     'auth/weak-password': 'Password must be at least 6 characters.',
     'auth/too-many-requests': 'Too many attempts. Please wait a moment and try again.',
-    'auth/popup-closed-by-user': 'Sign-in popup was closed. Please try again.',
-    'auth/popup-blocked': 'Sign-in popup was blocked. Please allow popups for this site.',
     'auth/account-exists-with-different-credential': 'An account already exists with this email but using a different sign-in method.',
     'auth/invalid-credential': 'Invalid email or password. Please check and try again.',
     'auth/network-request-failed': 'Network error. Please check your connection.',

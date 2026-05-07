@@ -9,10 +9,10 @@ export const AuthPage = () => {
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const { signIn, signUp, signInWithGoogle, resetPassword, loading } = useAuth();
+  const { signIn, signUp, resetPassword, loading } = useAuth();
   const [authError, setAuthError] = useState('');
   const [message, setMessage] = useState('');
-  const [socialLoading, setSocialLoading] = useState('');
+
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -38,13 +38,7 @@ export const AuthPage = () => {
     }
   };
 
-  const handleGoogleSignIn = async () => {
-    setSocialLoading('google');
-    setAuthError(''); setMessage('');
-    const { error } = await signInWithGoogle();
-    if (error) setAuthError(error.message);
-    setSocialLoading('');
-  };
+
 
 
 
@@ -69,41 +63,7 @@ export const AuthPage = () => {
           </p>
         </div>
 
-        {/* Social Login Buttons */}
-        {!isForgot && (
-          <div className="flex flex-col gap-3 mb-6">
-            <button
-              type="button"
-              onClick={handleGoogleSignIn}
-              disabled={!!socialLoading}
-              className="w-full py-4 rounded-2xl bg-white/5 border border-white/10 text-text-main text-sm font-black uppercase tracking-wider flex items-center justify-center gap-3 hover:bg-white/10 hover:-translate-y-0.5 active:translate-y-0 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-            >
-              {socialLoading === 'google' ? (
-                <Loader2 size={20} className="animate-spin" />
-              ) : (
-                <>
-                  <svg width="20" height="20" viewBox="0 0 48 48">
-                    <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
-                    <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
-                    <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
-                    <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
-                  </svg>
-                  Continue with Google
-                </>
-              )}
-            </button>
 
-          </div>
-        )}
-
-        {/* Divider */}
-        {!isForgot && (
-          <div className="flex items-center gap-4 mb-6">
-            <div className="flex-1 h-[1px] bg-border-light" />
-            <span className="text-[10px] font-black text-text-muted uppercase tracking-[0.2em]">Or with email</span>
-            <div className="flex-1 h-[1px] bg-border-light" />
-          </div>
-        )}
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="flex flex-col gap-5">
@@ -235,7 +195,7 @@ export const AuthPage = () => {
       {/* DESKTOP / WEB VIEW (Side-by-side no-scroll panels) */}
       <div className="hidden lg:flex lg:flex-row lg:gap-8 lg:max-w-4xl lg:w-full lg:items-stretch lg:justify-center animate-in fade-in zoom-in-95 duration-500 relative z-10">
         
-        {/* Left Side Frame: Neural Interface Title Frame & Social Logins */}
+        {/* Left Side Frame: Neural Interface Title Frame & Secure Stats */}
         <div className="flex-1 bg-bg-card/70 backdrop-blur-2xl rounded-[40px] p-10 border border-white/10 flex flex-col justify-between shadow-2xl">
           {/* Framed Title Block */}
           <div className="border border-white/10 rounded-2xl p-6 bg-white/5 text-center relative overflow-hidden shadow-inner">
@@ -250,47 +210,31 @@ export const AuthPage = () => {
             </p>
           </div>
 
-          {/* Left Panel Body: Social buttons or instruction info */}
-          {isForgot ? (
-            <div className="flex-1 flex flex-col items-center justify-center text-center p-6 space-y-4">
-              <div className="w-12 h-12 rounded-full bg-accent-blue/10 border border-accent-blue/20 flex items-center justify-center text-accent-blue animate-pulse">
-                <KeyRound size={20} />
+          {/* Left Panel Body: Cinematic instructions for full encryption */}
+          <div className="flex-1 flex flex-col justify-center space-y-6 py-6 px-2">
+            <div className="border border-white/5 rounded-2xl p-5 bg-white/[0.02] space-y-3">
+              <div className="flex items-center gap-2 text-accent-blue">
+                <span className="w-1.5 h-1.5 rounded-full bg-accent-blue animate-ping" />
+                <p className="text-[10px] font-black uppercase tracking-widest">SYSTEM STATUS: READY</p>
               </div>
-              <div className="space-y-1">
-                <p className="text-xs font-black text-text-main uppercase tracking-wider">RECOVERY PORT MODULE</p>
-                <p className="text-xs text-text-muted max-w-[200px] leading-relaxed mx-auto">
-                  Authentication bypass protocol. Reset request is processed on the right verification terminal.
-                </p>
-              </div>
+              <p className="text-xs text-text-muted leading-relaxed">
+                Welcome to GoalForge, your ultimate visual workspace designed to map goals, build high-frequency habits, and monitor real-time discipline.
+              </p>
             </div>
-          ) : (
-            <div className="flex-1 flex flex-col justify-center gap-4 py-6">
-              <button
-                type="button"
-                onClick={handleGoogleSignIn}
-                disabled={!!socialLoading}
-                className="w-full py-4 rounded-2xl bg-white/5 border border-white/10 text-text-main text-sm font-black uppercase tracking-wider flex items-center justify-center gap-3 hover:bg-white/10 hover:-translate-y-0.5 active:translate-y-0 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shadow-sm"
-              >
-                {socialLoading === 'google' ? (
-                  <Loader2 size={20} className="animate-spin" />
-                ) : (
-                  <>
-                    <svg width="20" height="20" viewBox="0 0 48 48">
-                      <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
-                      <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
-                      <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
-                      <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
-                    </svg>
-                    Continue with Google
-                  </>
-                )}
-              </button>
 
+            <div className="border border-white/5 rounded-2xl p-5 bg-white/[0.02] space-y-3">
+              <div className="flex items-center gap-2 text-text-muted">
+                <span className="w-1.5 h-1.5 rounded-full bg-text-muted/60" />
+                <p className="text-[10px] font-black uppercase tracking-widest">ENCRYPTED IDENTITY</p>
+              </div>
+              <p className="text-xs text-text-muted leading-relaxed">
+                We safeguard your progress. Log in using your secure email credentials to seamlessly sync stats directly across your browser and native mobile applications.
+              </p>
             </div>
-          )}
+          </div>
 
           <div className="text-center text-[10px] font-black text-text-muted uppercase tracking-[0.25em] opacity-40">
-            Secure OAuth Protocol
+            Encrypted Core Terminal
           </div>
         </div>
 
@@ -385,7 +329,7 @@ export const AuthPage = () => {
 
             <button 
               type="submit" 
-              disabled={loading || !!socialLoading}
+              disabled={loading}
               className="w-full py-4 rounded-xl bg-accent-blue text-white text-xs font-black uppercase tracking-[0.2em] shadow-lg shadow-accent-blue/30 hover:opacity-90 hover:-translate-y-0.5 active:translate-y-0 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer mt-1"
             >
               {loading ? (
