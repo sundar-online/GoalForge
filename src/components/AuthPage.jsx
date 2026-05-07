@@ -78,7 +78,7 @@ export const AuthPage = () => {
         </div>
 
         {/* Social Login Buttons */}
-        {!isForgot && !isAndroidAPK && (
+        {!isForgot && (
           <div className="flex flex-col gap-3 mb-6 animate-in fade-in duration-500">
             <button
               type="button"
@@ -104,7 +104,7 @@ export const AuthPage = () => {
         )}
 
         {/* Divider */}
-        {!isForgot && !isAndroidAPK && (
+        {!isForgot && (
           <div className="flex items-center gap-4 mb-6">
             <div className="flex-1 h-[1px] bg-border-light" />
             <span className="text-[10px] font-black text-text-muted uppercase tracking-[0.2em]">Or with email</span>
@@ -259,7 +259,7 @@ export const AuthPage = () => {
 
           {/* Left Panel Body: Cinematic instructions for full encryption */}
           <div className="flex-1 flex flex-col justify-center space-y-6 py-6 px-2">
-            {!isForgot && !isAndroidAPK && (
+            {!isForgot && (
               <div className="space-y-4 animate-in fade-in duration-500">
                 <button
                   type="button"

@@ -5,6 +5,8 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   signOut as firebaseSignOut,
   updateProfile,
   sendPasswordResetEmail
@@ -18,6 +20,17 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Process redirect results (useful on Android WebView)
+    getRedirectResult(auth)
+      .then((result) => {
+        if (result) {
+          console.log('Successfully completed Google Redirect sign-in:', result.user);
+        }
+      })
+      .catch((error) => {
+        console.error('Error during Google Redirect sign-in:', error);
+      });
+
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       if (firebaseUser) {
         // Normalize the user object so the rest of the app gets a consistent shape
@@ -75,8 +88,20 @@ export const AuthProvider = ({ children }) => {
   // ── Google Sign-In ────────────────────────────────────
   const signInWithGoogle = async () => {
     try {
-      const result = await signInWithPopup(auth, googleProvider);
-      return { data: result, error: null };
+      const isAndroidAPK = typeof window !== 'undefined' && (
+        !!window.Capacitor || 
+        navigator.userAgent.includes('wv') || 
+        (navigator.userAgent.includes('Android') && !navigator.userAgent.includes('Chrome'))
+      );
+
+      if (isAndroidAPK) {
+        // Use redirect on Android APK / WebView to avoid popup blocks
+        await signInWithRedirect(auth, googleProvider);
+        return { data: null, error: null }; // Will reload the page
+      } else {
+        const result = await signInWithPopup(auth, googleProvider);
+        return { data: result, error: null };
+      }
     } catch (error) {
       return { data: null, error: { message: getFirebaseErrorMessage(error.code) } };
     }
