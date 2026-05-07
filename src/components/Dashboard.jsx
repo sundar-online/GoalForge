@@ -42,7 +42,7 @@ export const Dashboard = ({ setView }) => {
   if (accuracy >= 100) accColor = '#22c55e';
   else if (accuracy >= 50) accColor = 'var(--accent-blue)';
   else if (accuracy > 0) accColor = '#faba2c';
-  else accColor = 'var(--bg-input)';
+  else accColor = '#ef4444';
 
   const topStreaks = (goals || [])
     .map(g => {
@@ -172,14 +172,14 @@ export const Dashboard = ({ setView }) => {
               </div>
 
               {/* Bottom row: Discipline Score + Badges */}
-              <div className="flex items-center justify-between mt-4 pt-4 border-t border-white/10">
-                <div className="flex items-center gap-3">
-                  <div className="px-3 py-1.5 rounded-xl bg-white/10 border border-white/10">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mt-4 pt-4 border-t border-white/10">
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <div className="px-3 py-1.5 rounded-xl bg-white/10 border border-white/10 shrink-0">
                     <p className="text-[8px] font-black text-white/40 uppercase tracking-widest">Discipline</p>
                     <p className="text-lg font-black text-white leading-none tracking-tighter">{disciplineScore}</p>
                   </div>
                   {insights.length > 0 && (
-                    <div className="flex items-center gap-2 bg-white/5 px-3 py-2 rounded-xl border border-white/10 max-w-[200px]">
+                    <div className="flex items-center gap-2 bg-white/5 px-3 py-2 rounded-xl border border-white/10 max-w-[200px] sm:max-w-[250px] min-w-0 flex-1 animate-in fade-in">
                       <Sparkles size={14} className="text-accent-blue shrink-0 animate-pulse" />
                       <p className="text-[11px] font-semibold text-white/70 leading-snug truncate">{insights[0]}</p>
                     </div>
@@ -188,7 +188,7 @@ export const Dashboard = ({ setView }) => {
 
                 {/* Earned Badges Preview */}
                 {(xpData.earnedBadges || []).length > 0 && (
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1 self-start sm:self-auto shrink-0">
                     {(xpData.earnedBadges || []).slice(0, 4).map(id => {
                       const badge = BADGE_DEFINITIONS.find(b => b.id === id);
                       return badge ? (

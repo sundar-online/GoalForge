@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import * as db from '../lib/supabaseDb';
+import * as db from '../lib/firebaseDb';
 import { useAuth } from './AuthContext';
 import { TODAY, addDays, diffDays } from '../utils/dateUtils';
 import {
@@ -172,7 +172,7 @@ export const AppProvider = ({ children }) => {
     return [...smartAlerts];
   }, [smartAlerts]);
 
-  // ── Supabase Initial Load ────────────────────────────────
+  // ── Firebase Initial Load ────────────────────────────────
   // -- Local Persistence Effects --
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.GOALS, JSON.stringify(goals)); }, [goals]);
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.TASKS, JSON.stringify(tasks)); }, [tasks]);
@@ -184,17 +184,19 @@ export const AppProvider = ({ children }) => {
     document.documentElement.setAttribute('data-theme', settings.theme || 'dark');
   }, [settings]);
 
-  // Secondary Supabase Load (Optional / Background)
+  // Secondary Firebase Load (Optional / Background)
   const syncFromCloud = async () => {
     if (!user) { setLoading(false); return; }
     try {
       setSyncError(null);
-      const [g, t, f, l, s] = await Promise.all([
+      const [g, t, f, l, s, n, x] = await Promise.all([
         db.fetchGoals(user.id),
         db.fetchTasks(user.id),
         db.fetchFocusHistory(user.id),
         db.fetchTaskLogs(user.id),
-        db.fetchUserSettings(user.id)
+        db.fetchUserSettings(user.id),
+        db.fetchNotes(user.id),
+        db.fetchXpData(user.id)
       ]);
 
       // Smart Merge: Merge cloud data with local data by ID to prevent overwriting new local items
@@ -210,6 +212,21 @@ export const AppProvider = ({ children }) => {
         return [...prev, ...cloudTasks];
       });
 
+      setNotes(prev => {
+        const localIds = new Set(prev.map(i => i.id));
+        const cloudNotes = (n || []).filter(i => !localIds.has(i.id));
+        return [...prev, ...cloudNotes];
+      });
+
+      if (x) {
+        setXpData(prev => {
+          if ((x.totalXP || 0) > (prev.totalXP || 0)) {
+            return x;
+          }
+          return prev;
+        });
+      }
+
       if (l) setTaskLogs(prev => ({ ...l, ...prev }));
 
       if (s || f) {
@@ -223,7 +240,7 @@ export const AppProvider = ({ children }) => {
       }
     } catch (err) {
       setSyncError('Cloud sync interrupted. Your data is safe locally.');
-      console.warn('[Supabase] Offline mode or sync failed.');
+      console.warn('[Firebase] Offline mode or sync failed.', err);
     } finally {
       setLoading(false);
     }
@@ -574,7 +591,7 @@ export const AppProvider = ({ children }) => {
     }));
   };
 
-  const deleteGoal = id => { setGoals(prev => prev.filter(g => g.id !== id)); if (user) db.deleteGoalDb(id); };
+  const deleteGoal = id => { setGoals(prev => prev.filter(g => g.id !== id)); if (user) db.deleteGoalDb(user.id, id); };
 
   const addHabit = (goalId, habit) => {
     const newH = {
@@ -600,7 +617,7 @@ export const AppProvider = ({ children }) => {
 
   const deleteHabit = (goalId, habitId) => {
     setGoals(prev => prev.map(g => {
-      if (g.id === goalId) { if (user) db.deleteHabitDb(habitId); return { ...g, habits: g.habits.filter(h => h.id !== habitId) }; }
+      if (g.id === goalId) { if (user) db.deleteHabitDb(user.id, goalId, habitId); return { ...g, habits: g.habits.filter(h => h.id !== habitId) }; }
       return g;
     }));
   };
@@ -796,7 +813,7 @@ export const AppProvider = ({ children }) => {
     }));
   };
 
-  const deleteTask = id => { setTasks(prev => prev.filter(t => t.id !== id)); if (user) db.deleteTaskDb(id); };
+  const deleteTask = id => { setTasks(prev => prev.filter(t => t.id !== id)); if (user) db.deleteTaskDb(user.id, id); };
 
   const toggleTaskComplete = (taskId) => {
     setTasks(prev => prev.map(t => {
@@ -931,9 +948,34 @@ export const AppProvider = ({ children }) => {
     return () => clearTimeout(timer);
   }, [settings.focusTimeToday, settings.theme, user]);
 
-  const addNote = note => { const now = new Date().toISOString(); const newN = { ...note, id: Date.now().toString(), created_at: now, updated_at: now }; setNotes(prev => [newN, ...prev]); return newN; };
-  const updateNote = (id, updates) => setNotes(prev => prev.map(n => n.id === id ? { ...n, ...updates } : n));
-  const deleteNote = id => setNotes(prev => prev.filter(n => n.id !== id));
+  const addNote = note => {
+    const now = new Date().toISOString();
+    const newN = { ...note, id: Date.now().toString(), created_at: now, updated_at: now };
+    setNotes(prev => [newN, ...prev]);
+    if (user) db.upsertNote(user.id, newN);
+    return newN;
+  };
+  const updateNote = (id, updates) => setNotes(prev => prev.map(n => {
+    if (n.id === id) {
+      const updated = { ...n, ...updates, updated_at: new Date().toISOString() };
+      if (user) db.upsertNote(user.id, updated);
+      return updated;
+    }
+    return n;
+  }));
+  const deleteNote = id => {
+    setNotes(prev => prev.filter(n => n.id !== id));
+    if (user) db.deleteNoteDb(user.id, id);
+  };
+
+  // Sync XP data to DB on change (debounced)
+  useEffect(() => {
+    if (!user || loading) return;
+    const timer = setTimeout(() => {
+      db.upsertXpData(user.id, xpData);
+    }, 10000);
+    return () => clearTimeout(timer);
+  }, [xpData, user, loading]);
 
   // Gamification engine moved to top for initialization safety
 
