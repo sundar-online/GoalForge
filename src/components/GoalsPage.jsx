@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { Target, Plus, ChevronDown, ChevronUp, Trash2, Clock, Check, Layers, Calendar, History } from 'lucide-react';
+import { Target, Plus, ChevronDown, ChevronUp, Trash2, Clock, Check, Layers, Calendar, History, Edit3 } from 'lucide-react';
 import { isGoalDoneToday, calculateGoalDailyProgress, isHabitScheduledToday } from '../utils/calculationUtils';
 import { addDays } from '../utils/dateUtils';
 
@@ -107,6 +107,181 @@ const ExtendDeadlineModal = ({ goal, onClose, onExtend }) => {
             Confirm
           </button>
         </div>
+      </div>
+    </div>
+  );
+};
+
+// ── Edit Goal System Modal ──────────────────────────────────
+const EditGoalSystemModal = ({ goal, onClose, onSave }) => {
+  const [title, setTitle] = useState(goal.title || '');
+  const [tag, setTag] = useState(goal.tag || 'General');
+  const [deadline, setDeadline] = useState(goal.deadline || '');
+  const [mode, setMode] = useState(goal.mode || 'ANY');
+  const [minHabits, setMinHabits] = useState(goal.minHabits || 1);
+  const [habits, setHabits] = useState(
+    (goal.habits || []).map(h => ({
+      id: h.id,
+      title: h.title || '',
+      type: h.type || 'time',
+      targetTime: h.targetTime || 15,
+      targetCount: h.targetCount || 10,
+      scheduleDays: h.scheduleDays || []
+    }))
+  );
+
+  const handleAddStagingHabit = () => {
+    setHabits(prev => [...prev, { id: 'staging_' + Date.now() + '_' + Math.random(), title: '', type: 'time', targetTime: 15, targetCount: 10, scheduleDays: [] }]);
+  };
+
+  const handleRemoveStagingHabit = (id) => {
+    const remaining = habits.filter(h => h.id !== id);
+    setHabits(remaining);
+    setMinHabits(prev => Math.max(1, Math.min(prev, remaining.length)));
+  };
+
+  const handleUpdateStagingHabit = (id, updates) => {
+    setHabits(prev => prev.map(h => h.id === id ? { ...h, ...updates } : h));
+  };
+
+  const handleSave = (e) => {
+    e.preventDefault();
+    if (!title.trim()) return;
+    if (habits.length === 0) return alert('Your system needs at least one daily habit!');
+    if (habits.some(h => !h.title.trim())) return alert('Give all habits a title!');
+
+    const cleanedHabits = habits.map(h => ({
+      ...h,
+      targetTime: Number(h.targetTime || 15),
+      targetCount: Number(h.targetCount || 10),
+      scheduleDays: h.scheduleDays || []
+    }));
+
+    onSave(goal.id, {
+      title,
+      tag,
+      deadline,
+      mode,
+      minHabits: mode === 'CUSTOM' ? parseInt(minHabits, 10) : 1
+    }, cleanedHabits);
+
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[250] p-4 backdrop-blur-md" onClick={onClose}>
+      <div className="bg-bg-card rounded-[32px] p-6 md:p-8 w-full max-w-2xl shadow-float border border-border-light max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95" onClick={e => e.stopPropagation()}>
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <h3 className="text-xl font-black text-text-main tracking-tight">Edit Goal System</h3>
+            <p className="text-xs font-bold text-text-muted mt-0.5">Optimize your system configuration and daily habits on the fly.</p>
+          </div>
+          <button type="button" onClick={onClose} className="px-4 py-2 rounded-xl bg-bg-input text-text-muted font-bold text-xs hover:bg-border-light transition-colors">Cancel</button>
+        </div>
+
+        <form onSubmit={handleSave} className="space-y-6">
+          <div className="space-y-2">
+            <p className="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] ml-1">Core Vision</p>
+            <input required type="text" value={title} onChange={e => setTitle(e.target.value)}
+              placeholder="What major milestone are we hitting?"
+              className="w-full text-lg font-black text-text-main border-none bg-bg-input p-4 rounded-xl outline-none placeholder:text-text-muted/50 focus:ring-2 ring-accent-blue/20 transition-all" />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <p className="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] ml-1">Category</p>
+              <select value={tag} onChange={e => setTag(e.target.value)} className="w-full bg-bg-input border-none rounded-xl p-3.5 font-bold text-text-main outline-none appearance-none hover:bg-bg-input/80 transition-colors">
+                {Object.keys(TAG_COLORS).map(t => <option key={t}>{t}</option>)}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <p className="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] ml-1">Target Date</p>
+              <input type="date" value={deadline} onChange={e => setDeadline(e.target.value)} className="w-full bg-bg-input border-none rounded-xl p-3.5 font-bold text-text-main outline-none hover:bg-bg-input/80 transition-colors" />
+            </div>
+          </div>
+
+          <div className="bg-bg-input/50 rounded-[24px] p-5 border border-border-light space-y-4">
+            <div>
+              <p className="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] mb-3">Forge Logic (Strategy)</p>
+              <div className="grid grid-cols-3 gap-3">
+                {['ALL', 'ANY', 'CUSTOM'].map(m => (
+                  <button key={m} type="button" onClick={() => setMode(m)}
+                    className={`
+                      py-3 rounded-xl font-black text-xs transition-all border-2
+                      ${mode === m ? 'border-accent-blue bg-white text-accent-blue shadow-md' : 'border-transparent bg-bg-card text-text-muted hover:border-border-med'}
+                    `}
+                  >
+                    {m === 'ALL' ? 'Complete All' : m === 'ANY' ? 'Any One' : 'Custom'}
+                  </button>
+                ))}
+              </div>
+            </div>
+            
+            {mode === 'CUSTOM' && (
+              <div className="bg-bg-card rounded-xl p-3.5 border border-border-light flex items-center justify-between animate-in fade-in zoom-in-95">
+                <span className="text-xs font-black text-text-main">Min required habits:</span>
+                <div className="flex items-center bg-bg-input rounded-xl border border-border-light overflow-hidden">
+                    <button type="button" onClick={() => setMinHabits(prev => Math.max(1, parseInt(prev) - 1))} className="w-9 h-9 flex items-center justify-center font-black text-text-main hover:bg-border-light">−</button>
+                    <span className="w-8 text-center text-xs font-black text-accent-blue">{minHabits}</span>
+                    <button type="button" onClick={() => setMinHabits(prev => Math.min(habits.length, parseInt(prev) + 1))} className="w-9 h-9 flex items-center justify-center font-black text-accent-blue border-l border-border-light hover:bg-border-light">+</button>
+                </div>
+              </div>
+            )}
+            
+            <p className="text-[11px] font-bold text-text-muted italic px-1">
+              {mode === 'ALL' ? '⚡ Mastery increases only when EVERY habit in the system is finished today.' : 
+               mode === 'ANY' ? '🚀 Completing ANY one habit counts as a full day of progress.' : 
+               `🎯 You must finish at least ${minHabits} habit${minHabits > 1 ? 's' : ''} daily to progress.`}
+            </p>
+          </div>
+
+          <div className="space-y-4 max-h-[320px] overflow-y-auto pr-2">
+            <div className="flex justify-between items-end px-1 sticky top-0 bg-bg-card py-2 z-10 border-b border-border-light/40 mb-2">
+               <p className="text-[10px] font-black text-text-muted uppercase tracking-[0.2em]">Daily Systems & Habits</p>
+               <button type="button" onClick={handleAddStagingHabit} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent-blue/10 text-accent-blue font-black text-[10px] hover:bg-accent-blue/20 transition-all">
+                 <Plus size={12} strokeWidth={3} /> Add Habit
+               </button>
+            </div>
+            
+            <div className="grid grid-cols-1 gap-3">
+              {habits.map((h, idx) => (
+                <div key={h.id} className="bg-bg-input/60 rounded-xl p-4 border border-border-light space-y-3 relative">
+                   <div className="flex gap-3">
+                      <input required type="text" value={h.title} onChange={e => handleUpdateStagingHabit(h.id, { title: e.target.value })} placeholder={`Habit #${idx + 1}...`} className="flex-1 bg-transparent border-b border-border-light p-1.5 text-sm font-bold text-text-main outline-none focus:border-accent-blue transition-colors" />
+                      <button type="button" onClick={() => handleRemoveStagingHabit(h.id)} className="p-1.5 text-text-muted hover:text-rose-500 transition-colors"><Trash2 size={16} /></button>
+                   </div>
+                   <div className="flex flex-wrap gap-2">
+                      <select value={h.type} onChange={e => handleUpdateStagingHabit(h.id, { type: e.target.value })} className="flex-1 min-w-[100px] bg-bg-card rounded-lg px-3 py-2 text-[11px] font-black text-text-main border-none shadow-sm">
+                        <option value="time">⏱️ Time-Based</option>
+                        <option value="check">✅ Simple Check</option>
+                        <option value="count">🔢 Count-Based</option>
+                      </select>
+                      {h.type !== 'check' && (
+                        <div className="flex items-center gap-1.5 bg-bg-card px-3 py-1.5 rounded-lg shadow-sm border border-border-light/50">
+                           <input type="number" min="1" value={h.type === 'count' ? h.targetCount : h.targetTime} 
+                             onChange={e => {
+                               const val = parseInt(e.target.value, 10) || 1;
+                               handleUpdateStagingHabit(h.id, { [h.type === 'count' ? 'targetCount' : 'targetTime']: val });
+                             }} 
+                             className="w-10 bg-transparent text-center font-black text-accent-blue outline-none text-xs" 
+                           />
+                           <span className="text-[9px] font-black text-text-muted uppercase tracking-widest">{h.type === 'count' ? 'units' : 'mins'}</span>
+                        </div>
+                      )}
+                   </div>
+                   <DayPicker
+                     value={h.scheduleDays || []}
+                     onChange={days => handleUpdateStagingHabit(h.id, { scheduleDays: days })}
+                   />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <button type="submit" className="w-full bg-accent-blue text-white rounded-xl py-4 font-black text-sm shadow-md shadow-accent-blue/20 hover:opacity-90 active:scale-95 transition-all">
+            Save System Changes
+          </button>
+        </form>
       </div>
     </div>
   );
@@ -224,11 +399,12 @@ const HabitRow = ({ habit, goalId, logHabitTime, deleteHabit, toggleHabitCheck, 
 };
 
 export const GoalsPage = () => {
-  const { goals, addGoal, deleteGoal, addHabit, deleteHabit, logHabitTime, toggleHabitCheck, updateHabitCount, extendGoalDeadline } = useAppContext();
+  const { goals, addGoal, deleteGoal, addHabit, deleteHabit, logHabitTime, toggleHabitCheck, updateHabitCount, extendGoalDeadline, editGoalSystem } = useAppContext();
   const [expandedGoal, setExpandedGoal] = useState(null);
   const [showAddGoal, setShowAddGoal] = useState(false);
   const [showAddHabit, setShowAddHabit] = useState(null);
   const [extendingGoal, setExtendingGoal] = useState(null);
+  const [editingGoal, setEditingGoal] = useState(null);
   const [newGoal, setNewGoal] = useState({ 
     title: '', 
     tag: 'General', 
@@ -516,7 +692,8 @@ export const GoalsPage = () => {
                   </div>
 
                   <div className="flex flex-col gap-2 items-center">
-                    <button onClick={e => { e.stopPropagation(); deleteGoal(goal.id); }} className="w-9 h-9 rounded-xl text-text-muted hover:text-rose-500 hover:bg-rose-500/10 transition-all flex items-center justify-center"><Trash2 size={18} /></button>
+                    <button onClick={e => { e.stopPropagation(); setEditingGoal(goal); }} className="w-9 h-9 rounded-xl text-text-muted hover:text-accent-blue hover:bg-accent-blue/10 transition-all flex items-center justify-center" title="Edit Goal System"><Edit3 size={18} /></button>
+                    <button onClick={e => { e.stopPropagation(); deleteGoal(goal.id); }} className="w-9 h-9 rounded-xl text-text-muted hover:text-rose-500 hover:bg-rose-500/10 transition-all flex items-center justify-center" title="Delete Goal System"><Trash2 size={18} /></button>
                     {isOpen ? <ChevronUp size={24} className="text-text-muted" /> : <ChevronDown size={24} className="text-text-muted" />}
                   </div>
                 </div>
@@ -576,6 +753,7 @@ export const GoalsPage = () => {
       </div>
       
       {extendingGoal && <ExtendDeadlineModal goal={extendingGoal} onClose={() => setExtendingGoal(null)} onExtend={extendGoalDeadline} />}
+      {editingGoal && <EditGoalSystemModal goal={editingGoal} onClose={() => setEditingGoal(null)} onSave={editGoalSystem} />}
       
       {goals.length === 0 && !showAddGoal && (
         <div className="flex flex-col items-center justify-center py-32 text-text-muted/50">

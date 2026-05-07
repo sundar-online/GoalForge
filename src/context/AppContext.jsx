@@ -854,6 +854,120 @@ export const AppProvider = ({ children }) => {
     }));
   };
 
+  const editGoalSystem = async (goalId, goalUpdates, finalHabits) => {
+    const targetGoal = goals.find(g => g.id === goalId);
+    if (!targetGoal) return;
+
+    // 1. Handle deleted habits in Firestore
+    const finalHabitIds = new Set(finalHabits.map(h => String(h.id)));
+    const deletedHabits = (targetGoal.habits || []).filter(h => !finalHabitIds.has(String(h.id)));
+
+    if (user) {
+      for (const dh of deletedHabits) {
+        await db.deleteHabitDb(user.id, goalId, dh.id);
+      }
+    }
+
+    // 2. Map final habits
+    const mappedHabits = finalHabits.map(h => {
+      const existing = (targetGoal.habits || []).find(eh => String(eh.id) === String(h.id));
+      if (!existing) {
+        // Brand new staging habit added during editing
+        return {
+          ...h,
+          id: String(h.id || (Date.now() + Math.random())),
+          timeSpent: 0,
+          currentCount: 0,
+          completed: false,
+          streak: 0,
+          lastCompletedDate: null,
+          completedDates: [],
+          missedDays: 0,
+          lastActiveDate: TODAY()
+        };
+      } else {
+        // Preserving tracker details but modifying target config
+        const typeChanged = existing.type !== h.type;
+        const currentCount = typeChanged ? 0 : (existing.currentCount || 0);
+        const timeSpent = typeChanged ? 0 : (existing.timeSpent || 0);
+
+        const targetCount = Number(h.targetCount || existing.targetCount || 10);
+        const targetTime = Number(h.targetTime || existing.targetTime || 15);
+        let completed = existing.completed;
+        if (typeChanged || targetCount !== existing.targetCount || targetTime !== existing.targetTime) {
+          if (h.type === 'check') {
+            completed = existing.completed || false;
+          } else if (h.type === 'count') {
+            completed = currentCount >= targetCount;
+          } else {
+            completed = timeSpent >= targetTime;
+          }
+        }
+
+        return {
+          ...existing,
+          title: h.title,
+          type: h.type,
+          targetTime,
+          targetCount,
+          scheduleDays: h.scheduleDays || [],
+          currentCount,
+          timeSpent,
+          completed
+        };
+      }
+    });
+
+    const updatedGoal = {
+      ...targetGoal,
+      ...goalUpdates,
+      habits: mappedHabits
+    };
+
+    // Recalculate daily progress, completion dates, streak and overall progress
+    const today = TODAY();
+    const isGoalDone = isGoalDoneToday(updatedGoal);
+    let updatedGoalDates = updatedGoal.completedDates ? [...updatedGoal.completedDates] : [];
+    if (updatedGoal.lastCompletedDate && !updatedGoalDates.includes(updatedGoal.lastCompletedDate)) {
+      updatedGoalDates.push(updatedGoal.lastCompletedDate);
+    }
+
+    if (isGoalDone) {
+      if (!updatedGoalDates.includes(today)) {
+        updatedGoalDates.push(today);
+      }
+    } else {
+      updatedGoalDates = updatedGoalDates.filter(d => d !== today);
+    }
+
+    const newGoalStreak = calculateStreakFromHistory(updatedGoalDates, []);
+    const sortedGoalDates = [...updatedGoalDates].sort((a, b) => b.localeCompare(a));
+    const newGoalLastCompleted = sortedGoalDates.length > 0 ? sortedGoalDates[0] : null;
+
+    updatedGoal.completedDates = updatedGoalDates;
+    updatedGoal.streak = newGoalStreak;
+    updatedGoal.lastCompletedDate = newGoalLastCompleted;
+    if (isGoalDone) {
+      updatedGoal.missedDays = 0;
+    }
+    updatedGoal.progress = calculateOverallProgress(updatedGoal);
+
+    // Save locally
+    setGoals(prev => prev.map(g => g.id === goalId ? updatedGoal : g));
+
+    // Save in Firestore
+    if (user) {
+      try {
+        await db.upsertGoal(user.id, updatedGoal);
+        for (const h of mappedHabits) {
+          await db.upsertHabit(user.id, goalId, h);
+        }
+      } catch (err) {
+        console.error('[Realtime Sync] Failed to edit goal system in Firestore:', err);
+      }
+    }
+  };
+
 
 
   const extendGoalDeadline = (id, newDeadline) => {
@@ -1655,7 +1769,7 @@ export const AppProvider = ({ children }) => {
   // Performance Optimization: Memoize the context value to prevent
   // unnecessary re-renders across the entire app on every state change.
   const value = useMemo(() => ({
-    goals, addGoal, updateGoal, deleteGoal, extendGoalDeadline,
+    goals, addGoal, updateGoal, editGoalSystem, deleteGoal, extendGoalDeadline,
     addHabit, deleteHabit, logHabitTime, toggleHabitCheck, updateHabitCount,
     tasks, addTask, updateTask, deleteTask, logTaskTime, toggleTaskComplete, updateTaskCount,
     focusTime, focusHistory, addFocusTime, addFocusTimeToHabit,
@@ -1682,7 +1796,7 @@ export const AppProvider = ({ children }) => {
     xpData, levelUpEvent, badgeUnlockEvent, currentlyEarnedBadges,
     aiInsights, recoveryStrategies, smartSuggestions,
     totalItems, completedItems, todayTasks, allHabits,
-    settings, saveWeeklyIntention
+    settings, saveWeeklyIntention, editGoalSystem
   ]);
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
