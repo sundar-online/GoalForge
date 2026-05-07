@@ -7,7 +7,7 @@ import { getFirestore } from 'firebase/firestore';
 
 const firebaseConfig = {
   apiKey: "AIzaSyD59ewUm8tQYj4Vg_a-vPEmJ3Rd5khVwtY",
-  authDomain: "goalforage.firebaseapp.com",
+  authDomain: "goal-forge-two.vercel.app",
   projectId: "goalforage",
   storageBucket: "goalforage.firebasestorage.app",
   messagingSenderId: "47005570215",
