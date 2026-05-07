@@ -2,7 +2,7 @@
 // Firebase Configuration — GoalForge
 // ═══════════════════════════════════════════════════════
 import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
 const firebaseConfig = {
@@ -19,6 +19,8 @@ const app = initializeApp(firebaseConfig);
 
 // Auth
 export const auth = getAuth(app);
+export const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({ prompt: 'select_account' });
 
 // Firestore
 export const fireDb = getFirestore(app);
