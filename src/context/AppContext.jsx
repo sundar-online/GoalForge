@@ -66,8 +66,29 @@ export const AppProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [syncError, setSyncError] = useState(null);
 
-  // Initial local state
-  const [goals, setGoals] = useState(() => safeParse(STORAGE_KEYS.GOALS, []));
+  // Track deleted goal IDs locally and persistently to ensure instant sync/offline support
+  const [deletedGoalIds, setDeletedGoalIds] = useState(() => {
+    try {
+      const saved = localStorage.getItem('gf_deleted_goal_ids');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const deletedGoalIdsRef = useRef(deletedGoalIds);
+  useEffect(() => {
+    deletedGoalIdsRef.current = deletedGoalIds;
+    localStorage.setItem('gf_deleted_goal_ids', JSON.stringify(deletedGoalIds));
+  }, [deletedGoalIds]);
+
+  // Initial local state with deleted goals filtered out
+  const [goals, setGoals] = useState(() => {
+    const rawGoals = safeParse(STORAGE_KEYS.GOALS, []);
+    const saved = localStorage.getItem('gf_deleted_goal_ids');
+    const parsedDeletedIds = saved ? JSON.parse(saved) : [];
+    return rawGoals.filter(g => g && g.id && !parsedDeletedIds.includes(String(g.id)) && !g.deleted && !g.isDeleted);
+  });
   const [tasks, setTasks] = useState(() => safeParse(STORAGE_KEYS.TASKS, []));
   const [taskLogs, setTaskLogs] = useState(() => safeParse(STORAGE_KEYS.LOGS, {}));
   const [notes, setNotes] = useState(() => safeParse(STORAGE_KEYS.NOTES, []));
@@ -317,6 +338,9 @@ export const AppProvider = ({ children }) => {
       const unsubGoals = onSnapshot(goalsQuery, { includeMetadataChanges: true }, (snapshot) => {
         const goalsList = snapshot.docs.map(docSnap => {
           const g = docSnap.data();
+          if (g.deleted || g.isDeleted || deletedGoalIdsRef.current.includes(String(docSnap.id))) {
+            return null;
+          }
           return {
             id: docSnap.id,
             title: g.title,
@@ -338,7 +362,7 @@ export const AppProvider = ({ children }) => {
             syncPending: docSnap.metadata.hasPendingWrites,
             habits: [] // Will be populated in real-time by nested listeners below
           };
-        });
+        }).filter(Boolean);
 
         // Push new goals notifications
         if (!isInitialGoalsLoad.current) {
@@ -421,8 +445,10 @@ export const AppProvider = ({ children }) => {
         // Clean up listeners for any goals that have been deleted
         const activeGoalIds = new Set(goalsList.map(g => g.id));
         Object.keys(habitsListeners.current).forEach(gId => {
-          if (!activeGoalIds.has(gId)) {
-            habitsListeners.current[gId](); // Unsubscribe
+          if (!activeGoalIds.has(gId) || deletedGoalIdsRef.current.includes(String(gId))) {
+            if (habitsListeners.current[gId]) {
+              habitsListeners.current[gId](); // Unsubscribe
+            }
             delete habitsListeners.current[gId];
           }
         });
@@ -982,7 +1008,48 @@ export const AppProvider = ({ children }) => {
     }));
   };
 
-  const deleteGoal = id => { setGoals(prev => prev.filter(g => g.id !== id)); if (user) db.deleteGoalDb(user.id, id); };
+  const deleteGoal = id => {
+    const goalIdStr = String(id);
+    
+    // 1. Clean up active habits sub-collection real-time snapshot listener
+    if (habitsListeners.current[goalIdStr]) {
+      habitsListeners.current[goalIdStr]();
+      delete habitsListeners.current[goalIdStr];
+    }
+
+    // 2. Clear any lingering recovery state, dismissed insights, or weekly intention cache
+    const targetGoal = goals.find(g => String(g.id) === goalIdStr);
+    const habitIds = targetGoal ? (targetGoal.habits || []).map(h => String(h.id)) : [];
+    
+    setSettings(prev => {
+      const updatedIntentions = { ...prev.weeklyIntentions };
+      delete updatedIntentions[goalIdStr];
+
+      const todayKey = TODAY();
+      const dismissed = prev.dismissedInsights || [];
+      // Clean up/dismiss any recovery strategies/alerts related to this goal & habits instantly
+      const idsToDismiss = [
+        `recovery_${goalIdStr}`,
+        ...habitIds.map(hId => `recovery_${hId}`),
+        ...habitIds.map(hId => `recovery_${goalIdStr}_${hId}`)
+      ].map(dId => dId.includes('__') ? dId : `${dId}__${todayKey}`);
+
+      return {
+        ...prev,
+        weeklyIntentions: updatedIntentions,
+        dismissedInsights: [...new Set([...dismissed, ...idsToDismiss])]
+      };
+    });
+
+    // 3. Mark the ID as deleted persistently to shield the UI from stale Firestore snapshot feeds
+    setDeletedGoalIds(prev => [...new Set([...prev, goalIdStr])]);
+
+    // 4. Instantly remove from goals list in-memory state
+    setGoals(prev => prev.filter(g => String(g.id) !== goalIdStr));
+
+    // 5. Trigger physical database deletion
+    if (user) db.deleteGoalDb(user.id, goalIdStr);
+  };
 
   const addHabit = (goalId, habit) => {
     const targetGoal = goals.find(g => g.id === goalId);

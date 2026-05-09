@@ -23,6 +23,7 @@ export async function fetchGoals(userId) {
 
     for (const goalDoc of snap.docs) {
       const g = goalDoc.data();
+      if (g.deleted || g.isDeleted) continue;
       // Fetch nested habits sub-collection
       const habitsSnap = await getDocs(collection(goalDoc.ref, 'habits'));
       const habits = habitsSnap.docs.map(h => {
@@ -103,11 +104,15 @@ export async function upsertGoal(userId, goal) {
 
 export async function deleteGoalDb(userId, goalId) {
   try {
+    const goalRef = userDoc(userId, 'goals', String(goalId));
+    // Soft-delete markers updated first to preempt cache snapshot triggers in other tabs or offline
+    await setDoc(goalRef, { deleted: true, isDeleted: true }, { merge: true });
+
     // Delete all habits in sub-collection first
     const habitsSnap = await getDocs(collection(fireDb, 'users', userId, 'goals', String(goalId), 'habits'));
     const batch = writeBatch(fireDb);
     habitsSnap.docs.forEach(h => batch.delete(h.ref));
-    batch.delete(userDoc(userId, 'goals', String(goalId)));
+    batch.delete(goalRef);
     await batch.commit();
   } catch (err) {
     log('deleteGoal', err);
