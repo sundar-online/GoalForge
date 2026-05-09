@@ -399,7 +399,7 @@ const HabitRow = ({ habit, goalId, logHabitTime, deleteHabit, toggleHabitCheck, 
 };
 
 export const GoalsPage = () => {
-  const { goals, addGoal, deleteGoal, addHabit, deleteHabit, logHabitTime, toggleHabitCheck, updateHabitCount, extendGoalDeadline, editGoalSystem } = useAppContext();
+  const { goals, addGoal, deleteGoal, addHabit, deleteHabit, logHabitTime, toggleHabitCheck, updateHabitCount, extendGoalDeadline, editGoalSystem, setCompletedGoalForCelebration } = useAppContext();
   const [expandedGoal, setExpandedGoal] = useState(null);
   const [showAddGoal, setShowAddGoal] = useState(false);
   const [showAddHabit, setShowAddHabit] = useState(null);
@@ -676,6 +676,18 @@ export const GoalsPage = () => {
                     <div className="flex flex-wrap items-center gap-2 mb-2">
                       <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md ${tc.bg} ${tc.color}`}>{goal.tag}</span>
                       <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md bg-accent-blue-light text-accent-blue">Today: {dailyProgress}%</span>
+                      {goal.progress >= 100 && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setCompletedGoalForCelebration(goal);
+                          }}
+                          className="text-[9px] font-black bg-amber-400/15 text-amber-400 border border-amber-400/20 px-2 py-0.5 rounded-md hover:scale-105 active:scale-95 transition-all flex items-center gap-1"
+                          title="Click to trigger Celebration Memory modal!"
+                        >
+                          ✨ Mastered (Save Memory)
+                        </button>
+                      )}
                     </div>
                     <p className="text-lg font-black text-text-main tracking-tight leading-tight mb-3 group-hover:text-accent-blue transition-colors">{goal.title}</p>
                     

@@ -452,3 +452,31 @@ export async function upsertUserProfile(userId, profile) {
     log('upsertUserProfile', err);
   }
 }
+
+// ── Story Moment Memories ──────────────────────────────────
+export async function upsertMemory(userId, memory) {
+  try {
+    await setDoc(userDoc(userId, 'memories', memory.id), {
+      goalId: memory.goalId || '',
+      title: memory.title || '',
+      completionDate: memory.completionDate || '',
+      streak: memory.streak || 0,
+      consistency: memory.consistency || 100,
+      userNote: memory.userNote || '',
+      userPhoto: memory.userPhoto || '',
+      achievementStats: memory.achievementStats || {},
+      createdAt: memory.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    }, { merge: true });
+  } catch (err) {
+    log('upsertMemory', err);
+  }
+}
+
+export async function deleteMemoryDb(userId, memoryId) {
+  try {
+    await deleteDoc(userDoc(userId, 'memories', memoryId));
+  } catch (err) {
+    log('deleteMemoryDb', err);
+  }
+}

@@ -12,6 +12,7 @@ import { ProfilePage } from './components/ProfilePage';
 import { WeeklyPlan } from './components/WeeklyPlan';
 import { LevelUpModal } from './components/LevelUpModal';
 import { BadgeToast } from './components/BadgeToast';
+import { GoalCompletionModal } from './components/GoalCompletionModal';
 import { registerServiceWorker } from './utils/notificationUtils';
 
 function AppInner() {
@@ -99,7 +100,11 @@ function AppInner() {
 
 /** Renders level-up and badge modals, reading from context. */
 function GamificationOverlays() {
-  const { levelUpEvent, setLevelUpEvent, badgeUnlockEvent, setBadgeUnlockEvent } = useAppContext();
+  const { 
+    levelUpEvent, setLevelUpEvent, 
+    badgeUnlockEvent, setBadgeUnlockEvent,
+    completedGoalForCelebration, setCompletedGoalForCelebration 
+  } = useAppContext();
   return (
     <>
       {levelUpEvent && (
@@ -113,6 +118,12 @@ function GamificationOverlays() {
         <BadgeToast
           badge={badgeUnlockEvent}
           onClose={() => setBadgeUnlockEvent(null)}
+        />
+      )}
+      {completedGoalForCelebration && (
+        <GoalCompletionModal
+          goal={completedGoalForCelebration}
+          onClose={() => setCompletedGoalForCelebration(null)}
         />
       )}
     </>

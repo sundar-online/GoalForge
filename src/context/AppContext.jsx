@@ -33,7 +33,8 @@ const STORAGE_KEYS = {
   LOGS: 'goalforge_logs',
   SETTINGS: 'goalforge_settings',
   NOTES: 'goalforge_notes',
-  XP: 'goalforge_xp'
+  XP: 'goalforge_xp',
+  MEMORIES: 'goalforge_memories'
 };
 
 const DEFAULT_XP_DATA = {
@@ -92,15 +93,47 @@ export const AppProvider = ({ children }) => {
   const [tasks, setTasks] = useState(() => safeParse(STORAGE_KEYS.TASKS, []));
   const [taskLogs, setTaskLogs] = useState(() => safeParse(STORAGE_KEYS.LOGS, {}));
   const [notes, setNotes] = useState(() => safeParse(STORAGE_KEYS.NOTES, []));
+  const [memories, setMemories] = useState(() => safeParse(STORAGE_KEYS.MEMORIES, []));
 
   const tasksRef = useRef([]);
   const notesRef = useRef([]);
   const goalsRef = useRef([]);
+  const memoriesRef = useRef([]);
 
   useEffect(() => { tasksRef.current = tasks; }, [tasks]);
   useEffect(() => { notesRef.current = notes; }, [notes]);
   useEffect(() => { goalsRef.current = goals; }, [goals]);
+  useEffect(() => { memoriesRef.current = memories; }, [memories]);
   const habitsListeners = useRef({});
+
+  // Story Celebration Modal state
+  const [completedGoalForCelebration, setCompletedGoalForCelebration] = useState(null);
+
+  // Reactive completion detector to capture when a goal progress hits 100%
+  const prevGoalsProgressRef = useRef({});
+  useEffect(() => {
+    if (loading) return;
+    goals.forEach(goal => {
+      const prevProgress = prevGoalsProgressRef.current[goal.id];
+      const currentProgress = goal.progress || 0;
+      
+      // If progress newly transitions to 100%
+      if (currentProgress === 100 && prevProgress !== undefined && prevProgress < 100) {
+        // Trigger completion celebration modal!
+        setCompletedGoalForCelebration(goal);
+      }
+      
+      prevGoalsProgressRef.current[goal.id] = currentProgress;
+    });
+    
+    // Clean up deleted goals from our ref
+    const currentGoalIds = new Set(goals.map(g => g.id));
+    Object.keys(prevGoalsProgressRef.current).forEach(gId => {
+      if (!currentGoalIds.has(gId)) {
+        delete prevGoalsProgressRef.current[gId];
+      }
+    });
+  }, [goals, loading]);
 
   // Gamification state
   const [xpData, setXpData] = useState(() => ({ ...DEFAULT_XP_DATA, ...safeParse(STORAGE_KEYS.XP, DEFAULT_XP_DATA) }));
@@ -529,6 +562,33 @@ export const AppProvider = ({ children }) => {
         console.error('[Realtime Sync] Error in XP subscription:', error);
       });
       unsubscribes.push(unsubXp);
+
+      // 8. Subscribe to Memories Collection
+      const memoriesQuery = query(collection(fireDb, 'users', user.id, 'memories'), orderBy('createdAt', 'desc'));
+      const unsubMemories = onSnapshot(memoriesQuery, { includeMetadataChanges: true }, (snapshot) => {
+        const updatedMemories = snapshot.docs.map(doc => {
+          const m = doc.data();
+          return {
+            id: doc.id,
+            goalId: m.goalId || '',
+            title: m.title || '',
+            completionDate: m.completionDate || '',
+            streak: m.streak || 0,
+            consistency: m.consistency || 100,
+            userNote: m.userNote || '',
+            userPhoto: m.userPhoto || '',
+            achievementStats: m.achievementStats || {},
+            createdAt: m.createdAt || '',
+            syncPending: doc.metadata.hasPendingWrites,
+          };
+        });
+
+        setMemories(updatedMemories);
+        localStorage.setItem(STORAGE_KEYS.MEMORIES, JSON.stringify(updatedMemories));
+      }, (error) => {
+        console.error('[Realtime Sync] Error in Memories subscription:', error);
+      });
+      unsubscribes.push(unsubMemories);
 
     } catch (err) {
       console.error('[Realtime Sync] Error mounting realtime listeners:', err);
@@ -1721,6 +1781,46 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+  const addMemory = async (memory) => {
+    const newM = {
+      ...memory,
+      id: memory.id || Date.now().toString(),
+      createdAt: memory.createdAt || new Date().toISOString()
+    };
+    
+    // Save locally
+    setMemories(prev => {
+      const updated = [newM, ...prev.filter(m => m.id !== newM.id)];
+      localStorage.setItem(STORAGE_KEYS.MEMORIES, JSON.stringify(updated));
+      return updated;
+    });
+
+    // Save online in Firestore
+    if (user) {
+      try {
+        await db.upsertMemory(user.id, newM);
+      } catch (err) {
+        console.error('[Firestore Sync] Failed to add memory:', err);
+      }
+    }
+  };
+
+  const deleteMemory = async id => {
+    if (user) {
+      try {
+        await db.deleteMemoryDb(user.id, id);
+      } catch (err) {
+        console.error('[Firestore Sync] Failed to delete memory:', err);
+      }
+    } else {
+      setMemories(prev => {
+        const updated = prev.filter(m => m.id !== id);
+        localStorage.setItem(STORAGE_KEYS.MEMORIES, JSON.stringify(updated));
+        return updated;
+      });
+    }
+  };
+
   // Sync XP data to DB on change (debounced)
   useEffect(() => {
     if (!user || loading) return;
@@ -1856,14 +1956,18 @@ export const AppProvider = ({ children }) => {
     applyRecoveryPlan,
     smartSuggestions,
     settings,
-    saveWeeklyIntention
+    saveWeeklyIntention,
+    // Memories & Completed Celebration Modal
+    memories, addMemory, deleteMemory,
+    completedGoalForCelebration, setCompletedGoalForCelebration
   }), [
     goals, tasks, taskLogs, notes, settings, loading, syncError,
     accuracy, alerts, weeklyReport, disciplineScore, userLevel,
     xpData, levelUpEvent, badgeUnlockEvent, currentlyEarnedBadges,
     aiInsights, recoveryStrategies, smartSuggestions,
     totalItems, completedItems, todayTasks, allHabits,
-    settings, saveWeeklyIntention, editGoalSystem
+    settings, saveWeeklyIntention, editGoalSystem,
+    memories, completedGoalForCelebration
   ]);
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

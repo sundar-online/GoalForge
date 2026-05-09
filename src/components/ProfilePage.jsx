@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { BADGE_DEFINITIONS, LEVEL_THRESHOLDS, getLevelFromXP } from '../utils/gamificationEngine';
-import { Award, Zap, Target, Clock, Flame, TrendingUp, Star, Lock, ChevronRight, Bell, BellOff } from 'lucide-react';
+import { Award, Zap, Target, Clock, Flame, TrendingUp, Star, Lock, ChevronRight, Bell, BellOff, BookOpen, Trash2, Sparkles, History } from 'lucide-react';
 import { requestNotificationPermission, checkNotificationPermission } from '../utils/notificationUtils';
 
 export const ProfilePage = () => {
@@ -10,9 +10,11 @@ export const ProfilePage = () => {
     xpData: rawXpData, goals, tasks, notes,
     focusTime, focusHistory, accuracy,
     disciplineScore, allHabits,
+    memories = [], deleteMemory
   } = useAppContext();
   const { displayName, user } = useAuth();
   const [selectedBadge, setSelectedBadge] = useState(null);
+  const [activeReplayMemory, setActiveReplayMemory] = useState(null);
   const [pushPerm, setPushPerm] = useState('default');
 
   useEffect(() => {
@@ -221,6 +223,108 @@ export const ProfilePage = () => {
             </div>
           </section>
 
+          {/* Story Moment Memories Timeline */}
+          <section className="space-y-5">
+            <div className="flex items-center justify-between px-2">
+              <div className="flex items-center gap-2">
+                <BookOpen size={18} className="text-accent-blue" />
+                <h3 className="text-[10px] font-black text-text-muted uppercase tracking-[0.15em]">Story Moment Memories</h3>
+              </div>
+              <span className="text-xs font-bold text-accent-blue bg-accent-blue/10 px-2.5 py-1 rounded-full">
+                {memories.length} {memories.length === 1 ? 'Memory' : 'Memories'}
+              </span>
+            </div>
+
+            {memories.length === 0 ? (
+              <div className="bg-bg-card border border-border-light rounded-[32px] p-8 text-center space-y-4">
+                <div className="w-16 h-16 rounded-2xl bg-white/[0.02] border border-white/5 flex items-center justify-center mx-auto text-3xl">
+                  📖
+                </div>
+                <div className="space-y-1">
+                  <h4 className="text-sm font-black text-text-main">Your achievements book is empty</h4>
+                  <p className="text-xs text-text-muted max-w-sm mx-auto leading-relaxed">
+                    Complete any goal to 100% to trigger the celebration and save your first permanent story reflection!
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="relative border-l border-white/10 ml-4 pl-6 space-y-6">
+                {memories.map((memory) => {
+                  return (
+                    <div key={memory.id} className="relative group animate-in fade-in slide-in-from-bottom-2 duration-300">
+                      {/* Timeline Dot */}
+                      <div className="absolute -left-[31px] top-1.5 w-4 h-4 rounded-full bg-bg-app border-2 border-accent-blue flex items-center justify-center shadow-lg group-hover:scale-125 transition-transform" />
+
+                      {/* Memory Polaroid Card */}
+                      <div className="bg-bg-card border border-border-light hover:border-white/20 rounded-[28px] p-5 shadow-sm hover:shadow-xl transition-all duration-300 relative overflow-hidden">
+                        {/* Header color accent glow */}
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-accent-blue/5 rounded-full blur-2xl pointer-events-none" />
+
+                        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between relative z-10">
+                          {/* Left Profile details */}
+                          <div className="flex items-center gap-3.5 min-w-0">
+                            <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-white/[0.03] to-white/[0.08] border border-white/10 flex items-center justify-center text-2xl shadow-inner select-none">
+                              {memory.userPhoto || '🏆'}
+                            </div>
+                            <div className="min-w-0">
+                              <h4 className="text-sm font-black text-text-main truncate group-hover:text-accent-blue transition-colors">
+                                {memory.title}
+                              </h4>
+                              <p className="text-[10px] font-bold text-text-muted mt-0.5 uppercase tracking-widest">
+                                Completed {new Date(memory.completionDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Right Stats Quick Info */}
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-black bg-amber-400/10 text-amber-400 px-2.5 py-1 rounded-lg flex items-center gap-1 shrink-0">
+                              🔥 {memory.streak || 0} Streak
+                            </span>
+                            <span className="text-[10px] font-black bg-emerald-500/10 text-emerald-400 px-2.5 py-1 rounded-lg shrink-0">
+                              {memory.consistency || 100}% Fit
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Journal reflection notes */}
+                        {memory.userNote && (
+                          <div className="mt-4 p-3 bg-white/[0.02] border-l-2 border-accent-blue/30 rounded-r-xl">
+                            <p className="text-xs text-text-muted italic leading-relaxed font-medium">
+                              "{memory.userNote}"
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Actions line */}
+                        <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between">
+                          <button
+                            onClick={() => setActiveReplayMemory(memory)}
+                            className="text-[10px] font-black text-accent-blue uppercase tracking-widest hover:text-indigo-400 flex items-center gap-1 transition-colors"
+                          >
+                            <History size={12} /> Relive Memory Replay
+                          </button>
+                          
+                          <button
+                            onClick={() => {
+                              if (confirm('Are you sure you want to delete this memory from your permanent achievements? This cannot be undone.')) {
+                                deleteMemory(memory.id);
+                              }
+                            }}
+                            className="text-text-muted/40 hover:text-red-400 p-1 rounded-lg transition-colors"
+                            title="Delete Memory"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+
           {/* XP History Feed */}
           {xpHistory.length > 0 && (
             <section className="space-y-4">
@@ -354,6 +458,76 @@ export const ProfilePage = () => {
             )}
             <button onClick={() => setSelectedBadge(null)} className="mt-4 px-8 py-3 rounded-xl bg-bg-input text-text-main font-black text-sm hover:bg-bg-input/80 transition-colors">
               Close
+            </button>
+          </div>
+        </div>
+      )}
+      {/* Story Moment Replay / History Modal */}
+      {activeReplayMemory && (
+        <div 
+          className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[200] p-4 animate-in fade-in duration-300" 
+          onClick={() => setActiveReplayMemory(null)}
+        >
+          <div 
+            className="bg-[#0e0e11] border border-white/10 rounded-[32px] p-6 md:p-8 w-full max-w-md shadow-2xl relative overflow-hidden text-center space-y-6 animate-in zoom-in-95 duration-300"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Ambient background glow */}
+            <div className="absolute -top-16 left-1/2 -translate-x-1/2 w-40 h-40 rounded-full bg-accent-blue/15 blur-3xl pointer-events-none" />
+
+            {/* Emoji Emblem */}
+            <div className="w-20 h-20 rounded-2xl bg-gradient-to-tr from-accent-blue/10 to-indigo-500/15 border border-white/10 flex items-center justify-center text-4xl mx-auto shadow-xl">
+              {activeReplayMemory.userPhoto || '🏆'}
+            </div>
+
+            <div className="space-y-1.5">
+              <span className="text-[10px] font-black tracking-[0.3em] uppercase text-accent-blue">
+                Mastered Journey Story
+              </span>
+              <h3 className="text-2xl font-black text-white tracking-tight leading-tight">
+                {activeReplayMemory.title}
+              </h3>
+              <p className="text-xs text-white/40 font-bold uppercase tracking-wider">
+                Completed on {new Date(activeReplayMemory.completionDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+              </p>
+            </div>
+
+            {/* Achievement Details */}
+            <div className="grid grid-cols-2 gap-3.5 pt-2">
+              <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-3.5">
+                <p className="text-[9px] font-black uppercase tracking-wider text-white/40">Peak Streak</p>
+                <p className="text-xl font-extrabold text-amber-400 mt-1">🔥 {activeReplayMemory.streak || 0} Days</p>
+              </div>
+              <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-3.5">
+                <p className="text-[9px] font-black uppercase tracking-wider text-white/40">Consistency</p>
+                <p className="text-xl font-extrabold text-emerald-400 mt-1">{activeReplayMemory.consistency || 100}% Fit</p>
+              </div>
+            </div>
+
+            {/* Journal Entry Reflection */}
+            {activeReplayMemory.userNote ? (
+              <div className="bg-white/[0.01] border border-white/5 rounded-2xl p-4 text-left relative">
+                <p className="text-xs text-white/40 font-bold uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                  <span>📝</span> Personal Reflection Note
+                </p>
+                <p className="text-xs text-white/80 leading-relaxed italic font-medium">
+                  "{activeReplayMemory.userNote}"
+                </p>
+              </div>
+            ) : (
+              <p className="text-xs text-white/30 italic">No reflection note was written for this memory.</p>
+            )}
+
+            {/* Motivational Replay Praise */}
+            <div className="bg-accent-blue/5 border border-accent-blue/10 rounded-2xl p-4 text-xs text-accent-blue/80 font-bold leading-relaxed">
+              ⭐ "Your level of discipline on this journey was stellar! This moment remains permanently etched in your achievements as a symbol of your growth."
+            </div>
+
+            <button 
+              onClick={() => setActiveReplayMemory(null)} 
+              className="w-full py-3.5 rounded-xl bg-gradient-to-r from-accent-blue to-indigo-500 text-white font-extrabold text-xs tracking-wider uppercase hover:shadow-lg hover:shadow-accent-blue/20 transition-all transform active:translate-y-0 hover:-translate-y-0.5"
+            >
+              Back to Profile
             </button>
           </div>
         </div>
