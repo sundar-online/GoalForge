@@ -4,6 +4,7 @@ import { useAppContext } from '../context/AppContext';
 import { CalendarCheck, Plus, Clock, Trash2, Check, CalendarRange, Calendar, Cloud } from 'lucide-react';
 import { isTaskDone } from '../utils/calculationUtils';
 import { TODAY } from '../utils/dateUtils';
+import { DeleteConfirmationModal } from './DeleteConfirmationModal';
 
 const SCHEDULE_ICONS = {
   daily:  <Clock size={12} />,
@@ -55,6 +56,7 @@ export const DailyTasks = () => {
   const [newTask, setNewTask] = useState(defaultTask);
   const [isAdding, setIsAdding] = useState(false);
   const [showLog, setShowLog] = useState(null);
+  const [deletingTaskItem, setDeletingTaskItem] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [completedLimit, setCompletedLimit] = useState(5);
@@ -298,7 +300,7 @@ export const DailyTasks = () => {
                     ) : (isTime && !tDone) && (
                       <button onClick={() => setShowLog(task)} className="px-4 py-2 rounded-xl bg-accent-blue text-white text-[11px] font-black shadow-md shadow-accent-blue/20 active:scale-95 transition-all">+ Log</button>
                     )}
-                    <button onClick={() => deleteTask(task.id)} className="w-9 h-9 rounded-xl text-text-muted hover:text-rose-500 hover:bg-rose-500/10 transition-all flex items-center justify-center"><Trash2 size={18} /></button>
+                    <button onClick={() => setDeletingTaskItem(task)} className="w-9 h-9 rounded-xl text-text-muted hover:text-rose-500 hover:bg-rose-500/10 transition-all flex items-center justify-center" title="Delete Task"><Trash2 size={18} /></button>
                   </div>
                 </div>
                 
@@ -354,7 +356,7 @@ export const DailyTasks = () => {
                   </div>
 
                   <div className="flex gap-2 items-center">
-                    <button onClick={() => deleteTask(task.id)} className="w-9 h-9 rounded-xl text-text-muted hover:text-rose-500 hover:bg-rose-500/10 transition-all flex items-center justify-center"><Trash2 size={18} /></button>
+                    <button onClick={() => setDeletingTaskItem(task)} className="w-9 h-9 rounded-xl text-text-muted hover:text-rose-500 hover:bg-rose-500/10 transition-all flex items-center justify-center" title="Delete Task"><Trash2 size={18} /></button>
                   </div>
                 </div>
                 
@@ -393,6 +395,19 @@ export const DailyTasks = () => {
       </div>
       
       {showLog && <LogTaskTimeModal task={showLog} onClose={() => setShowLog(null)} logTaskTime={logTaskTime} />}
+
+      <DeleteConfirmationModal
+        isOpen={!!deletingTaskItem}
+        onClose={() => setDeletingTaskItem(null)}
+        onConfirm={() => {
+          if (deletingTaskItem) {
+            deleteTask(deletingTaskItem.id);
+          }
+        }}
+        title="Delete Task"
+        itemName={deletingTaskItem?.title}
+        message="Are you sure you want to delete this Task? This action cannot be undone and will permanently remove all related completion history and streak statistics."
+      />
     </div>
   );
 };

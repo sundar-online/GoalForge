@@ -3,6 +3,7 @@ import { useAppContext } from '../context/AppContext';
 import { Target, Plus, ChevronDown, ChevronUp, Trash2, Clock, Check, Layers, Calendar, History, Edit3 } from 'lucide-react';
 import { isGoalDoneToday, calculateGoalDailyProgress, isHabitScheduledToday } from '../utils/calculationUtils';
 import { addDays } from '../utils/dateUtils';
+import { DeleteConfirmationModal } from './DeleteConfirmationModal';
 
 // ── Day Picker ──────────────────────────────────────────────
 const ALL_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -405,6 +406,7 @@ export const GoalsPage = () => {
   const [showAddHabit, setShowAddHabit] = useState(null);
   const [extendingGoal, setExtendingGoal] = useState(null);
   const [editingGoal, setEditingGoal] = useState(null);
+  const [deletingGoalItem, setDeletingGoalItem] = useState(null);
   const [newGoal, setNewGoal] = useState({ 
     title: '', 
     tag: 'General', 
@@ -705,7 +707,7 @@ export const GoalsPage = () => {
 
                   <div className="flex flex-col gap-2 items-center">
                     <button onClick={e => { e.stopPropagation(); setEditingGoal(goal); }} className="w-9 h-9 rounded-xl text-text-muted hover:text-accent-blue hover:bg-accent-blue/10 transition-all flex items-center justify-center" title="Edit Goal System"><Edit3 size={18} /></button>
-                    <button onClick={e => { e.stopPropagation(); deleteGoal(goal.id); }} className="w-9 h-9 rounded-xl text-text-muted hover:text-rose-500 hover:bg-rose-500/10 transition-all flex items-center justify-center" title="Delete Goal System"><Trash2 size={18} /></button>
+                    <button onClick={e => { e.stopPropagation(); setDeletingGoalItem(goal); }} className="w-9 h-9 rounded-xl text-text-muted hover:text-rose-500 hover:bg-rose-500/10 transition-all flex items-center justify-center" title="Delete Goal System"><Trash2 size={18} /></button>
                     {isOpen ? <ChevronUp size={24} className="text-text-muted" /> : <ChevronDown size={24} className="text-text-muted" />}
                   </div>
                 </div>
@@ -766,6 +768,19 @@ export const GoalsPage = () => {
       
       {extendingGoal && <ExtendDeadlineModal goal={extendingGoal} onClose={() => setExtendingGoal(null)} onExtend={extendGoalDeadline} />}
       {editingGoal && <EditGoalSystemModal goal={editingGoal} onClose={() => setEditingGoal(null)} onSave={editGoalSystem} />}
+      
+      <DeleteConfirmationModal
+        isOpen={!!deletingGoalItem}
+        onClose={() => setDeletingGoalItem(null)}
+        onConfirm={() => {
+          if (deletingGoalItem) {
+            deleteGoal(deletingGoalItem.id);
+          }
+        }}
+        title="Delete Goal System"
+        itemName={deletingGoalItem?.title}
+        message="Are you sure you want to delete this Goal? This action cannot be undone and will permanently remove all related progress, habits, recovery suggestions, and streak metrics."
+      />
       
       {goals.length === 0 && !showAddGoal && (
         <div className="flex flex-col items-center justify-center py-32 text-text-muted/50">
