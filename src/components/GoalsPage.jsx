@@ -336,13 +336,13 @@ const HabitRow = ({ habit, goalId, logHabitTime, deleteHabit, toggleHabitCheck, 
   // If not scheduled today, show a greyed-out rest-day card
   if (!scheduledToday) {
     return (
-      <div className="p-4 rounded-2xl border border-dashed border-border-light bg-bg-input/30 flex items-center gap-3 opacity-50">
-        <div className="w-9 h-9 shrink-0 rounded-xl border-2 border-border-light bg-bg-card flex items-center justify-center">
-          <Calendar size={14} className="text-text-muted" />
+      <div className="p-2.5 sm:p-4 rounded-xl border border-dashed border-border-light bg-bg-input/30 flex items-center gap-2.5 sm:gap-3 opacity-50">
+        <div className="w-8 h-8 sm:w-9 sm:h-9 shrink-0 rounded-lg border-2 border-border-light bg-bg-card flex items-center justify-center">
+          <Calendar size={13} className="text-text-muted" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-black text-text-muted truncate">{habit.title}</p>
-          <p className="text-[10px] font-bold text-text-muted uppercase tracking-widest">Rest Day · {habit.scheduleDays?.join(', ')}</p>
+          <p className="text-xs sm:text-sm font-black text-text-muted truncate">{habit.title}</p>
+          <p className="text-[8px] sm:text-[10px] font-bold text-text-muted uppercase tracking-widest leading-none mt-0.5">Rest Day · {habit.scheduleDays?.join(', ')}</p>
         </div>
       </div>
     );
@@ -351,45 +351,53 @@ const HabitRow = ({ habit, goalId, logHabitTime, deleteHabit, toggleHabitCheck, 
   return (
     <>
       <div className={`
-        p-4 rounded-2xl transition-all duration-300 border flex flex-col gap-3
+        p-2.5 sm:p-4 rounded-xl transition-all duration-300 border flex flex-col gap-2 sm:gap-3
         ${done ? 'bg-emerald-500/5 border-emerald-500/10 opacity-70' : 'bg-bg-input border-border-light hover:border-border-med'}
       `}>
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3 flex-1 min-w-0">
+        {/* Main Content Line: Checkbox + Title + Streak & Inline Controls */}
+        <div className="flex items-center justify-between gap-2.5 sm:gap-4 w-full">
+          <div className="flex items-center gap-2.5 sm:gap-3 flex-1 min-w-0">
+            {/* Touch-Friendly Checkbox */}
             <button
                onClick={() => toggleHabitCheck(goalId, habit.id)}
                className={`
-                 w-9 h-9 shrink-0 rounded-xl border-2 flex items-center justify-center transition-all duration-200
+                 w-9 h-9 sm:w-10 sm:h-10 shrink-0 rounded-lg border-2 flex items-center justify-center transition-all duration-200
                  ${done ? 'bg-emerald-500 border-emerald-500 scale-95' : 'bg-bg-card border-border-med cursor-pointer hover:border-accent-blue'}
                `}
             >
-              {done ? <Check size={18} className="text-white" strokeWidth={3} /> : (isCheck ? null : <Icon size={16} className="text-text-muted" />)}
+              {done ? <Check size={16} className="text-white animate-in zoom-in-50" strokeWidth={3} /> : (isCheck ? null : <Icon size={14} className="text-text-muted" />)}
             </button>
+            
             <div className="flex-1 min-w-0">
-              <p className={`text-sm font-black tracking-tight truncate ${done ? 'text-emerald-600 line-through' : 'text-text-main'}`}>{habit.title}</p>
-              <div className="flex items-center gap-3 mt-0.5">
-                <p className="text-[11px] font-bold text-text-muted uppercase tracking-wide">
+              <p className={`text-xs sm:text-sm font-black tracking-tight truncate leading-snug ${done ? 'text-emerald-600 line-through' : 'text-text-main'}`}>{habit.title}</p>
+              <div className="flex flex-wrap items-center gap-1 sm:gap-2 mt-0.5">
+                <p className="text-[9px] sm:text-[11px] font-bold text-text-muted uppercase tracking-wide">
                   {isCheck ? (done ? 'Completed' : 'Pending') : `${current}/${target} ${isCount ? 'units' : 'mins'}`}
                 </p>
-                {habit.streak > 0 && <span className="text-[10px] font-black text-orange-500 bg-orange-500/10 px-1.5 py-0.5 rounded-md">🔥 {habit.streak}d</span>}
-                {hasSchedule && <span className="text-[10px] font-bold text-accent-blue/70 bg-accent-blue/10 px-1.5 py-0.5 rounded-md">{habit.scheduleDays.join('·')}</span>}
+                {habit.streak > 0 && <span className="text-[8px] sm:text-[9px] font-black text-orange-500 bg-orange-500/10 px-1 py-0.5 rounded leading-none">🔥 {habit.streak}d</span>}
+                {hasSchedule && <span className="text-[8px] sm:text-[9px] font-bold text-accent-blue/70 bg-accent-blue/10 px-1 py-0.5 rounded leading-none hidden min-[400px]:inline-block">{habit.scheduleDays.join('·')}</span>}
               </div>
             </div>
           </div>
-          <div className="flex gap-2 items-center">
+
+          {/* Stacking controls inline on the same row */}
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             {isCount ? (
-              <div className="flex bg-bg-card rounded-xl border border-border-light overflow-hidden shadow-sm">
-                 <button onClick={() => updateHabitCount(goalId, habit.id, -1)} className="px-3 py-1.5 text-text-main font-black hover:bg-bg-input transition-colors">−</button>
-                 <button onClick={() => updateHabitCount(goalId, habit.id, 1)} className="px-3 py-1.5 text-accent-blue font-black border-l border-border-light hover:bg-bg-input transition-colors">+</button>
+              <div className="flex bg-bg-card rounded-lg border border-border-light overflow-hidden shadow-sm h-8 sm:h-9">
+                 <button onClick={() => updateHabitCount(goalId, habit.id, -1)} className="px-2.5 sm:px-3.5 py-1 sm:py-2 text-text-main font-black hover:bg-bg-input transition-colors text-xs sm:text-sm">−</button>
+                 <button onClick={() => updateHabitCount(goalId, habit.id, 1)} className="px-2.5 sm:px-3.5 py-1 sm:py-2 text-accent-blue font-black border-l border-border-light hover:bg-bg-input transition-colors text-xs sm:text-sm">+</button>
               </div>
             ) : (!isCheck && !done) && (
-              <button onClick={() => setShowLog(true)} className="px-4 py-2 rounded-xl bg-accent-blue text-white text-[11px] font-black shadow-md shadow-accent-blue/20 active:scale-95 transition-all">+ Log</button>
+              <button onClick={() => setShowLog(true)} className="h-8 sm:h-9 px-2.5 sm:px-4 rounded-lg bg-accent-blue text-white text-[10px] sm:text-[11px] font-black shadow-sm active:scale-95 transition-all">+ Log</button>
             )}
-            <button onClick={() => deleteHabit(goalId, habit.id)} className="w-9 h-9 rounded-xl text-text-muted hover:text-rose-500 hover:bg-rose-500/10 transition-all flex items-center justify-center"><Trash2 size={16} /></button>
+            <button onClick={() => deleteHabit(goalId, habit.id)} className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg text-text-muted hover:text-rose-500 hover:bg-rose-500/10 transition-all flex items-center justify-center shrink-0">
+              <Trash2 size={14} />
+            </button>
           </div>
         </div>
+
         {!isCheck && (
-          <div className="w-full bg-bg-card rounded-full h-1.5 overflow-hidden">
+          <div className="w-full bg-bg-card rounded-full h-1 overflow-hidden">
             <div className={`h-full transition-all duration-700 ${done ? 'bg-emerald-500' : 'bg-accent-blue'}`} style={{ width: `${pct}%` }} />
           </div>
         )}
@@ -778,68 +786,76 @@ export const GoalsPage = () => {
 
                   return (
                     <div key={goal.id} className={`
-                      bg-bg-card rounded-[32px] overflow-hidden border-2 h-fit
+                      bg-bg-card rounded-[24px] sm:rounded-[32px] overflow-hidden border-2 h-fit
                       ${doneToday ? 'border-emerald-500 shadow-lg shadow-emerald-500/5' : 'border-border-light hover:border-border-med shadow-sm'}
                     `}>
-                      <div className="p-6 cursor-pointer group" onClick={() => toggleGoalExpanded(goal.id)}>
-                        <div className="flex items-center gap-5">
-                          <div className="relative w-20 h-20 shrink-0">
-                            <svg className="w-full h-full -rotate-90" viewBox="0 0 68 68">
-                              <circle cx="34" cy="34" r={R} fill="none" className="stroke-bg-input" strokeWidth="6" />
-                              <circle 
-                                cx="34" cy="34" r={R} fill="none" className="stroke-accent-blue" strokeWidth="6" 
-                                strokeDasharray={CIRC} strokeDashoffset={CIRC - (CIRC * (goal.progress || 0)) / 100} 
-                                strokeLinecap="round"
-                              />
-                            </svg>
-                            <div className="absolute inset-0 flex flex-col items-center justify-center">
-                              <span className="text-base font-black text-text-main tracking-tighter leading-none">{goal.progress || 0}%</span>
-                              <span className="text-[7px] font-black text-text-muted uppercase tracking-widest mt-0.5">Mastery</span>
+                      <div className="p-4 sm:p-6 cursor-pointer group" onClick={() => toggleGoalExpanded(goal.id)}>
+                        <div className="flex items-center justify-between gap-3 sm:gap-5">
+                          
+                          {/* Inner Content: Progress circle + details */}
+                          <div className="flex items-center gap-3 sm:gap-5 flex-1 min-w-0 w-full">
+                            {/* Circular Progress Ring */}
+                            <div className="relative w-14 h-14 sm:w-20 sm:h-20 shrink-0">
+                              <svg className="w-full h-full -rotate-90" viewBox="0 0 68 68">
+                                <circle cx="34" cy="34" r={R} fill="none" className="stroke-bg-input" strokeWidth="6" />
+                                <circle 
+                                  cx="34" cy="34" r={R} fill="none" className="stroke-accent-blue" strokeWidth="6" 
+                                  strokeDasharray={CIRC} strokeDashoffset={CIRC - (CIRC * (goal.progress || 0)) / 100} 
+                                  strokeLinecap="round"
+                                />
+                              </svg>
+                              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                                <span className="text-xs sm:text-base font-black text-text-main tracking-tighter leading-none">{goal.progress || 0}%</span>
+                                <span className="text-[5px] sm:text-[7px] font-black text-text-muted uppercase tracking-widest mt-0.5">Mastery</span>
+                              </div>
                             </div>
-                          </div>
 
-                          <div className="flex-1 min-w-0">
-                            <div className="flex flex-wrap items-center gap-2 mb-2">
-                              <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md ${tc.bg} ${tc.color}`}>{goal.tag}</span>
-                              <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md bg-accent-blue-light text-accent-blue">Today: {dailyProgress}%</span>
-                              {goal.progress >= 100 && (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setCompletedGoalForCelebration(goal);
-                                  }}
-                                  className="text-[9px] font-black bg-amber-400/15 text-amber-400 border border-amber-400/20 px-2 py-0.5 rounded-md hover:scale-105 active:scale-95 transition-all flex items-center gap-1"
-                                  title="Click to trigger Celebration Memory modal!"
-                                >
-                                  ✨ Mastered (Save Memory)
+                            {/* Main descriptive block */}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mb-1 sm:mb-2">
+                                <span className={`text-[8px] sm:text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md ${tc.bg} ${tc.color}`}>{goal.tag}</span>
+                                <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md bg-accent-blue-light text-accent-blue">Today: {dailyProgress}%</span>
+                                {goal.progress >= 100 && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setCompletedGoalForCelebration(goal);
+                                    }}
+                                    className="text-[8px] sm:text-[9px] font-black bg-amber-400/15 text-amber-400 border border-amber-400/20 px-2 py-0.5 rounded-md hover:scale-105 active:scale-95 transition-all flex items-center gap-1"
+                                    title="Click to trigger Celebration Memory modal!"
+                                  >
+                                    ✨ Mastered
+                                  </button>
+                                )}
+                              </div>
+                              <p className="text-sm sm:text-lg font-black text-text-main tracking-tight leading-tight mb-2 sm:mb-3 group-hover:text-accent-blue transition-colors truncate sm:whitespace-normal">{goal.title}</p>
+                              
+                              <div className="w-full bg-bg-input h-1 rounded-full overflow-hidden mb-2 sm:mb-3">
+                                <div className={`h-full ${dailyProgress === 100 ? 'bg-emerald-500' : 'bg-accent-blue'}`} style={{ width: `${dailyProgress}%` }} />
+                              </div>
+
+                              <div className="flex items-center gap-2 sm:gap-3">
+                                <button onClick={(e) => { e.stopPropagation(); setExtendingGoal(goal); }} className="px-2 py-0.5 sm:py-1 rounded-md bg-bg-input text-[8px] sm:text-[10px] font-bold text-text-muted hover:bg-border-med transition-colors flex items-center gap-1">
+                                  <Calendar size={10} /> {goal.deadline || 'No deadline'}
                                 </button>
-                              )}
-                            </div>
-                            <p className="text-lg font-black text-text-main tracking-tight leading-tight mb-3 group-hover:text-accent-blue transition-colors">{goal.title}</p>
-                            
-                            <div className="w-full bg-bg-input h-1.5 rounded-full overflow-hidden mb-3">
-                              <div className={`h-full ${dailyProgress === 100 ? 'bg-emerald-500' : 'bg-accent-blue'}`} style={{ width: `${dailyProgress}%` }} />
-                            </div>
-
-                            <div className="flex items-center gap-3">
-                              <button onClick={(e) => { e.stopPropagation(); setExtendingGoal(goal); }} className="px-2 py-1 rounded-md bg-bg-input text-[10px] font-bold text-text-muted hover:bg-border-med transition-colors flex items-center gap-2">
-                                <Calendar size={12} /> {goal.deadline || 'No deadline'}
-                              </button>
-                              {goal.extensions?.length > 0 && <History size={12} className="text-accent-blue opacity-50" />}
+                                {goal.extensions?.length > 0 && <History size={10} className="text-accent-blue opacity-50" />}
+                              </div>
                             </div>
                           </div>
 
-                          <div className="flex flex-col gap-2 items-center">
-                            <button onClick={e => { e.stopPropagation(); setEditingGoal(goal); }} className="w-9 h-9 rounded-xl text-text-muted hover:text-accent-blue hover:bg-accent-blue/10 transition-all flex items-center justify-center" title="Edit Goal System"><Edit3 size={18} /></button>
-                            <button onClick={e => { e.stopPropagation(); setDeletingGoalItem(goal); }} className="w-9 h-9 rounded-xl text-text-muted hover:text-rose-500 hover:bg-rose-500/10 transition-all flex items-center justify-center" title="Delete Goal System"><Trash2 size={18} /></button>
-                            {isOpen ? <ChevronUp size={24} className="text-text-muted" /> : <ChevronDown size={24} className="text-text-muted" />}
+                          {/* Action icons and controls */}
+                          <div className="flex sm:flex-col items-center gap-1 sm:gap-2 shrink-0">
+                            <button onClick={e => { e.stopPropagation(); setEditingGoal(goal); }} className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl text-text-muted hover:text-accent-blue hover:bg-accent-blue/10 transition-all flex items-center justify-center shrink-0" title="Edit Goal System"><Edit3 size={15} /></button>
+                            <button onClick={e => { e.stopPropagation(); setDeletingGoalItem(goal); }} className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl text-text-muted hover:text-rose-500 hover:bg-rose-500/10 transition-all flex items-center justify-center shrink-0" title="Delete Goal System"><Trash2 size={15} /></button>
+                            {isOpen ? <ChevronUp size={20} className="text-text-muted shrink-0" /> : <ChevronDown size={20} className="text-text-muted shrink-0" />}
                           </div>
+
                         </div>
                       </div>
 
                       {isOpen && (
-                        <div className="px-6 pb-6 pt-2 border-t border-border-light space-y-4">
-                          <div className="flex flex-col gap-3">
+                        <div className="px-3.5 sm:px-6 pb-4 sm:pb-6 pt-2 border-t border-border-light/60 space-y-4">
+                          <div className="flex flex-col gap-2 sm:gap-2.5">
                             {goal.habits
                               .sort((a, b) => {
                                 const aDone = a.type === 'check' ? a.completed : (a.type === 'count' ? (a.currentCount >= (a.targetCount ?? 10)) : (a.timeSpent >= (a.targetTime ?? 15)));
@@ -879,7 +895,7 @@ export const GoalsPage = () => {
                               </div>
                             </form>
                           ) : (
-                            <button onClick={() => setShowAddHabit(goal.id)} className="w-full py-4 rounded-2xl bg-bg-input border border-border-light border-dashed text-accent-blue font-black text-sm flex items-center justify-center gap-3 hover:bg-bg-input/80 transition-all">
+                            <button onClick={() => setShowAddHabit(goal.id)} className="w-full py-3.5 rounded-2xl bg-bg-input border border-border-light border-dashed text-accent-blue font-black text-sm flex items-center justify-center gap-3 hover:bg-bg-input/80 transition-all">
                               <Plus size={18} strokeWidth={3} /> Add Daily Habit
                             </button>
                           )}

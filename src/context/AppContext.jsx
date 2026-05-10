@@ -428,14 +428,12 @@ export const AppProvider = ({ children }) => {
             const existing = prev.find(p => p.id === g.id);
             if (!existing) return { ...g, habits: [] };
 
-            const localTime = existing.lastActionTimestamp ? new Date(existing.lastActionTimestamp).getTime() : 0;
-            const snapTime = g.updatedAt || g.updated_at ? new Date(g.updatedAt || g.updated_at).getTime() : 0;
-
-            if (localTime > snapTime) {
+            if (g.syncPending) {
               return {
                 ...g,
                 ...existing,
-                habits: existing.habits || []
+                habits: existing.habits || [],
+                syncPending: true
               };
             }
             return {
@@ -504,10 +502,7 @@ export const AppProvider = ({ children }) => {
 
                     processedIds.add(lId);
 
-                    const localTime = lh.lastActionTimestamp ? new Date(lh.lastActionTimestamp).getTime() : 0;
-                    const snapTime = sh.updated_at ? new Date(sh.updated_at).getTime() : 0;
-
-                    if (localTime > snapTime) {
+                    if (sh.syncPending) {
                       merged.push({
                         ...sh,
                         ...lh,
@@ -1196,9 +1191,9 @@ export const AppProvider = ({ children }) => {
       lastActionTimestamp: new Date().toISOString()
     };
     
+    let finalGoal = null;
     setGoals(prev => prev.map(g => {
       if (g.id === goalId) {
-        if (user) db.upsertHabit(user.id, goalId, newH);
         const updatedHabits = [...(g.habits || []), newH];
         const updatedGoal = { ...g, habits: updatedHabits };
 
@@ -1216,17 +1211,24 @@ export const AppProvider = ({ children }) => {
         updatedGoal.lastActionTimestamp = new Date().toISOString();
 
         updatedGoal.progress = calculateOverallProgress(updatedGoal);
-        if (user) db.upsertGoal(user.id, updatedGoal);
+        finalGoal = updatedGoal;
         return updatedGoal;
       }
       return g;
     }));
+
+    if (user) {
+      db.upsertHabit(user.id, goalId, newH).catch(err => console.error('[Firestore Sync] Habit upsert failed:', err));
+      if (finalGoal) {
+        db.upsertGoal(user.id, finalGoal).catch(err => console.error('[Firestore Sync] Goal upsert failed:', err));
+      }
+    }
   };
 
   const deleteHabit = (goalId, habitId) => {
+    let finalGoal = null;
     setGoals(prev => prev.map(g => {
       if (g.id === goalId) {
-        if (user) db.deleteHabitDb(user.id, goalId, habitId);
         const updatedHabits = g.habits.filter(h => h.id !== habitId);
         const updatedGoal = { ...g, habits: updatedHabits };
 
@@ -1244,17 +1246,27 @@ export const AppProvider = ({ children }) => {
         updatedGoal.lastActionTimestamp = new Date().toISOString();
 
         updatedGoal.progress = calculateOverallProgress(updatedGoal);
-        if (user) db.upsertGoal(user.id, updatedGoal);
+        finalGoal = updatedGoal;
         return updatedGoal;
       }
       return g;
     }));
+
+    if (user) {
+      db.deleteHabitDb(user.id, goalId, habitId).catch(err => console.error('[Firestore Sync] Habit delete failed:', err));
+      if (finalGoal) {
+        db.upsertGoal(user.id, finalGoal).catch(err => console.error('[Firestore Sync] Goal upsert failed:', err));
+      }
+    }
   };
 
   const logHabitTime = (goalId, habitId, minutes) => {
+    let habitToUpdate = null;
+    let finalGoal = null;
+    const today = TODAY();
+
     setGoals(prev => prev.map(goal => {
       if (goal.id !== goalId) return goal;
-      const today = TODAY();
 
       const updatedHabits = goal.habits.map(h => {
         if (h.id === habitId) {
@@ -1300,7 +1312,7 @@ export const AppProvider = ({ children }) => {
             if ((h.missedDays || 0) >= 2) recordComeback();
           }
 
-          if (user) db.upsertHabit(user.id, goalId, updatedH);
+          habitToUpdate = updatedH;
           return updatedH;
         }
         return h;
@@ -1313,7 +1325,7 @@ export const AppProvider = ({ children }) => {
       const sortedGoalDates = [...updatedGoalDates].sort((a, b) => b.localeCompare(a));
       const newGoalLastCompleted = sortedGoalDates.length > 0 ? sortedGoalDates[0] : null;
 
-      const finalGoal = {
+      finalGoal = {
         ...goal,
         habits: updatedHabits,
         completedDates: updatedGoalDates,
@@ -1325,9 +1337,17 @@ export const AppProvider = ({ children }) => {
       };
 
       finalGoal.progress = calculateOverallProgress(finalGoal);
-      if (user) db.upsertGoal(user.id, finalGoal);
       return finalGoal;
     }));
+
+    if (user) {
+      if (habitToUpdate) {
+        db.upsertHabit(user.id, goalId, habitToUpdate).catch(err => console.error('[Firestore Sync] Habit upsert failed:', err));
+      }
+      if (finalGoal) {
+        db.upsertGoal(user.id, finalGoal).catch(err => console.error('[Firestore Sync] Goal upsert failed:', err));
+      }
+    }
   };
 
   const calculateOverallProgress = (g) => {
@@ -1337,9 +1357,12 @@ export const AppProvider = ({ children }) => {
   };
 
   const toggleHabitCheck = (goalId, habitId) => {
+    let habitToUpdate = null;
+    let finalGoal = null;
+    const today = TODAY();
+
     setGoals(prev => prev.map(goal => {
       if (goal.id !== goalId) return goal;
-      const today = TODAY();
 
       const updatedHabits = goal.habits.map(h => {
         if (h.id === habitId) {
@@ -1392,7 +1415,7 @@ export const AppProvider = ({ children }) => {
             if ((h.missedDays || 0) >= 2) recordComeback();
           }
 
-          if (user) db.upsertHabit(user.id, goalId, updatedH);
+          habitToUpdate = updatedH;
           return updatedH;
         }
         return h;
@@ -1405,7 +1428,7 @@ export const AppProvider = ({ children }) => {
       const sortedGoalDates = [...updatedGoalDates].sort((a, b) => b.localeCompare(a));
       const newGoalLastCompleted = sortedGoalDates.length > 0 ? sortedGoalDates[0] : null;
 
-      const finalGoal = {
+      finalGoal = {
         ...goal,
         habits: updatedHabits,
         completedDates: updatedGoalDates,
@@ -1417,15 +1440,26 @@ export const AppProvider = ({ children }) => {
       };
 
       finalGoal.progress = calculateOverallProgress(finalGoal);
-      if (user) db.upsertGoal(user.id, finalGoal);
       return finalGoal;
     }));
+
+    if (user) {
+      if (habitToUpdate) {
+        db.upsertHabit(user.id, goalId, habitToUpdate).catch(err => console.error('[Firestore Sync] Habit upsert failed:', err));
+      }
+      if (finalGoal) {
+        db.upsertGoal(user.id, finalGoal).catch(err => console.error('[Firestore Sync] Goal upsert failed:', err));
+      }
+    }
   };
 
   const updateHabitCount = (goalId, habitId, delta) => {
+    let habitToUpdate = null;
+    let finalGoal = null;
+    const today = TODAY();
+
     setGoals(prev => prev.map(goal => {
       if (goal.id !== goalId) return goal;
-      const today = TODAY();
 
       const updatedHabits = goal.habits.map(h => {
         if (h.id === habitId) {
@@ -1469,7 +1503,7 @@ export const AppProvider = ({ children }) => {
             if ((h.missedDays || 0) >= 2) recordComeback();
           }
 
-          if (user) db.upsertHabit(user.id, goalId, updatedH);
+          habitToUpdate = updatedH;
           return updatedH;
         }
         return h;
@@ -1482,7 +1516,7 @@ export const AppProvider = ({ children }) => {
       const sortedGoalDates = [...updatedGoalDates].sort((a, b) => b.localeCompare(a));
       const newGoalLastCompleted = sortedGoalDates.length > 0 ? sortedGoalDates[0] : null;
 
-      const finalGoal = {
+      finalGoal = {
         ...goal,
         habits: updatedHabits,
         completedDates: updatedGoalDates,
@@ -1494,9 +1528,17 @@ export const AppProvider = ({ children }) => {
       };
 
       finalGoal.progress = calculateOverallProgress(finalGoal);
-      if (user) db.upsertGoal(user.id, finalGoal);
       return finalGoal;
     }));
+
+    if (user) {
+      if (habitToUpdate) {
+        db.upsertHabit(user.id, goalId, habitToUpdate).catch(err => console.error('[Firestore Sync] Habit upsert failed:', err));
+      }
+      if (finalGoal) {
+        db.upsertGoal(user.id, finalGoal).catch(err => console.error('[Firestore Sync] Goal upsert failed:', err));
+      }
+    }
   };
 
   const addTask = async (task) => {
@@ -1548,7 +1590,7 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  const toggleTaskComplete = async (taskId) => {
+  const toggleTaskComplete = (taskId) => {
     const t = tasks.find(item => item.id === taskId);
     if (!t) return;
 
@@ -1607,15 +1649,13 @@ export const AppProvider = ({ children }) => {
     setTasks(prev => prev.map(item => item.id === taskId ? updated : item));
 
     if (user) {
-      try {
-        await db.upsertTask(user.id, updated);
-      } catch (err) {
+      db.upsertTask(user.id, updated).catch(err => {
         console.error('[Firestore Sync] Failed to toggle task complete:', err);
-      }
+      });
     }
   };
 
-  const updateTaskCount = async (taskId, delta) => {
+  const updateTaskCount = (taskId, delta) => {
     const t = tasks.find(item => item.id === taskId);
     if (!t) return;
 
@@ -1660,15 +1700,13 @@ export const AppProvider = ({ children }) => {
     setTasks(prev => prev.map(item => item.id === taskId ? updated : item));
 
     if (user) {
-      try {
-        await db.upsertTask(user.id, updated);
-      } catch (err) {
+      db.upsertTask(user.id, updated).catch(err => {
         console.error('[Firestore Sync] Failed to update task count:', err);
-      }
+      });
     }
   };
 
-  const logTaskTime = async (id, mins) => {
+  const logTaskTime = (id, mins) => {
     const t = tasks.find(item => item.id === id);
     if (!t) return;
 
@@ -1713,11 +1751,9 @@ export const AppProvider = ({ children }) => {
     setTasks(prev => prev.map(item => item.id === id ? updated : item));
 
     if (user) {
-      try {
-        await db.upsertTask(user.id, updated);
-      } catch (err) {
+      db.upsertTask(user.id, updated).catch(err => {
         console.error('[Firestore Sync] Failed to log task time:', err);
-      }
+      });
     }
   };
 
