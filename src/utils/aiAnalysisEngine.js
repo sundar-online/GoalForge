@@ -192,7 +192,7 @@ export const generateRecoveryStrategies = (goals, tasks) => {
     const recoveryTarget =
       item.type === 'count'
         ? Math.max(1, Math.round((item.targetCount || 10) * 0.3))
-        : Math.max(5, Math.round((item.targetTime || 30) * 0.3));
+        : Math.max(5, Math.round((item.targetTime ?? 30) * 0.3));
 
     strategies.push({
       id: `recovery_${item.id}`,

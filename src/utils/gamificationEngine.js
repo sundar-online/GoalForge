@@ -73,8 +73,8 @@ export const BADGE_DEFINITIONS = [
     condition: (state) => {
       const maxStreak = Math.max(
         0,
-        ...state.goals.flatMap(g => (g.habits || []).map(h => h.streak || 0)),
-        ...state.tasks.map(t => t.currentStreak || 0)
+        ...state.goals.flatMap(g => (g.habits || []).map(h => h.streak ?? 0)),
+        ...state.tasks.map(t => t.currentStreak ?? 0)
       );
       return maxStreak >= 10;
     },
@@ -86,7 +86,7 @@ export const BADGE_DEFINITIONS = [
     description: "You've become a Deep Worker.",
     hint: 'Accumulate 10+ hours of focus time.',
     condition: (state) => {
-      const totalFocusSeconds = Object.values(state.focusHistory || {}).reduce((a, b) => a + b, 0) + (state.focusTime || 0);
+      const totalFocusSeconds = Object.values(state.focusHistory || {}).reduce((a, b) => a + b, 0) + (state.focusTime ?? 0);
       return totalFocusSeconds >= 10 * 3600; // 10 hours
     },
   },
@@ -96,7 +96,7 @@ export const BADGE_DEFINITIONS = [
     icon: '🎯',
     description: 'Precision is your superpower.',
     hint: 'Hit 100% accuracy on 5 separate days.',
-    condition: (state) => (state.perfectDays || 0) >= 5,
+    condition: (state) => (state.perfectDays ?? 0) >= 5,
   },
   {
     id: 'architect',
@@ -120,7 +120,7 @@ export const BADGE_DEFINITIONS = [
     icon: '🔄',
     description: 'Resilience is your edge.',
     hint: 'Recover a streak after hitting 2 missed days.',
-    condition: (state) => (state.comebackCount || 0) >= 1,
+    condition: (state) => (state.comebackCount ?? 0) >= 1,
   },
   {
     id: 'diamond_hands',
@@ -144,7 +144,7 @@ export const BADGE_DEFINITIONS = [
     icon: '⚡',
     description: 'A hundred victories forged.',
     hint: 'Complete 100 total habits or tasks.',
-    condition: (state) => (state.totalCompletions || 0) >= 100,
+    condition: (state) => (state.totalCompletions ?? 0) >= 100,
   },
 ];
 

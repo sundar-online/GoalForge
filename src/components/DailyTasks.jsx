@@ -257,7 +257,7 @@ export const DailyTasks = () => {
             const isCount = cType === 'count';
             const isCheck = cType === 'check';
 
-            const target = isCount ? (task.targetCount || 10) : (task.targetTime || 30);
+            const target = isCount ? (task.targetCount ?? 10) : (task.targetTime ?? 30);
             const current = isCount ? (task.currentCount || 0) : (task.timeSpent || 0);
             const pct = isCheck ? 0 : Math.min(100, Math.round((current / (target || 1)) * 100));
             const sType = task.type || 'daily';
@@ -321,7 +321,7 @@ export const DailyTasks = () => {
             const isCount = cType === 'count';
             const isCheck = cType === 'check';
 
-            const target = isCount ? (task.targetCount || 10) : (task.targetTime || 30);
+            const target = isCount ? (task.targetCount ?? 10) : (task.targetTime ?? 30);
             const current = isCount ? (task.currentCount || 0) : (task.timeSpent || 0);
             const pct = isCheck ? 0 : Math.min(100, Math.round((current / (target || 1)) * 100));
             const sType = task.type || 'daily';

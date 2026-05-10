@@ -280,23 +280,23 @@ export const AppProvider = ({ children }) => {
           return {
             id: doc.id,
             title: t.title,
-            type: t.type || 'daily',
-            completionType: t.completion_type || 'time',
-            targetTime: t.target_time || 15,
-            timeSpent: t.time_spent || 0,
-            completed: t.completed || false,
+            type: t.type ?? 'daily',
+            completionType: t.completion_type ?? 'time',
+            targetTime: t.target_time ?? 15,
+            timeSpent: t.time_spent ?? 0,
+            completed: t.completed ?? false,
             targetDate: t.target_date || null,
             startDate: t.start_date || null,
             endDate: t.end_date || null,
-            currentStreak: t.current_streak || 0,
+            currentStreak: t.current_streak ?? 0,
             completedDates: t.completed_dates || [],
-            missedDays: t.missed_days || 0,
+            missedDays: t.missed_days ?? 0,
             lastCompletedDate: t.last_completed_date || null,
             lastActiveDate: t.last_active_date || null,
-            priority: t.priority || 'Medium',
-            targetCount: t.target_count || 10,
-            currentCount: t.current_count || 0,
-            isRecovering: t.is_recovering || false,
+            priority: t.priority ?? 'Medium',
+            targetCount: t.target_count ?? 10,
+            currentCount: t.current_count ?? 0,
+            isRecovering: t.is_recovering ?? false,
             originalTarget: t.original_target || null,
             createdAt: t.created_at,
             syncPending: doc.metadata.hasPendingWrites,
@@ -377,18 +377,18 @@ export const AppProvider = ({ children }) => {
           return {
             id: docSnap.id,
             title: g.title,
-            description: g.description || '',
-            mode: g.mode || 'ALL',
-            minHabits: g.min_habits || 1,
-            tag: g.tag || 'General',
+            description: g.description ?? '',
+            mode: g.mode ?? 'ALL',
+            minHabits: g.min_habits ?? 1,
+            tag: g.tag ?? 'General',
             deadline: g.deadline || null,
-            progress: g.progress || 0,
-            streak: g.streak || 0,
+            progress: g.progress ?? 0,
+            streak: g.streak ?? 0,
             completedDates: g.completed_dates || [],
-            missedDays: g.missed_days || 0,
+            missedDays: g.missed_days ?? 0,
             lastActiveDate: g.last_active_date || null,
             lastCompletedDate: g.last_completed_date || null,
-            daysCompleted: g.days_completed || 0,
+            daysCompleted: g.days_completed ?? 0,
             startDate: g.start_date || null,
             createdAt: g.created_at,
             extensions: g.extensions || [],
@@ -428,25 +428,26 @@ export const AppProvider = ({ children }) => {
           if (!habitsListeners.current[goal.id]) {
             const habitsQuery = query(collection(fireDb, 'users', user.id, 'goals', goal.id, 'habits'));
             const unsubHabit = onSnapshot(habitsQuery, { includeMetadataChanges: true }, (habitsSnapshot) => {
-              const habitsList = habitsSnapshot.docs.map(hDoc => {
+               const habitsList = habitsSnapshot.docs.map(hDoc => {
                 const hd = hDoc.data();
                 return {
                   id: hDoc.id,
                   title: hd.title,
                   type: hd.type || 'time',
-                  timeSpent: hd.time_spent || 0,
-                  targetTime: hd.target_time || 15,
-                  targetCount: hd.target_count || 10,
-                  currentCount: hd.current_count || 0,
-                  completed: hd.completed || false,
-                  streak: hd.streak || 0,
+                  timeSpent: hd.time_spent ?? 0,
+                  targetTime: hd.target_time ?? 15,
+                  targetCount: hd.target_count ?? 10,
+                  currentCount: hd.current_count ?? 0,
+                  completed: hd.completed ?? false,
+                  streak: hd.streak ?? 0,
                   lastCompletedDate: hd.last_completed_date || null,
                   completedDates: hd.completed_dates || [],
-                  missedDays: hd.missed_days || 0,
+                  missedDays: hd.missed_days ?? 0,
                   scheduleDays: hd.schedule_days || [],
                   lastActiveDate: hd.last_active_date || null,
-                  isRecovering: hd.is_recovering || false,
+                  isRecovering: hd.is_recovering ?? false,
                   originalTarget: hd.original_target || null,
+                  createdAt: hd.created_at || hd.updated_at || new Date().toISOString(),
                   syncPending: hDoc.metadata.hasPendingWrites,
                 };
               });
@@ -637,6 +638,7 @@ export const AppProvider = ({ children }) => {
 
   useEffect(() => {
     if (loading) return;
+    if (user && isInitialGoalsLoad.current) return;
 
     const todayStr = currentDate;
     const yesterdayStr = addDays(todayStr, -1);
@@ -659,8 +661,8 @@ export const AppProvider = ({ children }) => {
       const updatedHabits = (goal.habits || []).map(h => {
         let updatedH = { ...h };
         const wasDone = updatedH.completed ||
-                        (updatedH.type === 'time' && (updatedH.timeSpent || 0) >= (updatedH.targetTime || 15)) ||
-                        (updatedH.type === 'count' && (updatedH.currentCount || 0) >= (updatedH.targetCount || 10));
+                        (updatedH.type === 'time' && (updatedH.timeSpent ?? 0) >= (updatedH.targetTime ?? 15)) ||
+                        (updatedH.type === 'count' && (updatedH.currentCount ?? 0) >= (updatedH.targetCount ?? 10));
 
         // Check if yesterday (gLastActive) was a scheduled day for this habit
         const lastActiveDay = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date(gLastActive).getDay()];
@@ -755,7 +757,7 @@ export const AppProvider = ({ children }) => {
 
         if (!t.completed &&
           !(t.completionType === 'count' && (t.currentCount || 0) >= (t.targetCount || 10)) &&
-          !(t.completionType === 'time' && (t.timeSpent || 0) >= (t.targetTime || 30))) {
+          !(t.completionType === 'time' && (t.timeSpent ?? 0) >= (t.targetTime ?? 30))) {
           newMissed += 1;
         } else {
           newMissed = 0;
@@ -959,17 +961,21 @@ export const AppProvider = ({ children }) => {
       const existing = (targetGoal.habits || []).find(eh => String(eh.id) === String(h.id));
       if (!existing) {
         // Brand new staging habit added during editing
+        const hId = String(h.id || (Date.now() + Math.random()));
+        const hCreatedAt = new Date().toISOString();
+        const initialStreak = calculateStreakFromHistory([], h.scheduleDays || [], targetGoal.completedDates || [], hCreatedAt);
         return {
           ...h,
-          id: String(h.id || (Date.now() + Math.random())),
+          id: hId,
           timeSpent: 0,
           currentCount: 0,
           completed: false,
-          streak: 0,
+          streak: initialStreak,
           lastCompletedDate: null,
           completedDates: [],
           missedDays: 0,
-          lastActiveDate: TODAY()
+          lastActiveDate: TODAY(),
+          createdAt: hCreatedAt
         };
       } else {
         // Preserving tracker details but modifying target config
@@ -977,8 +983,8 @@ export const AppProvider = ({ children }) => {
         const currentCount = typeChanged ? 0 : (existing.currentCount || 0);
         const timeSpent = typeChanged ? 0 : (existing.timeSpent || 0);
 
-        const targetCount = Number(h.targetCount || existing.targetCount || 10);
-        const targetTime = Number(h.targetTime || existing.targetTime || 15);
+        const targetCount = Number(h.targetCount ?? existing.targetCount ?? 10);
+        const targetTime = Number(h.targetTime ?? existing.targetTime ?? 15);
         let completed = existing.completed;
         if (typeChanged || targetCount !== existing.targetCount || targetTime !== existing.targetTime) {
           if (h.type === 'check') {
@@ -1117,17 +1123,21 @@ export const AppProvider = ({ children }) => {
       console.warn(`[Habit Creator] Cannot create habit; parent Goal ID "${goalId}" does not exist.`);
       return;
     }
+    const hCreatedAt = new Date().toISOString();
+    const initialStreak = calculateStreakFromHistory([], habit.scheduleDays || [], targetGoal.completedDates || [], hCreatedAt);
+
     const newH = {
       ...habit,
       id: Date.now().toString(),
       timeSpent: 0,
       currentCount: 0,
       completed: false,
-      streak: 0,
+      streak: initialStreak,
       lastCompletedDate: null,
       completedDates: [],
       missedDays: 0,
-      lastActiveDate: TODAY()
+      lastActiveDate: TODAY(),
+      createdAt: hCreatedAt
     };
     
     setGoals(prev => prev.map(g => {
@@ -1222,7 +1232,7 @@ export const AppProvider = ({ children }) => {
         if (h.id === habitId) {
           const newTime = Math.max(0, (h.timeSpent || 0) + minutes);
           const wasCompleted = h.completed;
-          const target = h.targetTime || 15;
+          const target = h.targetTime ?? 15;
           const isDone = newTime >= target;
 
           let updatedDates = h.completedDates ? [...h.completedDates] : [];
@@ -1238,7 +1248,7 @@ export const AppProvider = ({ children }) => {
             updatedDates = updatedDates.filter(d => d !== today);
           }
 
-          const newStreak = calculateStreakFromHistory(updatedDates, h.scheduleDays || []);
+          const newStreak = calculateStreakFromHistory(updatedDates, h.scheduleDays || [], goal.completedDates || [], h.createdAt);
           const sortedDates = [...updatedDates].sort((a, b) => b.localeCompare(a));
           const newLastCompleted = sortedDates.length > 0 ? sortedDates[0] : null;
 
@@ -1326,7 +1336,7 @@ export const AppProvider = ({ children }) => {
             updatedH.completed = updatedH.currentCount >= target;
             isDone = updatedH.completed;
           } else {
-            const target = h.targetTime || 15;
+            const target = h.targetTime ?? 15;
             updatedH.timeSpent = (h.timeSpent >= target) ? 0 : target;
             updatedH.completed = updatedH.timeSpent >= target;
             isDone = updatedH.completed;
@@ -1345,7 +1355,7 @@ export const AppProvider = ({ children }) => {
             updatedDates = updatedDates.filter(d => d !== today);
           }
 
-          const newStreak = calculateStreakFromHistory(updatedDates, h.scheduleDays || []);
+          const newStreak = calculateStreakFromHistory(updatedDates, h.scheduleDays || [], goal.completedDates || [], h.createdAt);
           const sortedDates = [...updatedDates].sort((a, b) => b.localeCompare(a));
           const newLastCompleted = sortedDates.length > 0 ? sortedDates[0] : null;
 
@@ -1427,7 +1437,7 @@ export const AppProvider = ({ children }) => {
             updatedDates = updatedDates.filter(d => d !== today);
           }
 
-          const newStreak = calculateStreakFromHistory(updatedDates, h.scheduleDays || []);
+          const newStreak = calculateStreakFromHistory(updatedDates, h.scheduleDays || [], goal.completedDates || [], h.createdAt);
           const sortedDates = [...updatedDates].sort((a, b) => b.localeCompare(a));
           const newLastCompleted = sortedDates.length > 0 ? sortedDates[0] : null;
 
@@ -1555,7 +1565,7 @@ export const AppProvider = ({ children }) => {
       updated.completed = updated.currentCount >= target;
       isDone = updated.completed;
     } else {
-      const target = t.targetTime || 30;
+      const target = t.targetTime ?? 30;
       updated.timeSpent = (t.timeSpent >= target) ? 0 : target;
       updated.completed = updated.timeSpent >= target;
       isDone = updated.completed;
@@ -1663,7 +1673,7 @@ export const AppProvider = ({ children }) => {
     const today = TODAY();
     const newTime = Math.max(0, (t.timeSpent || 0) + mins);
     const wasCompleted = t.completed;
-    const target = t.targetTime || 15;
+    const target = t.targetTime ?? 15;
     const isDone = newTime >= target;
 
     let updated = { ...t, timeSpent: newTime, completed: isDone };

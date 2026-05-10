@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { Target, Plus, ChevronDown, ChevronUp, Trash2, Clock, Check, Layers, Calendar, History, Edit3 } from 'lucide-react';
+import { Target, Plus, ChevronDown, ChevronUp, Trash2, Clock, Check, Layers, Calendar, History, Edit3, Maximize2, Minimize2 } from 'lucide-react';
 import { isGoalDoneToday, calculateGoalDailyProgress, isHabitScheduledToday } from '../utils/calculationUtils';
 import { addDays } from '../utils/dateUtils';
 import { DeleteConfirmationModal } from './DeleteConfirmationModal';
@@ -125,8 +125,8 @@ const EditGoalSystemModal = ({ goal, onClose, onSave }) => {
       id: h.id,
       title: h.title || '',
       type: h.type || 'time',
-      targetTime: h.targetTime || 15,
-      targetCount: h.targetCount || 10,
+      targetTime: h.targetTime ?? 15,
+      targetCount: h.targetCount ?? 10,
       scheduleDays: h.scheduleDays || []
     }))
   );
@@ -153,8 +153,8 @@ const EditGoalSystemModal = ({ goal, onClose, onSave }) => {
 
     const cleanedHabits = habits.map(h => ({
       ...h,
-      targetTime: Number(h.targetTime || 15),
-      targetCount: Number(h.targetCount || 10),
+      targetTime: Number(h.targetTime ?? 15),
+      targetCount: Number(h.targetCount ?? 10),
       scheduleDays: h.scheduleDays || []
     }));
 
@@ -401,7 +401,34 @@ const HabitRow = ({ habit, goalId, logHabitTime, deleteHabit, toggleHabitCheck, 
 
 export const GoalsPage = () => {
   const { goals, addGoal, deleteGoal, addHabit, deleteHabit, logHabitTime, toggleHabitCheck, updateHabitCount, extendGoalDeadline, editGoalSystem, setCompletedGoalForCelebration } = useAppContext();
-  const [expandedGoal, setExpandedGoal] = useState(null);
+  const [expandedGoalIds, setExpandedGoalIds] = useState([]);
+
+  // Sync expanded goals if they get deleted in real-time
+  useEffect(() => {
+    const activeIds = new Set(goals.map(g => g.id));
+    setExpandedGoalIds(prev => prev.filter(id => activeIds.has(id)));
+  }, [goals]);
+
+  const toggleGoalExpanded = (goalId) => {
+    setExpandedGoalIds(prev => {
+      const isCurrentlyOpen = prev.includes(goalId);
+      if (isCurrentlyOpen) {
+        return prev.filter(id => id !== goalId);
+      }
+      if (prev.length > 1) {
+        return [...prev, goalId];
+      }
+      return [goalId];
+    });
+  };
+
+  const handleExpandAll = () => {
+    setExpandedGoalIds(goals.map(g => g.id));
+  };
+
+  const handleCollapseAll = () => {
+    setExpandedGoalIds([]);
+  };
   const [showAddGoal, setShowAddGoal] = useState(false);
   const [showAddHabit, setShowAddHabit] = useState(null);
   const [extendingGoal, setExtendingGoal] = useState(null);
@@ -429,8 +456,8 @@ export const GoalsPage = () => {
 
     const cleanedHabits = newGoal.habits.map(h => ({
       ...h,
-      targetTime: Number(h.targetTime || 15),
-      targetCount: Number(h.targetCount || 10),
+      targetTime: Number(h.targetTime ?? 15),
+      targetCount: Number(h.targetCount ?? 10),
       scheduleDays: h.scheduleDays || []
     }));
 
@@ -636,6 +663,39 @@ export const GoalsPage = () => {
         </form>
       )}
 
+      {/* Power-User Overview View Controls */}
+      {goals.length > 0 && (
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-bg-card border border-border-light rounded-[24px] px-6 py-4 shadow-sm gap-4 transition-all hover:border-border-med animate-in fade-in slide-in-from-top-2 duration-300">
+          <div className="space-y-0.5">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-accent-blue animate-pulse"></span>
+              <span className="text-sm font-black text-text-main tracking-tight">Expansion Strategy</span>
+            </div>
+            <p className="text-[11px] font-medium text-text-muted">
+              {expandedGoalIds.length > 1 
+                ? `⚡ Multi-Open Overview mode active (${expandedGoalIds.length} open)` 
+                : "🔒 Single-Open focused mode active (Only one card opens at a time)"}
+            </p>
+          </div>
+          <div className="flex gap-2.5 w-full sm:w-auto">
+            <button
+              type="button"
+              onClick={handleExpandAll}
+              className="flex-1 sm:flex-initial px-4 py-2.5 rounded-xl bg-bg-input text-xs font-black text-text-muted hover:text-accent-blue hover:bg-accent-blue/10 border border-transparent hover:border-accent-blue/20 transition-all flex items-center justify-center gap-2 active:scale-[0.97]"
+            >
+              <Maximize2 size={13} strokeWidth={2.5} /> Expand All
+            </button>
+            <button
+              type="button"
+              onClick={handleCollapseAll}
+              className="flex-1 sm:flex-initial px-4 py-2.5 rounded-xl bg-bg-input text-xs font-black text-text-muted hover:text-rose-500 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/20 transition-all flex items-center justify-center gap-2 active:scale-[0.97]"
+            >
+              <Minimize2 size={13} strokeWidth={2.5} /> Collapse All
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Goal Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6">
         {goals
@@ -647,7 +707,7 @@ export const GoalsPage = () => {
           })
           .map(goal => {
           const tc = TAG_COLORS[goal.tag] || TAG_COLORS.General;
-          const isOpen = expandedGoal === goal.id;
+          const isOpen = expandedGoalIds.includes(goal.id);
           const habitsTotal = goal.habits.length;
           const dailyProgress = calculateGoalDailyProgress(goal);
           const doneToday = isGoalDoneToday(goal);
@@ -657,7 +717,7 @@ export const GoalsPage = () => {
               bg-bg-card rounded-[32px] overflow-hidden border-2 transition-all duration-500 h-fit
               ${doneToday ? 'border-emerald-500 shadow-lg shadow-emerald-500/5' : 'border-border-light hover:border-border-med shadow-sm'}
             `}>
-              <div className="p-6 cursor-pointer group" onClick={() => setExpandedGoal(isOpen ? null : goal.id)}>
+              <div className="p-6 cursor-pointer group" onClick={() => toggleGoalExpanded(goal.id)}>
                 <div className="flex items-center gap-5">
                   <div className="relative w-20 h-20 shrink-0">
                     <svg className="w-full h-full -rotate-90" viewBox="0 0 68 68">
@@ -718,8 +778,8 @@ export const GoalsPage = () => {
                   <div className="flex flex-col gap-3">
                     {goal.habits
                       .sort((a, b) => {
-                        const aDone = a.type === 'check' ? a.completed : (a.type === 'count' ? (a.currentCount >= (a.targetCount || 10)) : (a.timeSpent >= (a.targetTime || 15)));
-                        const bDone = b.type === 'check' ? b.completed : (b.type === 'count' ? (b.currentCount >= (b.targetCount || 10)) : (b.timeSpent >= (b.targetTime || 15)));
+                        const aDone = a.type === 'check' ? a.completed : (a.type === 'count' ? (a.currentCount >= (a.targetCount ?? 10)) : (a.timeSpent >= (a.targetTime ?? 15)));
+                        const bDone = b.type === 'check' ? b.completed : (b.type === 'count' ? (b.currentCount >= (b.targetCount ?? 10)) : (b.timeSpent >= (b.targetTime ?? 15)));
                         if (aDone !== bDone) return aDone ? 1 : -1;
                         return 0;
                       })

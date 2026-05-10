@@ -576,8 +576,8 @@ export const FocusMode = () => {
                 .sort((a, b) => {
                   const cType = a.completionType || a.type || 'check';
                   const dType = b.completionType || b.type || 'check';
-                  const aDone = cType === 'check' ? a.completed : (cType === 'count' ? (a.currentCount >= (a.targetCount || 10)) : (a.timeSpent >= (a.targetTime || 15)));
-                  const bDone = dType === 'check' ? b.completed : (dType === 'count' ? (b.currentCount >= (b.targetCount || 10)) : (b.timeSpent >= (b.targetTime || 15)));
+                  const aDone = cType === 'check' ? a.completed : (cType === 'count' ? (a.currentCount >= (a.targetCount ?? 10)) : (a.timeSpent >= (a.targetTime ?? 15)));
+                  const bDone = dType === 'check' ? b.completed : (dType === 'count' ? (b.currentCount >= (b.targetCount ?? 10)) : (b.timeSpent >= (b.targetTime ?? 15)));
                   if (aDone !== bDone) return aDone ? 1 : -1;
                   return 0;
                 })
@@ -585,7 +585,7 @@ export const FocusMode = () => {
                   const cType = h.completionType || h.type || 'check';
                   const isCount = cType === 'count';
                   const isCheck = cType === 'check';
-                  const target = isCount ? (h.targetCount || 10) : (h.targetTime || 15);
+                  const target = isCount ? (h.targetCount ?? 10) : (h.targetTime ?? 15);
                   const progress = isCount ? (h.currentCount || 0) : (h.timeSpent || 0);
                   const unit = isCount ? '' : 'm';
                   return (

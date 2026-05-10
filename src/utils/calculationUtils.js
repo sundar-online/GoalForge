@@ -16,8 +16,8 @@ export const isHabitDoneToday = (h) => {
   const today = TODAY();
   if (h.lastCompletedDate !== today) return false;
   if (h.type === 'check') return h.completed;
-  if (h.type === 'count') return (h.currentCount || 0) >= (h.targetCount || 10);
-  return (h.timeSpent || 0) >= (h.targetTime || 15);
+  if (h.type === 'count') return (h.currentCount ?? 0) >= (h.targetCount ?? 10);
+  return (h.timeSpent ?? 0) >= (h.targetTime ?? 15);
 };
 
 export const isGoalDoneToday = (goal) => {
@@ -52,8 +52,8 @@ export const isTaskDone = (t) => {
   
   const cType = t.completionType || t.type || 'check';
   if (cType === 'check') return t.completed;
-  if (cType === 'count') return (t.currentCount || 0) >= (t.targetCount || 10);
-  return (t.timeSpent || 0) >= (t.targetTime || 30);
+  if (cType === 'count') return (t.currentCount ?? 0) >= (t.targetCount ?? 10);
+  return (t.timeSpent ?? 0) >= (t.targetTime ?? 30);
 };
 
 export const calculateAccuracy = (tasks, goals) => {
@@ -175,14 +175,25 @@ export const getSmartAlerts = (accuracy, goals = [], tasks = [], weeklyReport = 
   return alerts;
 };
 
-export const calculateStreakFromHistory = (completedDates, scheduleDays = []) => {
-  if (!completedDates || completedDates.length === 0) return 0;
+export const calculateStreakFromHistory = (completedDates, scheduleDays = [], parentGoalCompletedDates = [], habitCreatedAt = null) => {
+  if (!completedDates) return 0;
 
   const completedSet = new Set(completedDates);
   const todayStr = TODAY();
-  
+
+  if (habitCreatedAt && parentGoalCompletedDates && parentGoalCompletedDates.length > 0) {
+    const habitCreatedDateStr = habitCreatedAt.split('T')[0];
+    parentGoalCompletedDates.forEach(date => {
+      if (date < habitCreatedDateStr) {
+        completedSet.add(date);
+      }
+    });
+  }
+
+  if (completedSet.size === 0) return 0;
+
   // Find the earliest date to set a dynamic simulation window
-  const sorted = [...completedDates].sort();
+  const sorted = [...completedSet].sort();
   const earliestDate = sorted[0];
   const diff = diffDays(todayStr, earliestDate);
   const startDaysAgo = Math.min(1000, Math.max(365, diff));
