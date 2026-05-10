@@ -402,6 +402,17 @@ const HabitRow = ({ habit, goalId, logHabitTime, deleteHabit, toggleHabitCheck, 
 export const GoalsPage = () => {
   const { goals, addGoal, deleteGoal, addHabit, deleteHabit, logHabitTime, toggleHabitCheck, updateHabitCount, extendGoalDeadline, editGoalSystem, setCompletedGoalForCelebration } = useAppContext();
   const [expandedGoalIds, setExpandedGoalIds] = useState([]);
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Responsive design width observer
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 1024);
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Sync expanded goals if they get deleted in real-time
   useEffect(() => {
@@ -415,10 +426,19 @@ export const GoalsPage = () => {
       if (isCurrentlyOpen) {
         return prev.filter(id => id !== goalId);
       }
-      if (prev.length > 1) {
+      
+      const isMobileScreen = window.innerWidth < 1024;
+      if (isMobileScreen) {
+        // Mobile limit: maximum 1 expanded goal at a time
+        return [goalId];
+      } else {
+        // Desktop limit: maximum 2 expanded goals at a time
+        if (prev.length >= 2) {
+          // Collapse the oldest expanded goal (index 0) and append the new one
+          return [prev[prev.length - 1], goalId];
+        }
         return [...prev, goalId];
       }
-      return [goalId];
     });
   };
 
@@ -672,9 +692,13 @@ export const GoalsPage = () => {
               <span className="text-sm font-black text-text-main tracking-tight">Expansion Strategy</span>
             </div>
             <p className="text-[11px] font-medium text-text-muted">
-              {expandedGoalIds.length > 1 
+              {expandedGoalIds.length > 2 
                 ? `⚡ Multi-Open Overview mode active (${expandedGoalIds.length} open)` 
-                : "🔒 Single-Open focused mode active (Only one card opens at a time)"}
+                : isMobile 
+                  ? `🔒 Mobile Accordion mode active ${expandedGoalIds.length > 0 ? '(1 card open)' : ''}` 
+                  : expandedGoalIds.length > 0 
+                    ? `🔒 Desktop Balanced Mode active (${expandedGoalIds.length} of 2 open)` 
+                    : "🔒 Desktop Balanced Mode active (Max 2 cards open)"}
             </p>
           </div>
           <div className="flex gap-2.5 w-full sm:w-auto">
@@ -698,9 +722,13 @@ export const GoalsPage = () => {
 
       {/* Goal Cards Grid / Accordion List */}
       <div className={
-        expandedGoalIds.length > 1 
-          ? "flex flex-col gap-5 max-w-3xl mx-auto w-full" 
-          : "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6"
+        isMobile
+          ? "flex flex-col gap-5 max-w-2xl mx-auto w-full"
+          : expandedGoalIds.length > 2
+            ? "flex flex-col gap-6 max-w-4xl mx-auto w-full"
+            : expandedGoalIds.length > 0
+              ? "grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-6xl mx-auto w-full"
+              : "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6"
       }>
         {goals
           .sort((a, b) => {
