@@ -30,6 +30,13 @@ import {
 
 const AppContext = createContext();
 
+export const GoalsContext = createContext();
+export const TasksContext = createContext();
+export const FocusContext = createContext();
+export const AIContext = createContext();
+export const NotesContext = createContext();
+export const GamificationContext = createContext();
+
 const STORAGE_KEYS = {
   GOALS: 'goalforge_goals',
   TASKS: 'goalforge_tasks',
@@ -863,20 +870,24 @@ export const AppProvider = ({ children }) => {
   useEffect(() => {
     if (loading) return;
 
-    const insights = analyzeUserBehavior(goals, tasks, taskLogs, focusTime);
-    const strategies = generateRecoveryStrategies(goals, tasks);
-    const suggestion = getSmartSuggestions(new Date(), tasks, accuracy);
+    const timer = setTimeout(() => {
+      const insights = analyzeUserBehavior(goals, tasks, taskLogs, focusTime);
+      const strategies = generateRecoveryStrategies(goals, tasks);
+      const suggestion = getSmartSuggestions(new Date(), tasks, accuracy);
 
-    // Dismissed IDs are date-stamped (e.g. 'peak_performance__2026-05-05')
-    // so the same insight-type can re-appear the next day with fresh data.
-    const todayKey = TODAY();
-    const dismissed = settings.dismissedInsights || [];
-    const filteredInsights = insights.filter(i => !dismissed.includes(`${i.id}__${todayKey}`));
-    const filteredStrategies = strategies.filter(s => !dismissed.includes(`${s.id}__${todayKey}`));
+      // Dismissed IDs are date-stamped (e.g. 'peak_performance__2026-05-05')
+      // so the same insight-type can re-appear the next day with fresh data.
+      const todayKey = TODAY();
+      const dismissed = settings.dismissedInsights || [];
+      const filteredInsights = insights.filter(i => !dismissed.includes(`${i.id}__${todayKey}`));
+      const filteredStrategies = strategies.filter(s => !dismissed.includes(`${s.id}__${todayKey}`));
 
-    setAiInsights(filteredInsights);
-    setRecoveryStrategies(filteredStrategies);
-    setSmartSuggestions(suggestion);
+      setAiInsights(filteredInsights);
+      setRecoveryStrategies(filteredStrategies);
+      setSmartSuggestions(suggestion);
+    }, 600); // 600ms debounce to prevent layouts bottlenecking on quick item interactions!
+
+    return () => clearTimeout(timer);
   }, [goals, tasks, taskLogs, focusTime, accuracy, settings.dismissedInsights, loading]);
 
   const dismissInsight = (id) => {
@@ -1987,8 +1998,72 @@ export const AppProvider = ({ children }) => {
     }));
   }, []);
 
-  // Performance Optimization: Memoize the context value to prevent
-  // unnecessary re-renders across the entire app on every state change.
+  const goalsValue = useMemo(() => ({
+    goals, addGoal, updateGoal, editGoalSystem, deleteGoal, extendGoalDeadline,
+    addHabit, deleteHabit, logHabitTime, toggleHabitCheck, updateHabitCount,
+    allHabits, completedGoalForCelebration, setCompletedGoalForCelebration,
+    loading, syncError, retrySync: syncFromCloud, clearProfileData
+  }), [
+    goals, addGoal, updateGoal, editGoalSystem, deleteGoal, extendGoalDeadline,
+    addHabit, deleteHabit, logHabitTime, toggleHabitCheck, updateHabitCount,
+    allHabits, completedGoalForCelebration, setCompletedGoalForCelebration,
+    loading, syncError, clearProfileData
+  ]);
+
+  const tasksValue = useMemo(() => ({
+    tasks, addTask, updateTask, deleteTask, logTaskTime, toggleTaskComplete, updateTaskCount,
+    todayTasks, taskLogs, weeklyReport, totalItems, completedItems, accuracy,
+    loading, syncError, retrySync: syncFromCloud, clearProfileData
+  }), [
+    tasks, addTask, updateTask, deleteTask, logTaskTime, toggleTaskComplete, updateTaskCount,
+    todayTasks, taskLogs, weeklyReport, totalItems, completedItems, accuracy,
+    loading, syncError, clearProfileData
+  ]);
+
+  const focusValue = useMemo(() => ({
+    focusTime, focusHistory, addFocusTime, addFocusTimeToHabit,
+    theme, toggleTheme, settings, saveWeeklyIntention,
+    loading, syncError, retrySync: syncFromCloud
+  }), [
+    focusTime, focusHistory, addFocusTime, addFocusTimeToHabit,
+    theme, toggleTheme, settings, saveWeeklyIntention,
+    loading, syncError
+  ]);
+
+  const aiValue = useMemo(() => ({
+    aiInsights, recoveryStrategies, dismissInsight, applyRecoveryPlan, smartSuggestions,
+    alerts, insights: getInsights(accuracy, avgStreak, focusTime), disciplineScore, userLevel,
+    loading, syncError
+  }), [
+    aiInsights, recoveryStrategies, dismissInsight, applyRecoveryPlan, smartSuggestions,
+    alerts, accuracy, avgStreak, focusTime, disciplineScore, userLevel,
+    loading, syncError
+  ]);
+
+  const notesValue = useMemo(() => ({
+    notes, addNote, updateNote, deleteNote,
+    memories, addMemory, deleteMemory,
+    loading, syncError, retrySync: syncFromCloud, clearProfileData
+  }), [
+    notes, addNote, updateNote, deleteNote,
+    memories, addMemory, deleteMemory,
+    loading, syncError, clearProfileData
+  ]);
+
+  const gamificationValue = useMemo(() => ({
+    xpData, awardXP, incrementCompletions, awardFocusXP, recordComeback,
+    currentLevelInfo, levelUpEvent, setLevelUpEvent,
+    badgeUnlockEvent, setBadgeUnlockEvent, dismissBadgeEvent,
+    currentlyEarnedBadges,
+    loading, syncError
+  }), [
+    xpData, awardXP, incrementCompletions, awardFocusXP, recordComeback,
+    currentLevelInfo, levelUpEvent, setLevelUpEvent,
+    badgeUnlockEvent, setBadgeUnlockEvent, dismissBadgeEvent,
+    currentlyEarnedBadges,
+    loading, syncError
+  ]);
+
   const value = useMemo(() => ({
     goals, addGoal, updateGoal, editGoalSystem, deleteGoal, extendGoalDeadline,
     addHabit, deleteHabit, logHabitTime, toggleHabitCheck, updateHabitCount,
@@ -2025,7 +2100,59 @@ export const AppProvider = ({ children }) => {
     memories, completedGoalForCelebration, clearProfileData
   ]);
 
-  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
+  return (
+    <AppContext.Provider value={value}>
+      <GoalsContext.Provider value={goalsValue}>
+        <TasksContext.Provider value={tasksValue}>
+          <FocusContext.Provider value={focusValue}>
+            <AIContext.Provider value={aiValue}>
+              <NotesContext.Provider value={notesValue}>
+                <GamificationContext.Provider value={gamificationValue}>
+                  {children}
+                </GamificationContext.Provider>
+              </NotesContext.Provider>
+            </AIContext.Provider>
+          </FocusContext.Provider>
+        </TasksContext.Provider>
+      </GoalsContext.Provider>
+    </AppContext.Provider>
+  );
 };
 
 export const useAppContext = () => useContext(AppContext);
+
+export const useGoals = () => {
+  const context = useContext(GoalsContext);
+  if (!context) throw new Error('useGoals must be used within AppProvider');
+  return context;
+};
+
+export const useTasks = () => {
+  const context = useContext(TasksContext);
+  if (!context) throw new Error('useTasks must be used within AppProvider');
+  return context;
+};
+
+export const useFocus = () => {
+  const context = useContext(FocusContext);
+  if (!context) throw new Error('useFocus must be used within AppProvider');
+  return context;
+};
+
+export const useAI = () => {
+  const context = useContext(AIContext);
+  if (!context) throw new Error('useAI must be used within AppProvider');
+  return context;
+};
+
+export const useNotes = () => {
+  const context = useContext(NotesContext);
+  if (!context) throw new Error('useNotes must be used within AppProvider');
+  return context;
+};
+
+export const useGamification = () => {
+  const context = useContext(GamificationContext);
+  if (!context) throw new Error('useGamification must be used within AppProvider');
+  return context;
+};

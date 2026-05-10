@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useAppContext } from '../context/AppContext';
+import { useTasks } from '../context/AppContext';
 import { CalendarCheck, Plus, Clock, Trash2, Check, CalendarRange, Calendar, Cloud } from 'lucide-react';
 import { isTaskDone } from '../utils/calculationUtils';
 import { TODAY } from '../utils/dateUtils';
@@ -61,7 +61,7 @@ export const DailyTasks = () => {
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [completedLimit, setCompletedLimit] = useState(5);
 
-  const { tasks, addTask, deleteTask, logTaskTime, toggleTaskComplete, updateTaskCount } = useAppContext();
+  const { tasks, addTask, deleteTask, logTaskTime, toggleTaskComplete, updateTaskCount } = useTasks();
 
   // Debounce search input
   useEffect(() => {

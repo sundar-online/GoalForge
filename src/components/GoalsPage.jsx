@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useAppContext } from '../context/AppContext';
+import { useGoals } from '../context/AppContext';
 import { Target, Plus, ChevronDown, ChevronUp, Trash2, Clock, Check, Layers, Calendar, History, Edit3, Maximize2, Minimize2 } from 'lucide-react';
 import { isGoalDoneToday, calculateGoalDailyProgress, isHabitScheduledToday } from '../utils/calculationUtils';
 import { addDays } from '../utils/dateUtils';
@@ -400,7 +400,7 @@ const HabitRow = ({ habit, goalId, logHabitTime, deleteHabit, toggleHabitCheck, 
 };
 
 export const GoalsPage = () => {
-  const { goals, addGoal, deleteGoal, addHabit, deleteHabit, logHabitTime, toggleHabitCheck, updateHabitCount, extendGoalDeadline, editGoalSystem, setCompletedGoalForCelebration } = useAppContext();
+  const { goals, addGoal, deleteGoal, addHabit, deleteHabit, logHabitTime, toggleHabitCheck, updateHabitCount, extendGoalDeadline, editGoalSystem, setCompletedGoalForCelebration } = useGoals();
   const [expandedGoalIds, setExpandedGoalIds] = useState([]);
   const [isMobile, setIsMobile] = useState(false);
   const [colsCount, setColsCount] = useState(1);

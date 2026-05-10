@@ -2,18 +2,30 @@ import React, { useState } from 'react';
 import { AppProvider, useAppContext } from './context/AppContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Layout } from './components/Layout';
-import { Dashboard } from './components/Dashboard';
-import { GoalsPage } from './components/GoalsPage';
-import { DailyTasks } from './components/DailyTasks';
-import { FocusMode } from './components/FocusMode';
-import { NotesPage } from './components/NotesPage';
-import { AuthPage } from './components/AuthPage';
-import { ProfilePage } from './components/ProfilePage';
-import { WeeklyPlan } from './components/WeeklyPlan';
 import { LevelUpModal } from './components/LevelUpModal';
 import { BadgeToast } from './components/BadgeToast';
 import { GoalCompletionModal } from './components/GoalCompletionModal';
 import { registerServiceWorker } from './utils/notificationUtils';
+
+// Lazy loading heavy bundles & pages for code splitting & bundle size optimization
+const Dashboard = React.lazy(() => import('./components/Dashboard').then(m => ({ default: m.Dashboard })));
+const GoalsPage = React.lazy(() => import('./components/GoalsPage').then(m => ({ default: m.GoalsPage })));
+const DailyTasks = React.lazy(() => import('./components/DailyTasks').then(m => ({ default: m.DailyTasks })));
+const FocusMode = React.lazy(() => import('./components/FocusMode').then(m => ({ default: m.FocusMode })));
+const NotesPage = React.lazy(() => import('./components/NotesPage').then(m => ({ default: m.NotesPage })));
+const AuthPage = React.lazy(() => import('./components/AuthPage').then(m => ({ default: m.AuthPage })));
+const ProfilePage = React.lazy(() => import('./components/ProfilePage').then(m => ({ default: m.ProfilePage })));
+const WeeklyPlan = React.lazy(() => import('./components/WeeklyPlan').then(m => ({ default: m.WeeklyPlan })));
+
+// Premium fallback loading skeleton
+function ViewSkeleton() {
+  return (
+    <div className="w-full h-[60vh] flex flex-col items-center justify-center gap-4">
+      <div className="w-12 h-12 rounded-full border-2 border-accent-blue/10 border-t-accent-blue animate-spin" />
+      <span className="text-xs font-bold text-text-muted uppercase tracking-widest animate-pulse">Forging Layout...</span>
+    </div>
+  );
+}
 
 function AppInner() {
   const { user, loading } = useAuth();
@@ -73,7 +85,13 @@ function AppInner() {
     );
   }
 
-  if (!user) return <AuthPage />;
+  if (!user) {
+    return (
+      <React.Suspense fallback={<ViewSkeleton />}>
+        <AuthPage />
+      </React.Suspense>
+    );
+  }
 
   const renderView = () => {
     switch (currentView) {
@@ -92,7 +110,9 @@ function AppInner() {
     <AppProvider>
       <GamificationOverlays />
       <Layout currentView={currentView} setView={setCurrentView}>
-        {renderView()}
+        <React.Suspense fallback={<ViewSkeleton />}>
+          {renderView()}
+        </React.Suspense>
       </Layout>
     </AppProvider>
   );

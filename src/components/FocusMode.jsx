@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useAppContext } from '../context/AppContext';
+import { useGoals, useTasks, useFocus, useGamification } from '../context/AppContext';
 import { 
   Play, Pause, RotateCcw, Target, Coffee, Zap, 
   Volume2, VolumeX, CheckCircle, ChevronDown, Check, 
@@ -61,7 +61,10 @@ const playSynthesizedSound = (theme, volume = 0.5, isMuted = false) => {
 };
 
 export const FocusMode = () => {
-  const { tasks, goals, addFocusTimeToHabit, focusTime, awardFocusXP } = useAppContext();
+  const { goals, addFocusTimeToHabit } = useGoals();
+  const { tasks } = useTasks();
+  const { focusTime } = useFocus();
+  const { awardFocusXP } = useGamification();
   
   // ── PERSISTENT TIMER STATE MANAGEMENT ─────────────────────────────────
   const [timerState, setTimerState] = useState(() => {

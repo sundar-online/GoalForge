@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useAppContext } from '../context/AppContext';
+import { useNotes } from '../context/AppContext';
 import {
   Plus, ArrowLeft, Trash2, CheckSquare, Square, Check,
   FileText, ListChecks, MoreVertical, Search, X, Clock, Pin,
@@ -39,7 +39,7 @@ const getPreview = (note) => {
 
 // ── Main Component ───────────────────────────────────────
 export const NotesPage = () => {
-  const { notes, addNote, updateNote, deleteNote } = useAppContext();
+  const { notes, addNote, updateNote, deleteNote } = useNotes();
   const [view, setView] = useState('list');          // 'list' | 'detail' | 'new'
   const [activeNote, setActiveNote] = useState(null);
   const [search, setSearch] = useState('');
