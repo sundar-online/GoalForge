@@ -403,16 +403,37 @@ export const GoalsPage = () => {
   const { goals, addGoal, deleteGoal, addHabit, deleteHabit, logHabitTime, toggleHabitCheck, updateHabitCount, extendGoalDeadline, editGoalSystem, setCompletedGoalForCelebration } = useAppContext();
   const [expandedGoalIds, setExpandedGoalIds] = useState([]);
   const [isMobile, setIsMobile] = useState(false);
+  const [colsCount, setColsCount] = useState(1);
 
-  // Responsive design width observer
+  // Responsive design width and column observer
   useEffect(() => {
     const handleResize = () => {
-      setIsMobile(window.innerWidth < 1024);
+      const width = window.innerWidth;
+      setIsMobile(width < 1024);
+      
+      const isExpanded = expandedGoalIds.length > 0;
+      if (width < 768) {
+        setColsCount(1);
+      } else if (width < 1024) {
+        setColsCount(2);
+      } else {
+        // Desktop
+        if (isExpanded && expandedGoalIds.length <= 2) {
+          // Balanced 2-column mode
+          setColsCount(2);
+        } else if (expandedGoalIds.length > 2) {
+          // Stacked overview accordion mode
+          setColsCount(1);
+        } else {
+          // No goals are open: 3-column layout on large screens, 2-column on smaller desktops
+          setColsCount(width >= 1280 ? 3 : 2);
+        }
+      }
     };
     handleResize();
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  }, [expandedGoalIds]);
 
   // Sync expanded goals if they get deleted in real-time
   useEffect(() => {
@@ -720,143 +741,151 @@ export const GoalsPage = () => {
         </div>
       )}
 
-      {/* Goal Cards Grid / Accordion List */}
-      <div className={
-        isMobile
-          ? "flex flex-col gap-5 max-w-2xl mx-auto w-full"
-          : expandedGoalIds.length > 2
-            ? "flex flex-col gap-6 max-w-4xl mx-auto w-full"
-            : expandedGoalIds.length > 0
-              ? "grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-6xl mx-auto w-full"
-              : "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6"
-      }>
-        {goals
-          .sort((a, b) => {
-            const aDone = isGoalDoneToday(a);
-            const bDone = isGoalDoneToday(b);
-            if (aDone !== bDone) return aDone ? 1 : -1;
-            return 0;
-          })
-          .map(goal => {
-          const tc = TAG_COLORS[goal.tag] || TAG_COLORS.General;
-          const isOpen = expandedGoalIds.includes(goal.id);
-          const habitsTotal = goal.habits.length;
-          const dailyProgress = calculateGoalDailyProgress(goal);
-          const doneToday = isGoalDoneToday(goal);
+      {/* Goal Cards Masonry Grid / Accordion List */}
+      {(() => {
+        const sortedGoals = [...goals].sort((a, b) => {
+          const aDone = isGoalDoneToday(a);
+          const bDone = isGoalDoneToday(b);
+          if (aDone !== bDone) return aDone ? 1 : -1;
+          return 0;
+        });
 
-          return (
-            <div key={goal.id} className={`
-              bg-bg-card rounded-[32px] overflow-hidden border-2 transition-all duration-500 h-fit
-              ${doneToday ? 'border-emerald-500 shadow-lg shadow-emerald-500/5' : 'border-border-light hover:border-border-med shadow-sm'}
-            `}>
-              <div className="p-6 cursor-pointer group" onClick={() => toggleGoalExpanded(goal.id)}>
-                <div className="flex items-center gap-5">
-                  <div className="relative w-20 h-20 shrink-0">
-                    <svg className="w-full h-full -rotate-90" viewBox="0 0 68 68">
-                      <circle cx="34" cy="34" r={R} fill="none" className="stroke-bg-input" strokeWidth="6" />
-                      <circle 
-                        cx="34" cy="34" r={R} fill="none" className="stroke-accent-blue transition-all duration-1000 ease-out" strokeWidth="6" 
-                        strokeDasharray={CIRC} strokeDashoffset={CIRC - (CIRC * (goal.progress || 0)) / 100} 
-                        strokeLinecap="round"
-                      />
-                    </svg>
-                    <div className="absolute inset-0 flex flex-col items-center justify-center">
-                      <span className="text-base font-black text-text-main tracking-tighter leading-none">{goal.progress || 0}%</span>
-                      <span className="text-[7px] font-black text-text-muted uppercase tracking-widest mt-0.5">Mastery</span>
-                    </div>
-                  </div>
+        const masonryColumns = Array.from({ length: colsCount }, () => []);
+        sortedGoals.forEach((goal, idx) => {
+          masonryColumns[idx % colsCount].push(goal);
+        });
 
-                  <div className="flex-1 min-w-0">
-                    <div className="flex flex-wrap items-center gap-2 mb-2">
-                      <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md ${tc.bg} ${tc.color}`}>{goal.tag}</span>
-                      <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md bg-accent-blue-light text-accent-blue">Today: {dailyProgress}%</span>
-                      {goal.progress >= 100 && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setCompletedGoalForCelebration(goal);
-                          }}
-                          className="text-[9px] font-black bg-amber-400/15 text-amber-400 border border-amber-400/20 px-2 py-0.5 rounded-md hover:scale-105 active:scale-95 transition-all flex items-center gap-1"
-                          title="Click to trigger Celebration Memory modal!"
-                        >
-                          ✨ Mastered (Save Memory)
-                        </button>
+        return (
+          <div className={`
+            flex gap-6 items-start w-full transition-all duration-500 mx-auto
+            ${colsCount === 1 ? 'max-w-2xl flex-col' : colsCount === 2 ? 'max-w-5xl' : 'max-w-7xl'}
+          `}>
+            {masonryColumns.map((colGoals, colIdx) => (
+              <div key={colIdx} className="flex flex-col gap-6 flex-1 min-w-0">
+                {colGoals.map(goal => {
+                  const tc = TAG_COLORS[goal.tag] || TAG_COLORS.General;
+                  const isOpen = expandedGoalIds.includes(goal.id);
+                  const habitsTotal = goal.habits.length;
+                  const dailyProgress = calculateGoalDailyProgress(goal);
+                  const doneToday = isGoalDoneToday(goal);
+
+                  return (
+                    <div key={goal.id} className={`
+                      bg-bg-card rounded-[32px] overflow-hidden border-2 transition-all duration-500 h-fit
+                      ${doneToday ? 'border-emerald-500 shadow-lg shadow-emerald-500/5' : 'border-border-light hover:border-border-med shadow-sm'}
+                    `}>
+                      <div className="p-6 cursor-pointer group" onClick={() => toggleGoalExpanded(goal.id)}>
+                        <div className="flex items-center gap-5">
+                          <div className="relative w-20 h-20 shrink-0">
+                            <svg className="w-full h-full -rotate-90" viewBox="0 0 68 68">
+                              <circle cx="34" cy="34" r={R} fill="none" className="stroke-bg-input" strokeWidth="6" />
+                              <circle 
+                                cx="34" cy="34" r={R} fill="none" className="stroke-accent-blue transition-all duration-1000 ease-out" strokeWidth="6" 
+                                strokeDasharray={CIRC} strokeDashoffset={CIRC - (CIRC * (goal.progress || 0)) / 100} 
+                                strokeLinecap="round"
+                              />
+                            </svg>
+                            <div className="absolute inset-0 flex flex-col items-center justify-center">
+                              <span className="text-base font-black text-text-main tracking-tighter leading-none">{goal.progress || 0}%</span>
+                              <span className="text-[7px] font-black text-text-muted uppercase tracking-widest mt-0.5">Mastery</span>
+                            </div>
+                          </div>
+
+                          <div className="flex-1 min-w-0">
+                            <div className="flex flex-wrap items-center gap-2 mb-2">
+                              <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md ${tc.bg} ${tc.color}`}>{goal.tag}</span>
+                              <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md bg-accent-blue-light text-accent-blue">Today: {dailyProgress}%</span>
+                              {goal.progress >= 100 && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setCompletedGoalForCelebration(goal);
+                                  }}
+                                  className="text-[9px] font-black bg-amber-400/15 text-amber-400 border border-amber-400/20 px-2 py-0.5 rounded-md hover:scale-105 active:scale-95 transition-all flex items-center gap-1"
+                                  title="Click to trigger Celebration Memory modal!"
+                                >
+                                  ✨ Mastered (Save Memory)
+                                </button>
+                              )}
+                            </div>
+                            <p className="text-lg font-black text-text-main tracking-tight leading-tight mb-3 group-hover:text-accent-blue transition-colors">{goal.title}</p>
+                            
+                            <div className="w-full bg-bg-input h-1.5 rounded-full overflow-hidden mb-3">
+                              <div className={`h-full transition-all duration-1000 ${dailyProgress === 100 ? 'bg-emerald-500' : 'bg-accent-blue'}`} style={{ width: `${dailyProgress}%` }} />
+                            </div>
+
+                            <div className="flex items-center gap-3">
+                              <button onClick={(e) => { e.stopPropagation(); setExtendingGoal(goal); }} className="px-2 py-1 rounded-md bg-bg-input text-[10px] font-bold text-text-muted hover:bg-border-med transition-colors flex items-center gap-2">
+                                <Calendar size={12} /> {goal.deadline || 'No deadline'}
+                              </button>
+                              {goal.extensions?.length > 0 && <History size={12} className="text-accent-blue opacity-50" />}
+                            </div>
+                          </div>
+
+                          <div className="flex flex-col gap-2 items-center">
+                            <button onClick={e => { e.stopPropagation(); setEditingGoal(goal); }} className="w-9 h-9 rounded-xl text-text-muted hover:text-accent-blue hover:bg-accent-blue/10 transition-all flex items-center justify-center" title="Edit Goal System"><Edit3 size={18} /></button>
+                            <button onClick={e => { e.stopPropagation(); setDeletingGoalItem(goal); }} className="w-9 h-9 rounded-xl text-text-muted hover:text-rose-500 hover:bg-rose-500/10 transition-all flex items-center justify-center" title="Delete Goal System"><Trash2 size={18} /></button>
+                            {isOpen ? <ChevronUp size={24} className="text-text-muted" /> : <ChevronDown size={24} className="text-text-muted" />}
+                          </div>
+                        </div>
+                      </div>
+
+                      {isOpen && (
+                        <div className="px-6 pb-6 pt-2 border-t border-border-light space-y-4 animate-in slide-in-from-top-4">
+                          <div className="flex flex-col gap-3">
+                            {goal.habits
+                              .sort((a, b) => {
+                                const aDone = a.type === 'check' ? a.completed : (a.type === 'count' ? (a.currentCount >= (a.targetCount ?? 10)) : (a.timeSpent >= (a.targetTime ?? 15)));
+                                const bDone = b.type === 'check' ? b.completed : (b.type === 'count' ? (b.currentCount >= (b.targetCount ?? 10)) : (b.timeSpent >= (b.targetTime ?? 15)));
+                                if (aDone !== bDone) return aDone ? 1 : -1;
+                                return 0;
+                              })
+                              .map(h => <HabitRow key={h.id} habit={h} goalId={goal.id} logHabitTime={logHabitTime} deleteHabit={deleteHabit} toggleHabitCheck={toggleHabitCheck} updateHabitCount={updateHabitCount} />)}
+                          </div>
+                          
+                          {showAddHabit === goal.id ? (
+                            <form onSubmit={e => submitHabit(e, goal.id)} className="bg-bg-input/50 p-5 rounded-2xl border border-border-light space-y-4 animate-in zoom-in-95">
+                              <input autoFocus required type="text" value={newHabit.title} onChange={e => setNewHabit({ ...newHabit, title: e.target.value })} placeholder="New habit name..." className="w-full bg-transparent border-b-2 border-accent-blue p-2 font-bold text-text-main outline-none placeholder:text-text-muted/40" />
+                              <div className="flex gap-3">
+                                <select value={newHabit.type} onChange={e => setNewHabit({ ...newHabit, type: e.target.value })} className="flex-1 bg-bg-card rounded-xl px-4 py-3 text-xs font-black text-text-main shadow-sm border-none">
+                                  <option value="time">⏱️ Time</option>
+                                  <option value="check">✅ Check</option>
+                                  <option value="count">🔢 Count</option>
+                                </select>
+                                {newHabit.type !== 'check' && (
+                                  <input type="number" min="1" value={newHabit.type === 'count' ? newHabit.targetCount : newHabit.targetTime} 
+                                    onChange={e => {
+                                      const val = parseInt(e.target.value, 10) || 1;
+                                      setNewHabit(h => ({ ...h, [h.type === 'count' ? 'targetCount' : 'targetTime']: val }));
+                                    }} 
+                                    className="w-20 bg-bg-card rounded-xl px-4 py-3 text-sm font-black text-accent-blue shadow-sm border-none" 
+                                  />
+                                )}
+                              </div>
+                              <DayPicker
+                                value={newHabit.scheduleDays || []}
+                                onChange={days => setNewHabit(h => ({ ...h, scheduleDays: days }))}
+                              />
+                              <div className="flex gap-3 pt-2">
+                                <button type="submit" className="flex-1 py-3.5 rounded-xl bg-accent-blue text-white font-black text-sm shadow-md active:scale-95 transition-all">Add Daily Habit</button>
+                                <button type="button" onClick={() => setShowAddHabit(null)} className="px-6 py-3.5 rounded-xl bg-bg-input text-text-muted font-black text-sm hover:bg-bg-input/80 transition-colors">Cancel</button>
+                              </div>
+                            </form>
+                          ) : (
+                            <button onClick={() => setShowAddHabit(goal.id)} className="w-full py-4 rounded-2xl bg-bg-input border border-border-light border-dashed text-accent-blue font-black text-sm flex items-center justify-center gap-3 hover:bg-bg-input/80 transition-all">
+                              <Plus size={18} strokeWidth={3} /> Add Daily Habit
+                            </button>
+                          )}
+                        </div>
                       )}
                     </div>
-                    <p className="text-lg font-black text-text-main tracking-tight leading-tight mb-3 group-hover:text-accent-blue transition-colors">{goal.title}</p>
-                    
-                    <div className="w-full bg-bg-input h-1.5 rounded-full overflow-hidden mb-3">
-                      <div className={`h-full transition-all duration-1000 ${dailyProgress === 100 ? 'bg-emerald-500' : 'bg-accent-blue'}`} style={{ width: `${dailyProgress}%` }} />
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <button onClick={(e) => { e.stopPropagation(); setExtendingGoal(goal); }} className="px-2 py-1 rounded-md bg-bg-input text-[10px] font-bold text-text-muted hover:bg-border-med transition-colors flex items-center gap-2">
-                        <Calendar size={12} /> {goal.deadline || 'No deadline'}
-                      </button>
-                      {goal.extensions?.length > 0 && <History size={12} className="text-accent-blue opacity-50" />}
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col gap-2 items-center">
-                    <button onClick={e => { e.stopPropagation(); setEditingGoal(goal); }} className="w-9 h-9 rounded-xl text-text-muted hover:text-accent-blue hover:bg-accent-blue/10 transition-all flex items-center justify-center" title="Edit Goal System"><Edit3 size={18} /></button>
-                    <button onClick={e => { e.stopPropagation(); setDeletingGoalItem(goal); }} className="w-9 h-9 rounded-xl text-text-muted hover:text-rose-500 hover:bg-rose-500/10 transition-all flex items-center justify-center" title="Delete Goal System"><Trash2 size={18} /></button>
-                    {isOpen ? <ChevronUp size={24} className="text-text-muted" /> : <ChevronDown size={24} className="text-text-muted" />}
-                  </div>
-                </div>
+                  );
+                })}
               </div>
-
-              {isOpen && (
-                <div className="px-6 pb-6 pt-2 border-t border-border-light space-y-4 animate-in slide-in-from-top-4">
-                  <div className="flex flex-col gap-3">
-                    {goal.habits
-                      .sort((a, b) => {
-                        const aDone = a.type === 'check' ? a.completed : (a.type === 'count' ? (a.currentCount >= (a.targetCount ?? 10)) : (a.timeSpent >= (a.targetTime ?? 15)));
-                        const bDone = b.type === 'check' ? b.completed : (b.type === 'count' ? (b.currentCount >= (b.targetCount ?? 10)) : (b.timeSpent >= (b.targetTime ?? 15)));
-                        if (aDone !== bDone) return aDone ? 1 : -1;
-                        return 0;
-                      })
-                      .map(h => <HabitRow key={h.id} habit={h} goalId={goal.id} logHabitTime={logHabitTime} deleteHabit={deleteHabit} toggleHabitCheck={toggleHabitCheck} updateHabitCount={updateHabitCount} />)}
-                  </div>
-                  
-                  {showAddHabit === goal.id ? (
-                    <form onSubmit={e => submitHabit(e, goal.id)} className="bg-bg-input/50 p-5 rounded-2xl border border-border-light space-y-4 animate-in zoom-in-95">
-                      <input autoFocus required type="text" value={newHabit.title} onChange={e => setNewHabit({ ...newHabit, title: e.target.value })} placeholder="New habit name..." className="w-full bg-transparent border-b-2 border-accent-blue p-2 font-bold text-text-main outline-none placeholder:text-text-muted/40" />
-                      <div className="flex gap-3">
-                        <select value={newHabit.type} onChange={e => setNewHabit({ ...newHabit, type: e.target.value })} className="flex-1 bg-bg-card rounded-xl px-4 py-3 text-xs font-black text-text-main shadow-sm border-none">
-                          <option value="time">⏱️ Time</option>
-                          <option value="check">✅ Check</option>
-                          <option value="count">🔢 Count</option>
-                        </select>
-                        {newHabit.type !== 'check' && (
-                          <input type="number" min="1" value={newHabit.type === 'count' ? newHabit.targetCount : newHabit.targetTime} 
-                            onChange={e => {
-                              const val = parseInt(e.target.value, 10) || 1;
-                              setNewHabit(h => ({ ...h, [h.type === 'count' ? 'targetCount' : 'targetTime']: val }));
-                            }} 
-                            className="w-20 bg-bg-card rounded-xl px-4 py-3 text-sm font-black text-accent-blue shadow-sm border-none" 
-                          />
-                        )}
-                      </div>
-                      <DayPicker
-                        value={newHabit.scheduleDays || []}
-                        onChange={days => setNewHabit(h => ({ ...h, scheduleDays: days }))}
-                      />
-                      <div className="flex gap-3 pt-2">
-                        <button type="submit" className="flex-1 py-3.5 rounded-xl bg-accent-blue text-white font-black text-sm shadow-md active:scale-95 transition-all">Add Daily Habit</button>
-                        <button type="button" onClick={() => setShowAddHabit(null)} className="px-6 py-3.5 rounded-xl bg-bg-input text-text-muted font-black text-sm hover:bg-bg-input/80 transition-colors">Cancel</button>
-                      </div>
-                    </form>
-                  ) : (
-                    <button onClick={() => setShowAddHabit(goal.id)} className="w-full py-4 rounded-2xl bg-bg-input border border-border-light border-dashed text-accent-blue font-black text-sm flex items-center justify-center gap-3 hover:bg-bg-input/80 transition-all">
-                      <Plus size={18} strokeWidth={3} /> Add Daily Habit
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+            ))}
+          </div>
+        );
+      })()}
       
       {extendingGoal && <ExtendDeadlineModal goal={extendingGoal} onClose={() => setExtendingGoal(null)} onExtend={extendGoalDeadline} />}
       {editingGoal && <EditGoalSystemModal goal={editingGoal} onClose={() => setEditingGoal(null)} onSave={editGoalSystem} />}
