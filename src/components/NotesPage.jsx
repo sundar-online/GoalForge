@@ -4,7 +4,9 @@ import { useAppContext } from '../context/AppContext';
 import {
   Plus, ArrowLeft, Trash2, CheckSquare, Square, Check,
   FileText, ListChecks, MoreVertical, Search, X, Clock, Pin,
-  Folder, FolderPlus, ChevronDown
+  Folder, FolderPlus, ChevronDown, Bold, Italic, Underline,
+  Strikethrough, AlignLeft, AlignCenter, AlignRight, List,
+  ListOrdered, Quote, Code, Highlighter, Palette, Type
 } from 'lucide-react';
 
 // -- Helpers --
@@ -18,12 +20,20 @@ const fmtDate = (iso) => {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 };
 
+const stripHtml = (html) => {
+  if (!html) return '';
+  return html.replace(/<[^>]*>/g, ' ');
+};
+
 const getPreview = (note) => {
   if (note.checklist && note.checklist.length > 0) {
     const done = note.checklist.filter(c => c.completed).length;
     return `${done}/${note.checklist.length} items completed`;
   }
-  if (note.content) return note.content.slice(0, 80) + (note.content.length > 80 ? '…' : '');
+  if (note.content) {
+    const text = stripHtml(note.content).replace(/\s+/g, ' ').trim();
+    return text.slice(0, 80) + (text.length > 80 ? '…' : '');
+  }
   return 'Empty note';
 };
 
@@ -48,6 +58,65 @@ export const NotesPage = () => {
   const [activeFolderDropdown, setActiveFolderDropdown] = useState(false);
   const [typedFolderName, setTypedFolderName] = useState('');
   const [isTypingNewFolder, setIsTypingNewFolder] = useState(false);
+
+  // ── Rich Text States ──────────────────────────────────
+  const [showColorPopover, setShowColorPopover] = useState(false);
+  const [showHighlightPopover, setShowHighlightPopover] = useState(false);
+  const [localContent, setLocalContent] = useState('');
+  const saveTimeoutRef = useRef(null);
+  const editorRef = useRef(null);
+
+  // Sync localContent when activeNote ID changes
+  useEffect(() => {
+    if (activeNote) {
+      setLocalContent(activeNote.content || '');
+    } else {
+      setLocalContent('');
+    }
+  }, [activeNote?.id]);
+
+  // Sync editor innerHTML when activeNote ID changes
+  useEffect(() => {
+    if (editorRef.current && activeNote) {
+      if (editorRef.current.innerHTML !== activeNote.content) {
+        editorRef.current.innerHTML = activeNote.content || '';
+      }
+    }
+  }, [activeNote?.id]);
+
+  // Flush pending save on unmount or activeNote ID change
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, [activeNote?.id]);
+
+  const triggerAutosave = (newHtml) => {
+    setLocalContent(newHtml);
+    
+    // Clear existing timeout
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    
+    // Set new timeout for debounced save
+    saveTimeoutRef.current = setTimeout(() => {
+      const updated = { ...activeNote, content: newHtml, updated_at: new Date().toISOString() };
+      setActiveNote(updated);
+      updateNote(activeNote.id, { content: newHtml, updated_at: updated.updated_at });
+    }, 1000); // 1-second debounce
+  };
+
+  const handleGoBack = () => {
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+      // Flush save immediately to context/Firestore
+      const updated = { ...activeNote, content: localContent, updated_at: new Date().toISOString() };
+      updateNote(activeNote.id, { content: localContent, updated_at: updated.updated_at });
+    }
+    setView('list');
+    setActiveNote(null);
+  };
 
   // Extract all unique folder names dynamically
   const allFolders = Array.from(new Set(notes.map(n => n.folder).filter(Boolean)));
@@ -162,6 +231,54 @@ export const NotesPage = () => {
     const updated = { ...activeNote, checklist: newChecklist, content: '', updated_at: new Date().toISOString() };
     setActiveNote(updated);
     updateNote(activeNote.id, { checklist: newChecklist, content: '', updated_at: updated.updated_at });
+  };
+
+  // ── Rich Text Helpers ─────────────────────────────────
+  const execCmd = (command, value = null) => {
+    if (editorRef.current) {
+      editorRef.current.focus();
+      document.execCommand(command, false, value);
+      triggerAutosave(editorRef.current.innerHTML);
+    }
+  };
+
+  const insertChecklist = () => {
+    const html = `<div class="rich-todo-item flex items-start gap-2.5 my-2" contenteditable="false"><input type="checkbox" class="rich-todo-checkbox mt-1 w-4.5 h-4.5 rounded-md border-2 border-border-med bg-bg-input text-accent-blue focus:ring-accent-blue" /> <span class="flex-1 outline-hidden" contenteditable="true">Checklist item...</span></div>`;
+    execCmd('insertHTML', html);
+  };
+
+  const handleEditorKeyDown = (e) => {
+    // Bold: Ctrl+B / Cmd+B
+    if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
+      e.preventDefault();
+      execCmd('bold');
+    }
+    // Italic: Ctrl+I / Cmd+I
+    if ((e.ctrlKey || e.metaKey) && e.key === 'i') {
+      e.preventDefault();
+      execCmd('italic');
+    }
+    // Underline: Ctrl+U / Cmd+U
+    if ((e.ctrlKey || e.metaKey) && e.key === 'u') {
+      e.preventDefault();
+      execCmd('underline');
+    }
+    // Tab: Support indentation
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      execCmd('insertHTML', '&nbsp;&nbsp;&nbsp;&nbsp;');
+    }
+  };
+
+  const handleEditorClick = (e) => {
+    if (e.target.type === 'checkbox') {
+      if (e.target.checked) {
+        e.target.setAttribute('checked', 'checked');
+      } else {
+        e.target.removeAttribute('checked');
+      }
+      triggerAutosave(editorRef.current.innerHTML);
+    }
   };
 
   // Auto-focus title on new note
@@ -286,7 +403,7 @@ export const NotesPage = () => {
       <div className="flex flex-col gap-6 pb-32 md:pb-10">
         {/* Header */}
         <header className="flex items-center gap-4">
-          <button onClick={() => { setView('list'); setActiveNote(null); }}
+          <button onClick={handleGoBack}
             className="w-11 h-11 rounded-xl bg-bg-card border border-border-light flex items-center justify-center text-text-main hover:bg-bg-input transition-all active:scale-90 shadow-sm flex-shrink-0">
             <ArrowLeft size={18} />
           </button>
@@ -504,15 +621,254 @@ export const NotesPage = () => {
         {/* Text Content */}
         {!isChecklist && (
           <div className="flex flex-col gap-4">
-            <textarea
-              value={activeNote.content || ''}
-              onChange={e => handleUpdateContent(e.target.value)}
-              placeholder="Start forging your thoughts..."
-              className="w-full min-h-[300px] bg-bg-card border border-border-light rounded-[32px] p-8 text-base font-medium text-text-main leading-relaxed outline-hidden focus:border-accent-blue transition-colors shadow-sm resize-none"
+            {/* Rich Text Toolbar */}
+            <div className="bg-bg-card border border-border-light rounded-2xl p-2.5 flex items-center gap-1.5 overflow-x-auto scrollbar-none shadow-sm select-none">
+              
+              {/* Headings */}
+              <button
+                onMouseDown={e => e.preventDefault()}
+                onClick={() => execCmd('formatBlock', '<h1>')}
+                className="px-2.5 py-1.5 rounded-lg text-xs font-black text-text-muted hover:text-text-main hover:bg-bg-input transition-colors shrink-0 flex items-center gap-1"
+                title="Heading 1"
+              >
+                H1
+              </button>
+              <button
+                onMouseDown={e => e.preventDefault()}
+                onClick={() => execCmd('formatBlock', '<h2>')}
+                className="px-2.5 py-1.5 rounded-lg text-xs font-black text-text-muted hover:text-text-main hover:bg-bg-input transition-colors shrink-0 flex items-center gap-1"
+                title="Heading 2"
+              >
+                H2
+              </button>
+              <button
+                onMouseDown={e => e.preventDefault()}
+                onClick={() => execCmd('formatBlock', '<h3>')}
+                className="px-2.5 py-1.5 rounded-lg text-xs font-black text-text-muted hover:text-text-main hover:bg-bg-input transition-colors shrink-0 flex items-center gap-1"
+                title="Heading 3"
+              >
+                H3
+              </button>
+              <button
+                onMouseDown={e => e.preventDefault()}
+                onClick={() => execCmd('formatBlock', '<p>')}
+                className="px-2.5 py-1.5 rounded-lg text-xs font-black text-text-muted hover:text-text-main hover:bg-bg-input transition-colors shrink-0 flex items-center gap-1"
+                title="Paragraph"
+              >
+                P
+              </button>
+
+              <div className="h-5 w-px bg-border-med shrink-0 mx-1" />
+
+              {/* Inline formatting */}
+              <button
+                onMouseDown={e => e.preventDefault()}
+                onClick={() => execCmd('bold')}
+                className="p-2 rounded-lg text-text-muted hover:text-text-main hover:bg-bg-input transition-colors shrink-0"
+                title="Bold"
+              >
+                <Bold size={15} strokeWidth={2.5} />
+              </button>
+              <button
+                onMouseDown={e => e.preventDefault()}
+                onClick={() => execCmd('italic')}
+                className="p-2 rounded-lg text-text-muted hover:text-text-main hover:bg-bg-input transition-colors shrink-0"
+                title="Italic"
+              >
+                <Italic size={15} strokeWidth={2.5} />
+              </button>
+              <button
+                onMouseDown={e => e.preventDefault()}
+                onClick={() => execCmd('underline')}
+                className="p-2 rounded-lg text-text-muted hover:text-text-main hover:bg-bg-input transition-colors shrink-0"
+                title="Underline"
+              >
+                <Underline size={15} strokeWidth={2.5} />
+              </button>
+              <button
+                onMouseDown={e => e.preventDefault()}
+                onClick={() => execCmd('strikeThrough')}
+                className="p-2 rounded-lg text-text-muted hover:text-text-main hover:bg-bg-input transition-colors shrink-0"
+                title="Strikethrough"
+              >
+                <Strikethrough size={15} strokeWidth={2.5} />
+              </button>
+
+              <div className="h-5 w-px bg-border-med shrink-0 mx-1" />
+
+              {/* Alignment */}
+              <button
+                onMouseDown={e => e.preventDefault()}
+                onClick={() => execCmd('justifyLeft')}
+                className="p-2 rounded-lg text-text-muted hover:text-text-main hover:bg-bg-input transition-colors shrink-0"
+                title="Align Left"
+              >
+                <AlignLeft size={15} strokeWidth={2.5} />
+              </button>
+              <button
+                onMouseDown={e => e.preventDefault()}
+                onClick={() => execCmd('justifyCenter')}
+                className="p-2 rounded-lg text-text-muted hover:text-text-main hover:bg-bg-input transition-colors shrink-0"
+                title="Align Center"
+              >
+                <AlignCenter size={15} strokeWidth={2.5} />
+              </button>
+              <button
+                onMouseDown={e => e.preventDefault()}
+                onClick={() => execCmd('justifyRight')}
+                className="p-2 rounded-lg text-text-muted hover:text-text-main hover:bg-bg-input transition-colors shrink-0"
+                title="Align Right"
+              >
+                <AlignRight size={15} strokeWidth={2.5} />
+              </button>
+
+              <div className="h-5 w-px bg-border-med shrink-0 mx-1" />
+
+              {/* Lists */}
+              <button
+                onMouseDown={e => e.preventDefault()}
+                onClick={() => execCmd('insertUnorderedList')}
+                className="p-2 rounded-lg text-text-muted hover:text-text-main hover:bg-bg-input transition-colors shrink-0"
+                title="Bullet List"
+              >
+                <List size={15} strokeWidth={2.5} />
+              </button>
+              <button
+                onMouseDown={e => e.preventDefault()}
+                onClick={() => execCmd('insertOrderedList')}
+                className="p-2 rounded-lg text-text-muted hover:text-text-main hover:bg-bg-input transition-colors shrink-0"
+                title="Numbered List"
+              >
+                <ListOrdered size={15} strokeWidth={2.5} />
+              </button>
+              <button
+                onMouseDown={e => e.preventDefault()}
+                onClick={insertChecklist}
+                className="p-2 rounded-lg text-text-muted hover:text-text-main hover:bg-bg-input transition-colors shrink-0 flex items-center gap-1.5"
+                title="Checklist Item"
+              >
+                <CheckSquare size={15} strokeWidth={2.5} />
+              </button>
+
+              <div className="h-5 w-px bg-border-med shrink-0 mx-1" />
+
+              {/* Blocks */}
+              <button
+                onMouseDown={e => e.preventDefault()}
+                onClick={() => execCmd('formatBlock', '<blockquote>')}
+                className="p-2 rounded-lg text-text-muted hover:text-text-main hover:bg-bg-input transition-colors shrink-0"
+                title="Quote Block"
+              >
+                <Quote size={15} strokeWidth={2.5} />
+              </button>
+              <button
+                onMouseDown={e => e.preventDefault()}
+                onClick={() => execCmd('formatBlock', '<pre>')}
+                className="p-2 rounded-lg text-text-muted hover:text-text-main hover:bg-bg-input transition-colors shrink-0"
+                title="Code Block"
+              >
+                <Code size={15} strokeWidth={2.5} />
+              </button>
+
+              <div className="h-5 w-px bg-border-med shrink-0 mx-1" />
+
+              {/* Text Color Selection */}
+              <div className="relative shrink-0">
+                <button
+                  onMouseDown={e => e.preventDefault()}
+                  onClick={() => { setShowColorPopover(!showColorPopover); setShowHighlightPopover(false); }}
+                  className="p-2 rounded-lg text-text-muted hover:text-text-main hover:bg-bg-input transition-colors flex items-center gap-1"
+                  title="Text Color"
+                >
+                  <Palette size={15} strokeWidth={2.5} />
+                </button>
+                {showColorPopover && (
+                  <>
+                    <div className="fixed inset-0 z-40" onMouseDown={e => e.preventDefault()} onClick={() => setShowColorPopover(false)} />
+                    <div className="absolute top-10 left-0 bg-bg-card border border-border-med rounded-xl shadow-xl z-50 p-2 flex gap-1.5 items-center animate-in fade-in zoom-in-95 duration-150">
+                      {[
+                        { color: 'inherit', label: 'Default', bg: 'bg-text-main' },
+                        { color: '#5a85ff', label: 'Blue', bg: 'bg-accent-blue' },
+                        { color: '#10b981', label: 'Emerald', bg: 'bg-emerald-500' },
+                        { color: '#8b5cf6', label: 'Purple', bg: 'bg-violet-500' },
+                        { color: '#f43f5e', label: 'Rose', bg: 'bg-rose-500' },
+                        { color: '#f97316', label: 'Orange', bg: 'bg-orange-500' }
+                      ].map(swatch => (
+                        <button
+                          key={swatch.color}
+                          onMouseDown={e => e.preventDefault()}
+                          onClick={() => { execCmd('foreColor', swatch.color); setShowColorPopover(false); }}
+                          className={`w-6 h-6 rounded-full ${swatch.bg} border border-border-light hover:scale-110 active:scale-95 transition-all`}
+                          title={swatch.label}
+                        />
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Highlight Selection */}
+              <div className="relative shrink-0">
+                <button
+                  onMouseDown={e => e.preventDefault()}
+                  onClick={() => { setShowHighlightPopover(!showHighlightPopover); setShowColorPopover(false); }}
+                  className="p-2 rounded-lg text-text-muted hover:text-text-main hover:bg-bg-input transition-colors flex items-center gap-1"
+                  title="Highlight Text"
+                >
+                  <Highlighter size={15} strokeWidth={2.5} />
+                </button>
+                {showHighlightPopover && (
+                  <>
+                    <div className="fixed inset-0 z-40" onMouseDown={e => e.preventDefault()} onClick={() => setShowHighlightPopover(false)} />
+                    <div className="absolute top-10 left-0 bg-bg-card border border-border-med rounded-xl shadow-xl z-50 p-2 flex gap-1.5 items-center animate-in fade-in zoom-in-95 duration-150">
+                      {[
+                        { color: 'transparent', label: 'Clear', bg: 'bg-bg-input border-dashed' },
+                        { color: 'rgba(90, 133, 255, 0.2)', label: 'Blue', bg: 'bg-accent-blue/30' },
+                        { color: 'rgba(16, 185, 129, 0.2)', label: 'Emerald', bg: 'bg-emerald-500/30' },
+                        { color: 'rgba(139, 92, 246, 0.2)', label: 'Purple', bg: 'bg-violet-500/30' },
+                        { color: 'rgba(244, 63, 94, 0.2)', label: 'Rose', bg: 'bg-rose-500/30' },
+                        { color: 'rgba(234, 179, 8, 0.25)', label: 'Yellow', bg: 'bg-yellow-500/30' }
+                      ].map(swatch => (
+                        <button
+                          key={swatch.color}
+                          onMouseDown={e => e.preventDefault()}
+                          onClick={() => { execCmd('hiliteColor', swatch.color); setShowHighlightPopover(false); }}
+                          className={`w-6 h-6 rounded-full ${swatch.bg} border border-border-light hover:scale-110 active:scale-95 transition-all`}
+                          title={swatch.label}
+                        />
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+
+              <div className="h-5 w-px bg-border-med shrink-0 mx-1" />
+
+              {/* Clear Formatting */}
+              <button
+                onMouseDown={e => e.preventDefault()}
+                onClick={() => execCmd('removeFormat')}
+                className="p-2 rounded-lg text-text-muted hover:text-text-main hover:bg-bg-input transition-colors shrink-0"
+                title="Clear Formatting"
+              >
+                <Type size={15} strokeWidth={2.5} />
+              </button>
+            </div>
+
+            {/* Rich Editor Canvas */}
+            <div 
+              ref={editorRef}
+              contentEditable
+              onInput={e => triggerAutosave(e.currentTarget.innerHTML)}
+              onKeyDown={handleEditorKeyDown}
+              onClick={handleEditorClick}
+              data-placeholder="Start forging your thoughts with rich formats..."
+              className="rich-editor rich-editor-canvas w-full min-h-[400px] max-h-[60vh] overflow-y-auto bg-bg-card border border-border-light rounded-[32px] p-8 text-base font-medium text-text-main leading-relaxed outline-hidden focus:border-accent-blue transition-colors shadow-sm select-text"
             />
+
             <button 
               onClick={handleConvertToChecklist} 
-              className="flex items-center gap-2 text-[10px] font-black text-text-muted uppercase tracking-widest hover:text-accent-blue transition-colors px-4"
+              className="flex items-center gap-2 text-[10px] font-black text-text-muted uppercase tracking-widest hover:text-accent-blue transition-colors px-4 self-start"
             >
               <ListChecks size={14} /> Convert to operational checklist
             </button>
