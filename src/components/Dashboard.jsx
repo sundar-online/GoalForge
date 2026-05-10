@@ -95,22 +95,22 @@ export const Dashboard = ({ setView }) => {
       )}
 
       {/* Header */}
-      <header className="flex justify-between items-center">
+      <header className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <div className="space-y-1">
           <h1 className="text-2xl md:text-3xl font-black text-text-main tracking-tight leading-tight">
             Hey, {displayName} 👋
           </h1>
-          <p className="text-sm text-text-muted font-medium italic opacity-80">{quote}</p>
+          <p className="text-xs sm:text-sm text-text-muted font-medium italic opacity-80">{quote}</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto justify-end">
           <button onClick={() => setView('weeklyplan')} className="flex px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-purple-500/10 text-purple-400 font-black text-xs sm:text-sm items-center gap-1.5 sm:gap-2 hover:bg-purple-500/20 transition-all border border-purple-500/20 shadow-sm">
-            <CalendarDays size={16} className="w-4 h-4" /> <span className="whitespace-nowrap">Plan</span><span className="hidden sm:inline">&nbsp;Week</span>
+            <CalendarDays size={16} className="w-4 h-4 shrink-0" /> <span className="whitespace-nowrap">Plan</span><span className="hidden sm:inline">&nbsp;Week</span>
           </button>
-          <button onClick={toggleTheme} className="w-11 h-11 rounded-xl bg-bg-card border border-border-light flex items-center justify-center text-text-main hover:bg-bg-input transition-all active:scale-90 shadow-sm">
-            {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
+          <button onClick={toggleTheme} className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-bg-card border border-border-light flex items-center justify-center text-text-main hover:bg-bg-input transition-all active:scale-90 shadow-sm shrink-0">
+            {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
           </button>
-          <div className="relative">
-            <button onClick={() => setShowSignOut(!showSignOut)} className="w-11 h-11 rounded-xl bg-bg-dark-elem flex items-center justify-center text-text-inverted font-black text-lg hover:opacity-90 transition-all active:scale-90 shadow-md">
+          <div className="relative shrink-0">
+            <button onClick={() => setShowSignOut(!showSignOut)} className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-bg-dark-elem flex items-center justify-center text-text-inverted font-black text-lg hover:opacity-90 transition-all active:scale-90 shadow-md">
               {initial}
             </button>
             {showSignOut && (
@@ -179,9 +179,9 @@ export const Dashboard = ({ setView }) => {
                     <p className="text-lg font-black text-white leading-none tracking-tighter">{disciplineScore}</p>
                   </div>
                   {insights.length > 0 && (
-                    <div className="flex items-center gap-2 bg-white/5 px-3 py-2 rounded-xl border border-white/10 max-w-[200px] sm:max-w-[250px] min-w-0 flex-1 animate-in fade-in">
+                    <div className="flex items-center gap-2.5 bg-white/5 px-3.5 py-2 rounded-xl border border-white/10 min-w-0 flex-1 animate-in fade-in">
                       <Sparkles size={14} className="text-accent-blue shrink-0 animate-pulse" />
-                      <p className="text-[11px] font-semibold text-white/70 leading-snug truncate">{insights[0]}</p>
+                      <p className="text-[11px] font-semibold text-white/80 leading-relaxed">{insights[0]}</p>
                     </div>
                   )}
                 </div>
@@ -233,11 +233,11 @@ export const Dashboard = ({ setView }) => {
           )}
 
           {/* Accuracy + Focus Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
             {/* Accuracy Card */}
-            <div className="bg-bg-card rounded-3xl p-8 shadow-sm border border-border-light flex flex-col items-center gap-5 hover:shadow-md transition-shadow">
+            <div className="bg-bg-card rounded-3xl p-5 sm:p-8 shadow-sm border border-border-light flex flex-col items-center gap-4 sm:gap-5 hover:shadow-md transition-shadow">
               <p className="text-[10px] font-black text-text-muted uppercase tracking-[0.15em]">Today's Accuracy</p>
-              <div className="relative w-36 h-36">
+              <div className="relative w-28 h-28 sm:w-36 sm:h-36">
                 <svg className="w-full h-full -rotate-90" viewBox="0 0 124 124">
                   <circle cx="62" cy="62" r={R} fill="none" className="stroke-bg-input" strokeWidth="10" />
                   <circle 
@@ -247,7 +247,7 @@ export const Dashboard = ({ setView }) => {
                   />
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-4xl font-black text-text-main tracking-tighter">{accuracy}%</span>
+                  <span className="text-3xl sm:text-4xl font-black text-text-main tracking-tighter">{accuracy}%</span>
                 </div>
               </div>
               <div className="px-4 py-1.5 rounded-full bg-bg-input border border-border-light">
@@ -258,7 +258,7 @@ export const Dashboard = ({ setView }) => {
             </div>
 
             {/* Deep Work Card */}
-            <div className="bg-bg-dark-elem rounded-3xl p-8 shadow-xl flex flex-col justify-between group hover:scale-[1.02] transition-transform">
+            <div className="bg-bg-dark-elem rounded-3xl p-5 sm:p-8 shadow-xl flex flex-col justify-between group hover:scale-[1.02] transition-transform">
               <p className="text-[10px] font-black text-white/40 uppercase tracking-[0.15em]">Deep Work</p>
               <div className="my-6">
                 <div className="flex items-baseline gap-2">
@@ -358,7 +358,7 @@ export const Dashboard = ({ setView }) => {
           <WeeklyHeatmap focusHistory={focusHistory} taskLogs={taskLogs} accuracy={accuracy} />
 
           {/* Task Stats Widget */}
-          <div className="grid grid-cols-3 lg:grid-cols-1 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-1 gap-4">
             {[
               { label: 'Total Units', val: totalItems, icon: <Zap size={18} className="text-accent-blue" />, color: "text-accent-blue" },
               { label: 'Completed', val: completedItems, icon: <CheckCircle2 size={18} className="text-emerald-500" />, color: "text-emerald-500" },

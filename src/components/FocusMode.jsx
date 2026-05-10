@@ -4,7 +4,8 @@ import { useAppContext } from '../context/AppContext';
 import { 
   Play, Pause, RotateCcw, Target, Coffee, Zap, 
   Volume2, VolumeX, CheckCircle, ChevronDown, Check, 
-  Flame, Trophy, Calendar, Sparkles, Award, Bell, Music, HelpCircle
+  Flame, Trophy, Calendar, Sparkles, Award, Bell, Music, HelpCircle,
+  Clock, History
 } from 'lucide-react';
 import { TODAY } from '../utils/dateUtils';
 import { scheduleTimerCompletionNotification, cancelTimerNotification } from '../utils/notificationUtils';
@@ -428,7 +429,7 @@ export const FocusMode = () => {
   const isNearCompletion = timerState === 'running' && (time < 60 || pct >= 90);
 
   return (
-    <div className="flex flex-col items-center gap-8 w-full max-w-md mx-auto pb-12">
+    <div className="w-full max-w-6xl mx-auto pb-12 px-4 lg:px-0">
       {/* ── CELEBRATION MODAL OVERLAY ─────────────────────────────────── */}
       <AnimatePresence>
         {showCelebration && celebrationDetails && (
@@ -514,303 +515,325 @@ export const FocusMode = () => {
         )}
       </AnimatePresence>
 
-      {/* ── TIMER CONTAINER ─────────────────────────────────────────── */}
-      <div className="text-center w-full space-y-2">
-        <span className="inline-block bg-accent-blue/10 text-accent-blue text-[10px] font-black uppercase tracking-widest px-4 py-1.5 rounded-full shadow-xs">
-          Neural Focus Session
-        </span>
-        <h2 className="text-2xl font-black text-text-main tracking-tight line-clamp-1">
-          {selectedItem ? selectedItem.title : 'Deep Work Protocol'}
-        </h2>
-        <div className="flex items-center justify-center gap-2 text-xs font-bold text-text-muted">
-          {selectedGoal ? (
-            <>
-              <Target size={12} />
-              <span>Project: {selectedGoal.title}</span>
-            </>
-          ) : isDailyTaskMode ? (
-            <>
-              <Zap size={12} />
-              <span>Core Protocol Active</span>
-            </>
-          ) : (
-            <span>Standalone Session</span>
-          )}
-        </div>
-      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start">
+        {/* ── LEFT COLUMN: CONFIGURATION CABINET ── */}
+        <div className="lg:col-span-4 space-y-5 order-2 lg:order-1 lg:sticky lg:top-6">
+          {/* Target Selection Card */}
+          <div className="bg-bg-card border border-border-light rounded-[32px] p-6 shadow-sm space-y-4">
+            <span className="text-[10px] font-black text-text-muted uppercase tracking-widest flex items-center gap-1.5">
+              <Target size={12} className="text-accent-blue" /> Choose Active Target
+            </span>
+            <div className="w-full space-y-3">
+              <div className="relative group">
+                <select 
+                  value={selectedGoalId} 
+                  onChange={e => { setSelectedGoalId(e.target.value); setSelectedHabitId(''); }}
+                  disabled={timerState !== 'idle'}
+                  className="w-full bg-bg-input border border-border-med rounded-2xl px-4 py-3.5 text-sm font-bold text-text-main shadow-xs appearance-none cursor-pointer outline-hidden focus:border-accent-blue transition-all disabled:opacity-50 disabled:cursor-not-allowed pr-10"
+                >
+                  <option value="">— Choose Domain —</option>
+                  {goals.length > 0 && (
+                    <optgroup label="Primary Objectives" className="font-bold bg-bg-card">
+                      {goals.map(g => <option key={g.id} value={g.id}>{g.title}</option>)}
+                    </optgroup>
+                  )}
+                  {todayTasks.length > 0 && (
+                    <optgroup label="System Routines" className="bg-bg-card">
+                      <option value="DAILY_TASK">Daily Forge</option>
+                    </optgroup>
+                  )}
+                </select>
+                <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none group-focus-within:text-accent-blue transition-colors" />
+              </div>
 
-      {/* Domain Selectors */}
-      <div className="w-full space-y-3">
-        <div className="relative group">
-          <select 
-            value={selectedGoalId} 
-            onChange={e => { setSelectedGoalId(e.target.value); setSelectedHabitId(''); }}
-            disabled={timerState !== 'idle'}
-            className="w-full bg-bg-card border border-border-light rounded-2xl px-4 py-3 text-sm font-bold text-text-main shadow-xs appearance-none cursor-pointer outline-hidden focus:border-accent-blue transition-all disabled:opacity-50 disabled:cursor-not-allowed pr-10"
-          >
-            <option value="">— Choose Domain —</option>
-            {goals.length > 0 && (
-              <optgroup label="Primary Objectives" className="font-bold">
-                {goals.map(g => <option key={g.id} value={g.id}>{g.title}</option>)}
-              </optgroup>
-            )}
-            {todayTasks.length > 0 && (
-              <optgroup label="System Routines">
-                <option value="DAILY_TASK">Daily Forge</option>
-              </optgroup>
-            )}
-          </select>
-          <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none group-focus-within:text-accent-blue transition-colors" />
+              {selectedGoalId && activeList.length > 0 && (
+                <div className="relative group animate-in slide-in-from-top-2 duration-300">
+                  <select 
+                    value={selectedHabitId} 
+                    onChange={e => setSelectedHabitId(e.target.value)}
+                    disabled={timerState !== 'idle'}
+                    className="w-full bg-bg-input border border-border-med rounded-2xl px-4 py-3.5 text-sm font-bold text-text-main shadow-xs appearance-none cursor-pointer outline-hidden focus:border-accent-blue transition-all disabled:opacity-50 disabled:cursor-not-allowed pr-10"
+                  >
+                    <option value="">— Select Routine/Habit —</option>
+                    {activeList
+                      .sort((a, b) => {
+                        const cType = a.completionType || a.type || 'check';
+                        const dType = b.completionType || b.type || 'check';
+                        const aDone = cType === 'check' ? a.completed : (cType === 'count' ? (a.currentCount >= (a.targetCount ?? 10)) : (a.timeSpent >= (a.targetTime ?? 15)));
+                        const bDone = dType === 'check' ? b.completed : (dType === 'count' ? (b.currentCount >= (b.targetCount ?? 10)) : (b.timeSpent >= (b.targetTime ?? 15)));
+                        if (aDone !== bDone) return aDone ? 1 : -1;
+                        return 0;
+                      })
+                      .map(h => {
+                        const cType = h.completionType || h.type || 'check';
+                        const isCount = cType === 'count';
+                        const isCheck = cType === 'check';
+                        const target = isCount ? (h.targetCount ?? 10) : (h.targetTime ?? 15);
+                        const progress = isCount ? (h.currentCount || 0) : (h.timeSpent || 0);
+                        const unit = isCount ? '' : 'm';
+                        return (
+                          <option key={h.id} value={h.id} className="bg-bg-card">
+                            {h.title} {isCheck ? (h.completed ? '✓' : '') : `[${progress}${unit}/${target}${unit}]`}
+                          </option>
+                        );
+                      })}
+                  </select>
+                  <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none group-focus-within:text-accent-blue transition-colors" />
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Preset Duration Selector Card */}
+          <div className={`bg-bg-card border border-border-light rounded-[32px] p-6 shadow-sm space-y-4 transition-all ${timerState !== 'idle' ? 'opacity-40 grayscale pointer-events-none' : ''}`}>
+            <span className="text-[10px] font-black text-text-muted uppercase tracking-widest flex items-center gap-1.5">
+              <Clock size={12} className="text-accent-blue" /> Duration Preset
+            </span>
+            <div className="flex gap-1 bg-bg-input p-1 rounded-2xl border border-border-med shadow-xs">
+              {[10, 15, 25, 45, 60].map(m => (
+                <button 
+                  key={m} 
+                  onClick={() => changeDuration(m)} 
+                  disabled={timerState !== 'idle'}
+                  className={`flex-1 px-2.5 py-2.5 rounded-xl text-xs font-black transition-all ${duration === m ? 'bg-accent-blue text-white shadow-md shadow-accent-blue/20' : 'text-text-muted hover:bg-bg-card'}`}
+                >
+                  {m}m
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Sound Alert Configuration Card */}
+          <div className="bg-bg-card border border-border-light rounded-[32px] p-6 shadow-sm space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-black text-text-muted uppercase tracking-widest flex items-center gap-1.5">
+                <Bell size={12} className="text-accent-blue" /> Alert Configuration
+              </span>
+              <button
+                onClick={() => setIsMuted(!isMuted)}
+                className={`p-2 rounded-xl border transition-all active:scale-90 ${
+                  isMuted 
+                    ? 'bg-red-500/10 border-red-500/20 text-red-500' 
+                    : 'bg-bg-input border-border-med text-text-muted hover:text-text-main'
+                }`}
+              >
+                {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
+              </button>
+            </div>
+
+            <div className="grid grid-cols-4 gap-2">
+              {[
+                { id: 'zen', name: 'Zen' },
+                { id: 'digital', name: 'Cyber' },
+                { id: 'bell', name: 'Bell' },
+                { id: 'buzzer', name: 'Alarm' },
+              ].map(theme => (
+                <button
+                  key={theme.id}
+                  onClick={() => {
+                    setAudioTheme(theme.id);
+                    playSynthesizedSound(theme.id, volume, false);
+                  }}
+                  className={`py-2 rounded-xl text-[10px] font-black uppercase border transition-all ${
+                    audioTheme === theme.id
+                      ? 'bg-accent-blue/10 border-accent-blue text-accent-blue'
+                      : 'bg-bg-input border-border-med text-text-muted hover:border-border-light hover:text-text-main'
+                  }`}
+                >
+                  {theme.name}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-3 pt-1">
+              <VolumeX size={12} className="text-text-muted animate-pulse" />
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.1"
+                value={volume}
+                onChange={e => setVolume(parseFloat(e.target.value))}
+                className="flex-1 accent-accent-blue h-1 bg-bg-input rounded-lg cursor-pointer appearance-none"
+              />
+              <Volume2 size={12} className="text-text-muted" />
+            </div>
+          </div>
         </div>
 
-        {selectedGoalId && activeList.length > 0 && (
-          <div className="relative group animate-in slide-in-from-top-2 duration-300">
-            <select 
-              value={selectedHabitId} 
-              onChange={e => setSelectedHabitId(e.target.value)}
-              disabled={timerState !== 'idle'}
-              className="w-full bg-bg-card border border-border-light rounded-2xl px-4 py-3 text-sm font-bold text-text-main shadow-xs appearance-none cursor-pointer outline-hidden focus:border-accent-blue transition-all disabled:opacity-50 disabled:cursor-not-allowed pr-10"
+        {/* ── MIDDLE COLUMN: FOCUS VISUAL CENTERPIECE ── */}
+        <div className="lg:col-span-4 flex flex-col items-center justify-center text-center space-y-5 bg-bg-card border border-border-light rounded-[40px] p-6 sm:p-8 shadow-xl order-1 lg:order-2">
+          {/* Header */}
+          <div className="space-y-1 w-full">
+            <span className="inline-block bg-accent-blue/10 text-accent-blue text-[10px] font-black uppercase tracking-widest px-4 py-1.5 rounded-full shadow-xs">
+              Neural Focus Session
+            </span>
+            <h2 className="text-2xl font-black text-text-main tracking-tight line-clamp-1">
+              {selectedItem ? selectedItem.title : 'Deep Work Protocol'}
+            </h2>
+            <div className="flex items-center justify-center gap-2 text-xs font-bold text-text-muted">
+              {selectedGoal ? (
+                <>
+                  <Target size={12} className="text-accent-blue" />
+                  <span>Project: {selectedGoal.title}</span>
+                </>
+              ) : isDailyTaskMode ? (
+                <>
+                  <Zap size={12} className="text-indigo-400 animate-pulse" />
+                  <span>Core Protocol Active</span>
+                </>
+              ) : (
+                <span>Standalone Session</span>
+              )}
+            </div>
+          </div>
+
+          {/* Circular Timer Display */}
+          <div className="relative flex items-center justify-center group my-2">
+            <svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`} className="rotate-[-90deg]">
+              <defs>
+                <radialGradient id="glowGrad" cx="50%" cy="50%" r="50%">
+                  <stop offset="0%" stopColor="#4d7cff" stopOpacity="0.15" />
+                  <stop offset="100%" stopColor="#4d7cff" stopOpacity="0" />
+                </radialGradient>
+              </defs>
+              <circle cx={CX} cy={CY} r={R - 10} className="fill-bg-app transition-colors" />
+              
+              {/* Outer active neon glow */}
+              {timerState === 'running' && (
+                <circle cx={CX} cy={CY} r={R + 12} fill="url(#glowGrad)" className="animate-pulse" />
+              )}
+
+              <circle cx={CX} cy={CY} r={R} fill="none" className="stroke-border-med" strokeWidth="8" />
+              <circle cx={CX} cy={CY} r={R} fill="none" 
+                className={`transition-all duration-300 stroke-width-8 ${time === 0 ? 'stroke-emerald-500' : 'stroke-accent-blue'}`}
+                strokeDasharray={`${CIRC}`} 
+                strokeDashoffset={`${dashOffset}`} 
+                strokeLinecap="round"
+                style={{ 
+                  transition: timerState === 'running' ? 'stroke-dashoffset 1s linear' : 'stroke-dashoffset 0.4s ease',
+                  filter: timerState === 'running' ? 'drop-shadow(0px 0px 8px rgba(77,124,255,0.4))' : 'none'
+                }} 
+              />
+            </svg>
+            
+            {/* Near Completion dynamic breathing ring */}
+            {isNearCompletion && (
+              <div className="absolute inset-[-4px] border-4 border-red-500/20 rounded-full animate-ping pointer-events-none duration-1000" />
+            )}
+
+            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+              <div className="text-6xl font-black text-text-main tracking-tighter tabular-nums drop-shadow-sm flex items-center">
+                {String(Math.floor(time / 60)).padStart(2, '0')}
+                <span className={`transition-opacity duration-500 ${timerState === 'running' ? 'animate-pulse' : ''}`}>:</span>
+                {String(time % 60).padStart(2, '0')}
+              </div>
+              <div className={`text-[10px] font-black uppercase tracking-[0.25em] mt-4 transition-all duration-500 ${time === 0 ? 'text-emerald-500 animate-pulse' : (timerState === 'running' ? 'text-accent-blue animate-pulse' : 'text-text-muted')}`}>
+                {time === 0 ? 'Sequence Complete' : (timerState === 'running' ? 'Neural Sync Active' : 'System Ready')}
+              </div>
+            </div>
+            
+            {/* Decorative dynamic outer orbital ring */}
+            <div className={`absolute inset-[-12px] border-2 border-dashed border-accent-blue/10 rounded-full animate-[spin_25s_linear_infinite] ${timerState === 'running' ? 'opacity-100' : 'opacity-0 transition-opacity duration-500'}`} />
+          </div>
+
+          {/* Control Actions */}
+          <div className="flex items-center justify-center gap-10 w-full pt-2">
+            <button 
+              onClick={handleReset}
+              className="w-14 h-14 rounded-2xl bg-bg-input border border-border-med flex items-center justify-center text-text-muted hover:text-text-main hover:bg-bg-input/80 transition-all active:scale-90 shadow-sm"
+              title="Reset Timer"
             >
-              <option value="">— Select Routine/Habit —</option>
-              {activeList
-                .sort((a, b) => {
-                  const cType = a.completionType || a.type || 'check';
-                  const dType = b.completionType || b.type || 'check';
-                  const aDone = cType === 'check' ? a.completed : (cType === 'count' ? (a.currentCount >= (a.targetCount ?? 10)) : (a.timeSpent >= (a.targetTime ?? 15)));
-                  const bDone = dType === 'check' ? b.completed : (dType === 'count' ? (b.currentCount >= (b.targetCount ?? 10)) : (b.timeSpent >= (b.targetTime ?? 15)));
-                  if (aDone !== bDone) return aDone ? 1 : -1;
-                  return 0;
-                })
-                .map(h => {
-                  const cType = h.completionType || h.type || 'check';
-                  const isCount = cType === 'count';
-                  const isCheck = cType === 'check';
-                  const target = isCount ? (h.targetCount ?? 10) : (h.targetTime ?? 15);
-                  const progress = isCount ? (h.currentCount || 0) : (h.timeSpent || 0);
-                  const unit = isCount ? '' : 'm';
-                  return (
-                    <option key={h.id} value={h.id}>
-                      {h.title} {isCheck ? (h.completed ? '✓' : '') : `[${progress}${unit}/${target}${unit}]`}
-                    </option>
-                  );
-                })}
-            </select>
-            <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none group-focus-within:text-accent-blue transition-colors" />
-          </div>
-        )}
-      </div>
-
-      {/* Preset Duration Selector */}
-      <div className={`flex gap-1.5 bg-bg-card p-1.5 rounded-2xl border border-border-light shadow-xs transition-all ${timerState !== 'idle' ? 'opacity-40 grayscale pointer-events-none' : ''}`}>
-        {[10, 15, 25, 45, 60].map(m => (
-          <button 
-            key={m} 
-            onClick={() => changeDuration(m)} 
-            disabled={timerState !== 'idle'}
-            className={`px-4 py-2 rounded-xl text-xs font-black transition-all ${duration === m ? 'bg-accent-blue text-white shadow-md shadow-accent-blue/20' : 'text-text-muted hover:bg-bg-input'}`}
-          >
-            {m}m
-          </button>
-        ))}
-      </div>
-
-      {/* Circular Timer Display */}
-      <div className="relative flex items-center justify-center group">
-        <svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`} className="rotate-[-90deg]">
-          <defs>
-            <radialGradient id="glowGrad" cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stopColor="#4d7cff" stopOpacity="0.15" />
-              <stop offset="100%" stopColor="#4d7cff" stopOpacity="0" />
-            </radialGradient>
-          </defs>
-          <circle cx={CX} cy={CY} r={R - 10} className="fill-bg-app transition-colors" />
-          
-          {/* Outer active neon glow */}
-          {timerState === 'running' && (
-            <circle cx={CX} cy={CY} r={R + 12} fill="url(#glowGrad)" className="animate-pulse" />
-          )}
-
-          <circle cx={CX} cy={CY} r={R} fill="none" className="stroke-border-med" strokeWidth="8" />
-          <circle cx={CX} cy={CY} r={R} fill="none" 
-            className={`transition-all duration-300 stroke-width-8 ${time === 0 ? 'stroke-emerald-500' : 'stroke-accent-blue'}`}
-            strokeDasharray={`${CIRC}`} 
-            strokeDashoffset={`${dashOffset}`} 
-            strokeLinecap="round"
-            style={{ 
-              transition: timerState === 'running' ? 'stroke-dashoffset 1s linear' : 'stroke-dashoffset 0.4s ease',
-              filter: timerState === 'running' ? 'drop-shadow(0px 0px 8px rgba(77,124,255,0.4))' : 'none'
-            }} 
-          />
-        </svg>
-        
-        {/* Near Completion dynamic breathing ring */}
-        {isNearCompletion && (
-          <div className="absolute inset-[-4px] border-4 border-red-500/20 rounded-full animate-ping pointer-events-none duration-1000" />
-        )}
-
-        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-          <div className="text-6xl font-black text-text-main tracking-tighter tabular-nums drop-shadow-sm flex items-center">
-            {String(Math.floor(time / 60)).padStart(2, '0')}
-            <span className={`transition-opacity duration-500 ${timerState === 'running' ? 'animate-pulse' : ''}`}>:</span>
-            {String(time % 60).padStart(2, '0')}
-          </div>
-          <div className={`text-[10px] font-black uppercase tracking-[0.25em] mt-4 transition-all duration-500 ${time === 0 ? 'text-emerald-500 animate-pulse' : (timerState === 'running' ? 'text-accent-blue animate-pulse' : 'text-text-muted')}`}>
-            {time === 0 ? 'Sequence Complete' : (timerState === 'running' ? 'Neural Sync Active' : 'System Ready')}
-          </div>
-        </div>
-        
-        {/* Decorative dynamic outer orbital ring */}
-        <div className={`absolute inset-[-12px] border-2 border-dashed border-accent-blue/10 rounded-full animate-[spin_25s_linear_infinite] ${timerState === 'running' ? 'opacity-100' : 'opacity-0 transition-opacity duration-500'}`} />
-      </div>
-
-      {/* ── ALARMS & SOUND SETUP PREFERENCES ──────────────────────────── */}
-      <div className="w-full bg-bg-card border border-border-light rounded-2xl p-4 shadow-sm space-y-4">
-        <div className="flex items-center justify-between">
-          <span className="text-[10px] font-black text-text-muted uppercase tracking-widest flex items-center gap-1.5">
-            <Bell size={12} className="text-accent-blue" /> Alert Configuration
-          </span>
-          <button
-            onClick={() => setIsMuted(!isMuted)}
-            className={`p-2 rounded-xl border transition-all active:scale-90 ${
-              isMuted 
-                ? 'bg-red-500/10 border-red-500/20 text-red-500' 
-                : 'bg-bg-input border-border-med text-text-muted hover:text-text-main'
-            }`}
-          >
-            {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
-          </button>
-        </div>
-
-        <div className="grid grid-cols-4 gap-2">
-          {[
-            { id: 'zen', name: 'Zen' },
-            { id: 'digital', name: 'Cyber' },
-            { id: 'bell', name: 'Bell' },
-            { id: 'buzzer', name: 'Alarm' },
-          ].map(theme => (
-            <button
-              key={theme.id}
-              onClick={() => {
-                setAudioTheme(theme.id);
-                playSynthesizedSound(theme.id, volume, false);
-              }}
-              className={`py-2 rounded-xl text-[10px] font-black uppercase border transition-all ${
-                audioTheme === theme.id
-                  ? 'bg-accent-blue/10 border-accent-blue text-accent-blue'
-                  : 'bg-bg-input border-border-med text-text-muted hover:border-border-light hover:text-text-main'
+              <RotateCcw size={22} strokeWidth={2.5} />
+            </button>
+            
+            <button 
+              onClick={timerState === 'running' ? handlePause : handleStart}
+              disabled={time === 0}
+              className={`w-20 h-20 rounded-full flex items-center justify-center transition-all active:scale-95 shadow-2xl disabled:opacity-50 ${
+                time === 0 
+                ? 'bg-emerald-500 shadow-emerald-500/30' 
+                : 'bg-accent-blue shadow-accent-blue/40'
               }`}
             >
-              {theme.name}
+              {time === 0 ? (
+                <CheckCircle size={36} className="text-white" strokeWidth={2.5} />
+              ) : timerState === 'running' ? (
+                <Pause size={36} fill="white" className="text-white" />
+              ) : (
+                <Play size={36} fill="white" className="text-white ml-2" />
+              )}
             </button>
-          ))}
-        </div>
+            
+            <div className="w-14 h-14" /> {/* Kept for balance */}
+          </div>
 
-        {/* Volume controls */}
-        <div className="flex items-center gap-3">
-          <VolumeX size={12} className="text-text-muted" />
-          <input
-            type="range"
-            min="0"
-            max="1"
-            step="0.1"
-            value={volume}
-            onChange={e => setVolume(parseFloat(e.target.value))}
-            className="flex-1 accent-accent-blue h-1 bg-bg-input rounded-lg cursor-pointer appearance-none"
-          />
-          <Volume2 size={12} className="text-text-muted" />
-        </div>
-      </div>
-
-      {/* Control Actions */}
-      <div className="flex items-center gap-12 mt-2">
-        <button 
-          onClick={handleReset}
-          className="w-14 h-14 rounded-2xl bg-bg-card border border-border-light flex items-center justify-center text-text-muted hover:text-text-main hover:bg-bg-input transition-all active:scale-90 shadow-sm"
-        >
-          <RotateCcw size={22} strokeWidth={2.5} />
-        </button>
-        
-        <button 
-          onClick={timerState === 'running' ? handlePause : handleStart}
-          disabled={time === 0}
-          className={`w-20 h-20 rounded-full flex items-center justify-center transition-all active:scale-95 shadow-2xl disabled:opacity-50 ${
-            time === 0 
-            ? 'bg-emerald-500 shadow-emerald-500/30' 
-            : 'bg-accent-blue shadow-accent-blue/40'
-          }`}
-        >
-          {time === 0 ? (
-            <CheckCircle size={36} className="text-white" strokeWidth={2.5} />
-          ) : timerState === 'running' ? (
-            <Pause size={36} fill="white" className="text-white" />
-          ) : (
-            <Play size={36} fill="white" className="text-white ml-2" />
-          )}
-        </button>
-        
-        <div className="w-14 h-14" />
-      </div>
-
-      {/* ── STATS LEDGER & COMPLETED HISTORY ──────────────────────────────── */}
-      <div className="grid grid-cols-3 gap-3 w-full">
-        <div className="bg-bg-card border border-border-light rounded-2xl p-4 text-center shadow-xs">
-          <Flame size={18} className="mx-auto mb-1 text-amber-500 fill-current" />
-          <p className="text-[8px] font-black text-text-muted uppercase tracking-wider mb-0.5">Focus Streak</p>
-          <p className="text-base font-black text-text-main">{streakCount} Days</p>
-        </div>
-        <div className="bg-bg-card border border-border-light rounded-2xl p-4 text-center shadow-xs">
-          <Trophy size={18} className="mx-auto mb-1 text-yellow-500" />
-          <p className="text-[8px] font-black text-text-muted uppercase tracking-wider mb-0.5">Yield Today</p>
-          <p className="text-base font-black text-text-main">{todayCompletedCount} Blocks</p>
-        </div>
-        <div className="bg-accent-blue rounded-2xl p-4 text-center shadow-lg shadow-accent-blue/15">
-          <Calendar size={18} className="mx-auto mb-1 text-white/80" />
-          <p className="text-[8px] font-black text-white/60 uppercase tracking-wider mb-0.5">Lifetime Time</p>
-          <p className="text-base font-black text-white">
-            {Math.floor(focusTime / 3600)}h {Math.floor((focusTime % 3600) / 60)}m
-          </p>
-        </div>
-      </div>
-
-      {/* Completed ledger list */}
-      {sessionLogs.length > 0 && (
-        <div className="w-full space-y-3">
-          <span className="text-[10px] font-black text-text-muted uppercase tracking-widest px-1">
-            Focus Ledger Logs
-          </span>
-          <div className="bg-bg-card border border-border-light rounded-2xl p-3 shadow-xs max-h-48 overflow-y-auto space-y-2 divide-y divide-border-light">
-            {sessionLogs.slice(0, 5).map((log, index) => (
-              <div key={log.id || index} className={`flex items-center justify-between text-xs pt-2 ${index === 0 ? 'pt-0' : ''}`}>
-                <div className="min-w-0 pr-4">
-                  <p className="font-bold text-text-main truncate">{log.title}</p>
-                  <p className="text-[9px] font-medium text-text-muted truncate flex items-center gap-1.5 mt-0.5">
-                    <Target size={8} /> {log.goalTitle}
-                  </p>
-                </div>
-                <div className="text-right flex-shrink-0">
-                  <span className="inline-block bg-accent-blue/10 text-accent-blue text-[9px] font-black uppercase px-2 py-0.5 rounded-md">
-                    +{log.duration} mins
-                  </span>
-                  <p className="text-[8px] font-medium text-text-muted mt-0.5">
-                    {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </p>
-                </div>
+          {/* Active status indicator */}
+          {selectedHabitId && timerState === 'running' && (
+            <div className="bg-accent-blue/5 border border-accent-blue/10 rounded-2xl px-4 py-3.5 w-full animate-in fade-in slide-in-from-bottom-2 mt-2">
+              <div className="flex items-center justify-center gap-3">
+                <div className="w-1.5 h-1.5 rounded-full bg-accent-blue animate-pulse" />
+                <p className="text-[10px] font-black text-accent-blue uppercase tracking-wider">
+                  Automatic Sync Active: Logging to "{selectedItem?.title}"
+                </p>
               </div>
-            ))}
-          </div>
+            </div>
+          )}
         </div>
-      )}
 
-      {selectedHabitId && timerState === 'running' && (
-        <div className="bg-accent-blue/5 border border-accent-blue/10 rounded-xl px-4 py-3 w-full animate-in fade-in slide-in-from-bottom-2">
-          <div className="flex items-center justify-center gap-3">
-            <div className="w-1.5 h-1.5 rounded-full bg-accent-blue animate-pulse" />
-            <p className="text-[10px] font-black text-accent-blue uppercase tracking-wider">
-              Automatic Sync Active: Logging to "{selectedItem?.title}"
-            </p>
+        {/* ── RIGHT COLUMN: ANALYTICS & LOGS ── */}
+        <div className="lg:col-span-4 space-y-5 order-3 lg:order-3 lg:sticky lg:top-6">
+          {/* Stats ledger */}
+          <div className="grid grid-cols-3 gap-3 w-full">
+            <div className="bg-bg-card border border-border-light rounded-2xl p-4 text-center shadow-xs flex flex-col items-center justify-center min-h-[90px]">
+              <Flame size={18} className="text-amber-500 fill-current mb-1" />
+              <p className="text-[8px] font-black text-text-muted uppercase tracking-wider mb-0.5">Focus Streak</p>
+              <p className="text-sm sm:text-base font-black text-text-main leading-none mt-1">{streakCount} Days</p>
+            </div>
+            <div className="bg-bg-card border border-border-light rounded-2xl p-4 text-center shadow-xs flex flex-col items-center justify-center min-h-[90px]">
+              <Trophy size={18} className="text-yellow-500 mb-1" />
+              <p className="text-[8px] font-black text-text-muted uppercase tracking-wider mb-0.5">Yield Today</p>
+              <p className="text-sm sm:text-base font-black text-text-main leading-none mt-1">{todayCompletedCount} Blocks</p>
+            </div>
+            <div className="bg-accent-blue rounded-2xl p-4 text-center shadow-lg shadow-accent-blue/15 flex flex-col items-center justify-center min-h-[90px]">
+              <Calendar size={18} className="text-white/80 mb-1" />
+              <p className="text-[8px] font-black text-white/60 uppercase tracking-wider mb-0.5">Lifetime Time</p>
+              <p className="text-sm sm:text-base font-black text-white leading-none mt-1">
+                {Math.floor(focusTime / 3600)}h {Math.floor((focusTime % 3600) / 60)}m
+              </p>
+            </div>
           </div>
+
+          {/* Completed ledger list */}
+          {sessionLogs.length > 0 && (
+            <div className="bg-bg-card border border-border-light rounded-[32px] p-6 shadow-sm space-y-4">
+              <span className="text-[10px] font-black text-text-muted uppercase tracking-widest flex items-center gap-1.5">
+                <History size={12} className="text-accent-blue" /> Focus Ledger Logs
+              </span>
+              <div className="max-h-64 overflow-y-auto space-y-2.5 divide-y divide-border-light pr-1 scrollbar-thin">
+                {sessionLogs.slice(0, 5).map((log, index) => (
+                  <div key={log.id || index} className={`flex items-center justify-between text-xs pt-2.5 ${index === 0 ? 'pt-0' : ''}`}>
+                    <div className="min-w-0 pr-4">
+                      <p className="font-bold text-text-main truncate">{log.title}</p>
+                      <p className="text-[9px] font-medium text-text-muted truncate flex items-center gap-1 mt-0.5">
+                        <Target size={8} /> {log.goalTitle}
+                      </p>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <span className="inline-block bg-accent-blue/10 text-accent-blue text-[9px] font-black uppercase px-2 py-0.5 rounded-md">
+                        +{log.duration} mins
+                      </span>
+                      <p className="text-[8px] font-medium text-text-muted mt-0.5">
+                        {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 };

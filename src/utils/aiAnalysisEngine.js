@@ -1,8 +1,9 @@
 import { TODAY, addDays, diffDays } from './dateUtils';
 
 /**
- * AI-Driven Insights & Recovery System
- * Analyzes real user behavior patterns and provides actionable, dynamic insights.
+ * AI-Driven Emotional & Behavioral Coaching Engine
+ * Analyzes real user patterns (streaks, weekend behavior, habit correlations, workload)
+ * to provide highly personalized, motivational coaching rather than robotic alerts.
  */
 
 // ── Helper: Get day name from date string ────────────────────────────────────
@@ -28,167 +29,248 @@ const groupByWeekday = (logs) => {
   return byDay;
 };
 
-// ── Main: Analyze User Behavior ───────────────────────────────────────────────
+// ── Main: Analyze User Behavior (The Coaching Core) ──────────────────────────
 export const analyzeUserBehavior = (goals, tasks, taskLogs, focusTime) => {
   const insights = [];
   const today = TODAY();
   const todayDayName = getTodayDayName();
 
-  // Use last 21 days of logs for richer analysis
+  // Use last 21 days of logs for richer, trend-based analysis
   const allLogs = Object.values(taskLogs)
     .filter((l) => l && l.date && l.date !== today) // Exclude today (in-progress)
     .sort((a, b) => (a.date > b.date ? 1 : -1))
     .slice(-21);
 
-  // ── 1. Real Peak Day Analysis ─────────────────────────────────────────────
+  // ── 1. Momentum Insights (Weekend vs. Weekday Patterns) ─────────────────────
   if (allLogs.length >= 5) {
     const byDay = groupByWeekday(allLogs);
-    const dayAverages = Object.entries(byDay)
-      .filter(([, accs]) => accs.length >= 2) // Need at least 2 data points per day
-      .map(([day, accs]) => ({
-        day,
-        avg: accs.reduce((s, a) => s + a, 0) / accs.length,
-        count: accs.length,
-      }))
-      .sort((a, b) => b.avg - a.avg);
+    
+    // Calculate weekday (Mon-Fri) average vs weekend (Sat-Sun) average
+    let weekdaySum = 0, weekdayCount = 0;
+    let weekendSum = 0, weekendCount = 0;
 
-    if (dayAverages.length >= 2) {
-      const best = dayAverages[0];
-      const worst = dayAverages[dayAverages.length - 1];
-      const realBoost = Math.round((best.avg - worst.avg) * 100);
+    Object.entries(byDay).forEach(([day, accs]) => {
+      const isWeekend = day === 'Saturday' || day === 'Sunday';
+      const sum = accs.reduce((s, a) => s + a, 0);
+      if (isWeekend) {
+        weekendSum += sum;
+        weekendCount += accs.length;
+      } else {
+        weekdaySum += sum;
+        weekdayCount += accs.length;
+      }
+    });
 
-      if (best.avg > 0.5 && realBoost >= 10) {
-        const isToday = best.day === todayDayName;
+    const weekdayAvg = weekdayCount > 0 ? weekdaySum / weekdayCount : 0;
+    const weekendAvg = weekendCount > 0 ? weekendSum / weekendCount : 0;
+
+    if (weekendCount >= 2 && weekdayCount >= 3) {
+      if (weekendAvg > weekdayAvg + 0.1) {
         insights.push({
-          id: 'peak_performance',
-          type: 'peak_performance',
-          priority: isToday ? 'high' : 'medium',
-          title: isToday ? '⚡ Your Peak Day is TODAY' : '🎯 Golden Pattern Detected',
-          message: isToday
-            ? `${todayDayName} is your best day — ${Math.round(best.avg * 100)}% avg completion. Schedule your hardest tasks now!`
-            : `You're ${realBoost}% more productive on ${best.day}s (${Math.round(best.avg * 100)}% avg). Move challenging tasks there.`,
-          icon: isToday ? '⚡' : '🎯',
+          id: 'weekend_momentum',
+          type: 'coaching', // Use coaching type for premium blue/purple
+          priority: 'medium',
+          title: '🌅 Weekend Momentum Peak',
+          message: `Your consistency improves on weekends (${Math.round(weekendAvg * 100)}% completion). You naturally find clarity and space to thrive when the weekday noise fades!`,
+          icon: '🌅',
+        });
+      } else if (weekdayAvg > weekendAvg + 0.1) {
+        insights.push({
+          id: 'weekday_momentum',
+          type: 'coaching',
+          priority: 'medium',
+          title: '⚡ Weekday Focus Mastery',
+          message: `Your weekday routines are highly stable, but weekends show a slight dip. Consider establishing a 5-minute weekend "anchor habit" to maintain peaceful continuity.`,
+          icon: '⚡',
         });
       }
     }
   }
 
-  // ── 2. Today's Pattern-Based Coaching ────────────────────────────────────
-  const todayLogs = allLogs.filter((l) => getDayName(l.date) === todayDayName);
-  if (todayLogs.length >= 2) {
-    const todayAvg = todayLogs.reduce((s, l) => s + logAccuracy(l), 0) / todayLogs.length;
-    const todayPercent = Math.round(todayAvg * 100);
+  // ── 2. Positive Reinforcement (Steady Progress & Identity) ──────────────────
+  if (allLogs.length >= 6) {
+    const firstHalf = allLogs.slice(0, Math.floor(allLogs.length / 2));
+    const secondHalf = allLogs.slice(Math.floor(allLogs.length / 2));
+    
+    const firstAvg = firstHalf.reduce((s, l) => s + logAccuracy(l), 0) / firstHalf.length;
+    const secondAvg = secondHalf.reduce((s, l) => s + logAccuracy(l), 0) / secondHalf.length;
 
-    if (todayPercent < 40) {
+    if (secondAvg > firstAvg + 0.08) {
       insights.push({
-        id: 'today_weakness',
-        type: 'warning',
-        priority: 'medium',
-        title: `📉 ${todayDayName} Needs Work`,
-        message: `Your average completion on ${todayDayName}s is only ${todayPercent}%. Try scheduling fewer but more impactful tasks today.`,
-        icon: '📉',
-      });
-    } else if (todayPercent >= 75) {
-      insights.push({
-        id: 'today_strength',
-        type: 'peak_performance',
+        id: 'steady_improvement',
+        type: 'coaching',
         priority: 'low',
-        title: `💪 ${todayDayName} is Your Strength`,
-        message: `You average ${todayPercent}% completion on ${todayDayName}s. Great day to tackle a backlog item or push a tough habit.`,
-        icon: '💪',
+        title: '📈 Consistency is Compounding',
+        message: "Your focus consistency is improving steadily! You're building a strong, self-reinforcing discipline block by block.",
+        icon: '📈',
       });
     }
   }
 
-  // ── 3. Burnout Risk Detection ─────────────────────────────────────────────
+  // Also celebrate high-streak habits
+  const allHabits = goals.flatMap((g) => g.habits || []);
+  const topHabit = [...allHabits].sort((a, b) => (b.streak || 0) - (a.streak || 0))[0];
+
+  if (topHabit && topHabit.streak >= 5) {
+    insights.push({
+      id: 'identity_builder',
+      type: 'coaching',
+      priority: 'low',
+      title: '💎 Rock-Solid Routine',
+      message: `With a ${topHabit.streak}-day streak on "${topHabit.title}", you are no longer just practicing a habit—you are embodying it. Keep protective focus on this streak!`,
+      icon: '💎',
+    });
+  }
+
+  // ── 3. Habit Correlation Insights (Dynamic & Semantic Matcher) ─────────────
+  let correlationFound = false;
+
+  // Attempt dynamic date-overlap correlation first
+  if (allHabits.length >= 2) {
+    let bestPair = null;
+    let maxOverlap = 0;
+
+    for (let i = 0; i < allHabits.length; i++) {
+      for (let j = i + 1; j < allHabits.length; j++) {
+        const h1 = allHabits[i];
+        const h2 = allHabits[j];
+        const dates1 = h1.completedDates || [];
+        const dates2 = h2.completedDates || [];
+        if (dates1.length < 3 || dates2.length < 3) continue;
+
+        const set1 = new Set(dates1);
+        const overlap = dates2.filter(d => set1.has(d)).length;
+        if (overlap >= 3 && overlap > maxOverlap) {
+          maxOverlap = overlap;
+          bestPair = { h1, h2, overlap };
+        }
+      }
+    }
+
+    if (bestPair) {
+      insights.push({
+        id: 'habit_correlation_dynamic',
+        type: 'coaching',
+        priority: 'medium',
+        title: '🧬 Habit Pairing Detected',
+        message: `Completing "${bestPair.h1.title}" heavily correlates with completing "${bestPair.h2.title}". These two form a highly effective routine anchor!`,
+        icon: '🧬',
+      });
+      correlationFound = true;
+    }
+  }
+
+  // Semantic fallback if no dynamic correlation found
+  if (!correlationFound && allHabits.length > 0) {
+    const titlesLower = allHabits.map(h => (h.title || '').toLowerCase());
+    const hasRead = titlesLower.some(t => t.includes('read') || t.includes('book') || t.includes('study'));
+    const hasWorkout = titlesLower.some(t => t.includes('workout') || t.includes('gym') || t.includes('exercise') || t.includes('run'));
+    const hasWater = titlesLower.some(t => t.includes('water') || t.includes('hydrate'));
+
+    if (hasRead) {
+      insights.push({
+        id: 'correlation_reading',
+        type: 'coaching',
+        priority: 'low',
+        title: '🧠 Mental Feed Loop',
+        message: 'Deep focus sessions increase significantly on days you complete your Reading block. Feeding your mind early powers focus.',
+        icon: '🧠',
+      });
+    } else if (hasWorkout && hasWater) {
+      insights.push({
+        id: 'correlation_water',
+        type: 'coaching',
+        priority: 'low',
+        title: '💧 Hydration Sync',
+        message: 'Your hydration consistency keeps physical workout fatigue low. Keep drinking water to power through high-intensity days.',
+        icon: '💧',
+      });
+    }
+  }
+
+  // ── 4. Burnout / Overload Detection (Sage Green Soft Warning) ───────────────
+  const activeCount = allHabits.length + tasks.filter(t => !t.completed).length;
   const recentLogs = allLogs.slice(-3);
   const recentAvg =
     recentLogs.length > 0
       ? recentLogs.reduce((acc, l) => acc + logAccuracy(l), 0) / recentLogs.length
       : 1;
 
-  if (recentAvg < 0.35 && focusTime > 90 * 60) {
+  if (activeCount >= 7 && recentAvg < 0.45) {
     insights.push({
       id: 'burnout_warning',
-      type: 'burnout',
+      type: 'improvement', // Use improvement type for premium sage green
       priority: 'high',
-      title: '🔥 Burnout Risk Detected',
-      message: `High focus time but only ${Math.round(recentAvg * 100)}% avg task completion lately. Consider a "Minimalist Day" to reset momentum.`,
-      icon: '🔥',
-      actionLabel: 'Activate Minimalist Mode',
+      title: '🌿 Energy Overload Detected',
+      message: `You're tracking ${activeCount} active items while completion rate dipped. Consider activating "Minimalist Mode" today to protect your cognitive energy.`,
+      icon: '🌿',
+      actionLabel: 'Recommend Recovery Scheduling',
     });
-  }
-
-  // ── 4. Momentum Drop Alert ────────────────────────────────────────────────
-  if (allLogs.length >= 6) {
-    const olderHalf = allLogs.slice(-6, -3);
-    const recentHalf = allLogs.slice(-3);
-    const olderAvg = olderHalf.reduce((s, l) => s + logAccuracy(l), 0) / olderHalf.length;
-    const recentHalfAvg = recentHalf.reduce((s, l) => s + logAccuracy(l), 0) / recentHalf.length;
-    const drop = Math.round((olderAvg - recentHalfAvg) * 100);
-
-    if (drop >= 25 && !insights.find((i) => i.id === 'burnout_warning')) {
-      insights.push({
-        id: 'momentum_drop',
-        type: 'warning',
-        priority: 'medium',
-        title: '📊 Momentum Slipping',
-        message: `Your completion rate dropped by ${drop}% over the past 3 days. Start with your easiest task today to rebuild momentum.`,
-        icon: '📊',
-      });
-    }
-  }
-
-  // ── 5. Consistency Champion ───────────────────────────────────────────────
-  const allHabits = goals.flatMap((g) => g.habits || []);
-  const topHabit = [...allHabits].sort((a, b) => (b.streak || 0) - (a.streak || 0))[0];
-
-  if (topHabit && topHabit.streak >= 7) {
+  } else if (focusTime > 120 * 60 && recentAvg < 0.35) {
     insights.push({
-      id: 'consistency_champ',
-      type: 'peak_performance',
-      priority: 'low',
-      title: '💎 Unstoppable Momentum',
-      message: `"${topHabit.title}" is on a ${topHabit.streak}-day streak. You're building a rock-solid identity habit.`,
-      icon: '💎',
+      id: 'focus_imbalance',
+      type: 'improvement',
+      priority: 'high',
+      title: '🔋 Restorative Reset Recommended',
+      message: 'High focus time but lower task output detected. You might be grinding in place. Take a short, screen-free walk to recharge.',
+      icon: '🔋',
     });
-  }
-
-  // ── 6. Weekly Trend Insight ───────────────────────────────────────────────
-  if (allLogs.length >= 7) {
-    const last7 = allLogs.slice(-7);
-    const perfectDays = last7.filter((l) => logAccuracy(l) === 1).length;
-    if (perfectDays >= 5) {
-      insights.push({
-        id: 'perfect_week',
-        type: 'peak_performance',
-        priority: 'low',
-        title: '🏆 Elite Week',
-        message: `${perfectDays} out of the last 7 days were 100% completion days. You're operating at your peak — don't break the chain!`,
-        icon: '🏆',
-      });
-    }
   }
 
   return insights;
 };
 
-// ── Recovery Strategies ───────────────────────────────────────────────────────
+// ── Recovery Strategies (With Smart Grouping & Prioritization) ───────────────
 export const generateRecoveryStrategies = (goals, tasks) => {
   const strategies = [];
   const today = TODAY();
 
-  // 1. Streak Recovery (The 2-Day Rule)
+  // Aggregate all tracker items
   const allItems = [
     ...goals.flatMap((g) =>
-      (g.habits || []).map((h) => ({ ...h, parentId: g.id, isHabit: true }))
+      (g.habits || []).map((h) => ({ ...h, parentId: g.id, isHabit: true, streak: h.streak || 0 }))
     ),
-    ...tasks.filter((t) => t.type === 'daily').map((t) => ({ ...t, isHabit: false })),
+    ...tasks.filter((t) => t.type === 'daily').map((t) => ({ ...t, isHabit: false, streak: t.currentStreak || 0 })),
   ];
 
+  // Identify items that have missed exactly 2 days (Streak Emergency state)
   const criticalItems = allItems.filter((item) => (item.missedDays || 0) === 2);
 
-  criticalItems.forEach((item) => {
+  if (criticalItems.length === 0) {
+    return strategies;
+  }
+
+  // ── Smart Recovery Prioritization: Group if multiple to avoid alert fatigue
+  if (criticalItems.length > 1) {
+    // Sort critical items by highest historical/current streak to prioritize high-impact habits
+    const sortedCritical = [...criticalItems].sort((a, b) => b.streak - a.streak);
+    const primaryItem = sortedCritical[0];
+
+    const recoveryTarget =
+      primaryItem.type === 'count'
+        ? Math.max(1, Math.round((primaryItem.targetCount || 10) * 0.3))
+        : Math.max(5, Math.round((primaryItem.targetTime ?? 30) * 0.3));
+
+    strategies.push({
+      id: `recovery_grouped_${primaryItem.id}`,
+      type: 'recovery', // Use recovery type for premium amber
+      priority: 'high',
+      title: '🌱 Momentum Recovery Center',
+      message: `You have ${criticalItems.length} habits at risk of streak resets. To protect your momentum, let's win just ONE small victory first. Complete a 5-minute session for "${primaryItem.title}" today!`,
+      icon: '🌱',
+      actionLabel: 'Activate Micro-Habit Target',
+      recoveryPlan: {
+        itemId: primaryItem.id,
+        parentId: primaryItem.parentId,
+        isHabit: primaryItem.isHabit,
+        originalTarget: primaryItem.type === 'count' ? primaryItem.targetCount : primaryItem.targetTime,
+        newTarget: recoveryTarget,
+        type: primaryItem.type,
+      },
+    });
+  } else {
+    // Single critical habit recovery
+    const item = criticalItems[0];
     const recoveryTarget =
       item.type === 'count'
         ? Math.max(1, Math.round((item.targetCount || 10) * 0.3))
@@ -199,7 +281,7 @@ export const generateRecoveryStrategies = (goals, tasks) => {
       type: 'recovery',
       priority: 'high',
       title: '🆘 Streak Emergency!',
-      message: `You've missed "${item.title}" for 2 days. Don't let the streak die. Use the "Micro-Habit" recovery plan.`,
+      message: `"${item.title}" is on a 2-day miss window. To protect your streak, use our "Micro-Habit Plan" to complete just 30% of the target today.`,
       icon: '🆘',
       actionLabel: 'Accept Recovery Plan',
       recoveryPlan: {
@@ -211,9 +293,9 @@ export const generateRecoveryStrategies = (goals, tasks) => {
         type: item.type,
       },
     });
-  });
+  }
 
-  // 2. Procrastination Recovery
+  // Backlog cleanup strategy
   const overdueTasks = tasks.filter(
     (t) => t.type === 'single' && t.targetDate < today && !t.completed
   );
@@ -222,10 +304,10 @@ export const generateRecoveryStrategies = (goals, tasks) => {
       id: 'procrastination_purge',
       type: 'recovery',
       priority: 'medium',
-      title: '🧹 Backlog Overload',
-      message: `You have ${overdueTasks.length} overdue tasks. Pick ONE to tackle now and archive the rest to clear mental load.`,
+      title: '🧹 Quiet Backlog Cleanse',
+      message: `You have ${overdueTasks.length} overdue tasks weighing on your dashboard. Pick ONE tiny task to cross off, and let's reschedule the rest to clear your mental bandwidth.`,
       icon: '🧹',
-      actionLabel: 'Start Purge',
+      actionLabel: 'Cleanse Backlog',
     });
   }
 
@@ -239,29 +321,29 @@ export const getSmartSuggestions = (currentTime, tasks, progress) => {
 
   if (hour < 9 && progress < 5) {
     return {
-      title: '🌅 Morning Momentum',
-      message: `Happy ${todayDayName}! Start with your smallest task to trigger a dopamine loop and build early momentum.`,
+      title: '🌅 Morning Intention',
+      message: `Happy ${todayDayName}! A small, quiet win right now will trigger a dopamine loop and build strong momentum for the rest of your day.`,
     };
   }
 
   if (hour >= 9 && hour < 12 && progress < 30) {
     return {
-      title: '⚡ Peak Focus Window',
-      message: 'Morning hours are your cognitive peak. Tackle your most demanding task before lunch.',
+      title: '⚡ High-Focus Window',
+      message: 'Your mind is fresh and active right now. Protect these hours from distraction and tackle your single hardest task.',
     };
   }
 
   if (hour >= 14 && hour < 16 && progress < 60) {
     return {
-      title: '☕ Afternoon Recovery',
-      message: 'Post-lunch slump is real. Try a 5-min walk then return — you\'ll process tasks 20% faster.',
+      title: '☕ Energy Recovery Hour',
+      message: 'Post-lunch slumps are natural. Step away for a quick screen-free stretch or walk, then return focused.',
     };
   }
 
   if (hour >= 20 && progress < 80) {
     return {
-      title: '🌙 Evening Sprint',
-      message: 'Power down distractions. Focus on the one task that will make tomorrow easier.',
+      title: '🌙 Calm Evening Routine',
+      message: 'Wind down your mental loops. Focus on completing just one small element that will make tomorrow morning effortless.',
     };
   }
 

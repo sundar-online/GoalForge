@@ -482,3 +482,74 @@ export async function deleteMemoryDb(userId, memoryId) {
     log('deleteMemoryDb', err);
   }
 }
+
+// ── Clear User Data (Fresh Start Reset) ───────────────────
+export async function clearUserDataDb(userId) {
+  try {
+    const batch = writeBatch(fireDb);
+
+    // 1. Delete all goals & nested habits
+    const goalsSnap = await getDocs(userCol(userId, 'goals'));
+    for (const goalDoc of goalsSnap.docs) {
+      const habitsSnap = await getDocs(collection(goalDoc.ref, 'habits'));
+      habitsSnap.docs.forEach(h => batch.delete(h.ref));
+      batch.delete(goalDoc.ref);
+    }
+
+    // 2. Delete all tasks
+    const tasksSnap = await getDocs(userCol(userId, 'tasks'));
+    tasksSnap.docs.forEach(t => batch.delete(t.ref));
+
+    // 3. Delete all task_logs
+    const taskLogsSnap = await getDocs(userCol(userId, 'task_logs'));
+    taskLogsSnap.docs.forEach(l => batch.delete(l.ref));
+
+    // 4. Delete all focus_history
+    const focusHistorySnap = await getDocs(userCol(userId, 'focus_history'));
+    focusHistorySnap.docs.forEach(f => batch.delete(f.ref));
+
+    // 5. Delete all memories
+    const memoriesSnap = await getDocs(userCol(userId, 'memories'));
+    memoriesSnap.docs.forEach(m => batch.delete(m.ref));
+
+    // Commit deletions
+    await batch.commit();
+
+    // 6. Reset XP Profile
+    const xpRef = userDoc(userId, 'xp', 'profile');
+    await setDoc(xpRef, {
+      total_xp: 0,
+      level: 1,
+      earned_badges: [],
+      badge_unlock_dates: {},
+      perfect_days: 0,
+      comeback_count: 0,
+      total_completions: 0,
+      last_xp_date: '',
+      xp_history: [],
+      updated_at: new Date().toISOString()
+    });
+
+    // 7. Reset Settings preferences (keep theme, reset others)
+    const settingsRef = userDoc(userId, 'settings', 'preferences');
+    const prefSnap = await getDocs(userCol(userId, 'settings'));
+    let currentTheme = 'dark';
+    if (!prefSnap.empty) {
+      const prefDoc = prefSnap.docs.find(d => d.id === 'preferences');
+      if (prefDoc) {
+        currentTheme = prefDoc.data()?.theme || 'dark';
+      }
+    }
+    await setDoc(settingsRef, {
+      theme: currentTheme,
+      focus_time_today: 0,
+      last_reset: '',
+      updated_at: new Date().toISOString()
+    });
+
+  } catch (err) {
+    console.error('[FirestoreDB] Error clearing user data:', err);
+    throw err;
+  }
+}
+

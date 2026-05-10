@@ -1822,6 +1822,59 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+  const clearProfileData = async () => {
+    if (!user) return;
+    try {
+      // 1. Clear local state instantly to provide optimistic, immediate feedback
+      setGoals([]);
+      setTasks([]);
+      setTaskLogs({});
+      setMemories([]);
+      setAiInsights([]);
+      setRecoveryStrategies([]);
+      setSmartSuggestions(null);
+      setXpData(DEFAULT_XP_DATA);
+      setSettings(prev => ({
+        theme: prev.theme || 'dark',
+        focusTimeToday: 0,
+        lastActiveDate: '',
+        focusHistory: {},
+        dismissedInsights: [],
+        weeklyIntentions: {},
+        lastPushDate: ''
+      }));
+
+      // Clear deleted goal IDs locally
+      setDeletedGoalIds([]);
+      localStorage.removeItem('gf_deleted_goal_ids');
+
+      // 2. Reset LocalStorage keys
+      localStorage.setItem(STORAGE_KEYS.GOALS, JSON.stringify([]));
+      localStorage.setItem(STORAGE_KEYS.TASKS, JSON.stringify([]));
+      localStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify({}));
+      localStorage.setItem(STORAGE_KEYS.MEMORIES, JSON.stringify([]));
+      localStorage.setItem(STORAGE_KEYS.XP, JSON.stringify(DEFAULT_XP_DATA));
+      localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify({
+        theme: settings.theme || 'dark',
+        focusTimeToday: 0,
+        lastActiveDate: '',
+        focusHistory: {},
+        dismissedInsights: [],
+        weeklyIntentions: {},
+        lastPushDate: ''
+      }));
+
+      // 3. Perform Firestore delete
+      await db.clearUserDataDb(user.id);
+
+      console.log('[Clear Profile] Entire ecosystem reset completed successfully.');
+    } catch (err) {
+      console.error('[Clear Profile] Failed to clear user data from Firestore:', err);
+      throw err;
+    }
+  };
+
+
   // Sync XP data to DB on change (debounced)
   useEffect(() => {
     if (!user || loading) return;
@@ -1960,7 +2013,8 @@ export const AppProvider = ({ children }) => {
     saveWeeklyIntention,
     // Memories & Completed Celebration Modal
     memories, addMemory, deleteMemory,
-    completedGoalForCelebration, setCompletedGoalForCelebration
+    completedGoalForCelebration, setCompletedGoalForCelebration,
+    clearProfileData
   }), [
     goals, tasks, taskLogs, notes, settings, loading, syncError,
     accuracy, alerts, weeklyReport, disciplineScore, userLevel,
@@ -1968,7 +2022,7 @@ export const AppProvider = ({ children }) => {
     aiInsights, recoveryStrategies, smartSuggestions,
     totalItems, completedItems, todayTasks, allHabits,
     settings, saveWeeklyIntention, editGoalSystem,
-    memories, completedGoalForCelebration
+    memories, completedGoalForCelebration, clearProfileData
   ]);
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

@@ -204,7 +204,7 @@ const EditGoalSystemModal = ({ goal, onClose, onSave }) => {
           <div className="bg-bg-input/50 rounded-[24px] p-5 border border-border-light space-y-4">
             <div>
               <p className="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] mb-3">Forge Logic (Strategy)</p>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 min-[480px]:grid-cols-3 gap-2 sm:gap-3">
                 {['ALL', 'ANY', 'CUSTOM'].map(m => (
                   <button key={m} type="button" onClick={() => setMode(m)}
                     className={`
@@ -411,29 +411,19 @@ export const GoalsPage = () => {
       const width = window.innerWidth;
       setIsMobile(width < 1024);
       
-      const isExpanded = expandedGoalIds.length > 0;
       if (width < 768) {
         setColsCount(1);
       } else if (width < 1024) {
         setColsCount(2);
       } else {
-        // Desktop
-        if (isExpanded && expandedGoalIds.length <= 2) {
-          // Balanced 2-column mode
-          setColsCount(2);
-        } else if (expandedGoalIds.length > 2) {
-          // Stacked overview accordion mode
-          setColsCount(1);
-        } else {
-          // No goals are open: 3-column layout on large screens, 2-column on smaller desktops
-          setColsCount(width >= 1280 ? 3 : 2);
-        }
+        // Strict 3-column desktop layout at all times
+        setColsCount(3);
       }
     };
     handleResize();
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, [expandedGoalIds]);
+  }, []);
 
   // Sync expanded goals if they get deleted in real-time
   useEffect(() => {
@@ -623,7 +613,7 @@ export const GoalsPage = () => {
           <div className="bg-bg-input/50 rounded-[28px] p-6 border border-border-light space-y-6">
             <div>
               <p className="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] mb-4">Forge Logic (Strategy)</p>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 min-[480px]:grid-cols-3 gap-2 sm:gap-3">
                 {['ALL', 'ANY', 'CUSTOM'].map(m => (
                   <button key={m} type="button" onClick={() => setNewGoal({ ...newGoal, mode: m })}
                     className={`
@@ -751,13 +741,30 @@ export const GoalsPage = () => {
         });
 
         const masonryColumns = Array.from({ length: colsCount }, () => []);
-        sortedGoals.forEach((goal, idx) => {
-          masonryColumns[idx % colsCount].push(goal);
+        const columnWeights = Array(colsCount).fill(0);
+
+        sortedGoals.forEach((goal) => {
+          const isOpen = expandedGoalIds.includes(goal.id);
+          // Calculate height-weight based on open/closed state and habit count
+          const weight = isOpen ? (3 + goal.habits.length * 0.5) : 1.0;
+
+          // Find the column with the minimum height weight
+          let minColIdx = 0;
+          let minWeight = columnWeights[0];
+          for (let c = 1; c < colsCount; c++) {
+            if (columnWeights[c] < minWeight) {
+              minColIdx = c;
+              minWeight = columnWeights[c];
+            }
+          }
+
+          masonryColumns[minColIdx].push(goal);
+          columnWeights[minColIdx] += weight;
         });
 
         return (
           <div className={`
-            flex gap-6 items-start w-full transition-all duration-500 mx-auto
+            flex gap-6 items-start w-full mx-auto
             ${colsCount === 1 ? 'max-w-2xl flex-col' : colsCount === 2 ? 'max-w-5xl' : 'max-w-7xl'}
           `}>
             {masonryColumns.map((colGoals, colIdx) => (
@@ -771,7 +778,7 @@ export const GoalsPage = () => {
 
                   return (
                     <div key={goal.id} className={`
-                      bg-bg-card rounded-[32px] overflow-hidden border-2 transition-all duration-500 h-fit
+                      bg-bg-card rounded-[32px] overflow-hidden border-2 h-fit
                       ${doneToday ? 'border-emerald-500 shadow-lg shadow-emerald-500/5' : 'border-border-light hover:border-border-med shadow-sm'}
                     `}>
                       <div className="p-6 cursor-pointer group" onClick={() => toggleGoalExpanded(goal.id)}>
@@ -780,7 +787,7 @@ export const GoalsPage = () => {
                             <svg className="w-full h-full -rotate-90" viewBox="0 0 68 68">
                               <circle cx="34" cy="34" r={R} fill="none" className="stroke-bg-input" strokeWidth="6" />
                               <circle 
-                                cx="34" cy="34" r={R} fill="none" className="stroke-accent-blue transition-all duration-1000 ease-out" strokeWidth="6" 
+                                cx="34" cy="34" r={R} fill="none" className="stroke-accent-blue" strokeWidth="6" 
                                 strokeDasharray={CIRC} strokeDashoffset={CIRC - (CIRC * (goal.progress || 0)) / 100} 
                                 strokeLinecap="round"
                               />
@@ -811,7 +818,7 @@ export const GoalsPage = () => {
                             <p className="text-lg font-black text-text-main tracking-tight leading-tight mb-3 group-hover:text-accent-blue transition-colors">{goal.title}</p>
                             
                             <div className="w-full bg-bg-input h-1.5 rounded-full overflow-hidden mb-3">
-                              <div className={`h-full transition-all duration-1000 ${dailyProgress === 100 ? 'bg-emerald-500' : 'bg-accent-blue'}`} style={{ width: `${dailyProgress}%` }} />
+                              <div className={`h-full ${dailyProgress === 100 ? 'bg-emerald-500' : 'bg-accent-blue'}`} style={{ width: `${dailyProgress}%` }} />
                             </div>
 
                             <div className="flex items-center gap-3">
@@ -831,7 +838,7 @@ export const GoalsPage = () => {
                       </div>
 
                       {isOpen && (
-                        <div className="px-6 pb-6 pt-2 border-t border-border-light space-y-4 animate-in slide-in-from-top-4">
+                        <div className="px-6 pb-6 pt-2 border-t border-border-light space-y-4">
                           <div className="flex flex-col gap-3">
                             {goal.habits
                               .sort((a, b) => {

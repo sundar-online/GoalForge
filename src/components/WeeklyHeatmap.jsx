@@ -17,7 +17,7 @@ export const WeeklyHeatmap = ({ taskLogs, accuracy }) => {
         </div>
       </div>
 
-      <div className="grid grid-cols-10 gap-2 sm:grid-cols-15 md:grid-cols-30 md:gap-1.5">
+      <div className="grid grid-cols-[repeat(10,minmax(0,1fr))] gap-2 sm:grid-cols-[repeat(15,minmax(0,1fr))] md:grid-cols-[repeat(30,minmax(0,1fr))] md:gap-1.5">
         {cells.map((cell) => {
           let color = getIntensity(cell.key, taskLogs);
           

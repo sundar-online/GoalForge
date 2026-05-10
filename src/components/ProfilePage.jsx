@@ -10,12 +10,14 @@ export const ProfilePage = () => {
     xpData: rawXpData, goals, tasks, notes,
     focusTime, focusHistory, accuracy,
     disciplineScore, allHabits,
-    memories = [], deleteMemory
+    memories = [], deleteMemory,
+    clearProfileData
   } = useAppContext();
   const { displayName, user } = useAuth();
   const [selectedBadge, setSelectedBadge] = useState(null);
   const [activeReplayMemory, setActiveReplayMemory] = useState(null);
   const [pushPerm, setPushPerm] = useState('default');
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   useEffect(() => {
     const fetchPerm = async () => {
@@ -24,6 +26,18 @@ export const ProfilePage = () => {
     };
     fetchPerm();
   }, []);
+
+  const handleClearConfirm = async () => {
+    try {
+      await clearProfileData();
+      setShowClearConfirm(false);
+      alert("All goals, habits, tasks, history, and AI coaching insights have been completely reset.");
+    } catch (err) {
+      console.error("Failed to reset profile:", err);
+      alert("An error occurred while resetting your data. Please try again.");
+    }
+  };
+
 
   const handleToggleNotifications = async () => {
     if (pushPerm === 'granted') {
@@ -439,8 +453,72 @@ export const ProfilePage = () => {
               </button>
             </div>
           </section>
+
+          {/* Danger Zone */}
+          <section className="bg-bg-card rounded-[32px] p-6 shadow-sm border border-border-light">
+            <div className="flex items-center gap-2 mb-5">
+              <Trash2 size={18} className="text-red-500" />
+              <h3 className="text-[10px] font-black text-red-500 uppercase tracking-[0.15em]">Danger Zone</h3>
+            </div>
+            
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 bg-red-500/5 rounded-2xl border border-red-500/10">
+              <div>
+                <p className="text-sm font-black text-text-main">Clear Profile Data</p>
+                <p className="text-[10px] font-bold text-text-muted mt-0.5 max-w-[200px]">Permanently reset your Goals, Habits, Tasks, and related data.</p>
+              </div>
+              <button 
+                id="c9w2zm"
+                onClick={() => setShowClearConfirm(true)}
+                className="px-4 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 active:scale-[0.98] text-white font-black text-xs tracking-wider uppercase transition-all shadow-md shadow-red-500/20 self-start md:self-auto"
+              >
+                Clear Profile Data
+              </button>
+            </div>
+          </section>
         </div>
       </div>
+
+      {/* Clear Profile Confirmation Modal */}
+      {showClearConfirm && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[200] p-4 animate-in fade-in duration-200" onClick={() => setShowClearConfirm(false)}>
+          <div 
+            className="bg-bg-card rounded-[32px] p-6 md:p-8 w-full max-w-sm shadow-float border border-border-light text-center space-y-6 animate-in zoom-in-95 duration-200" 
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="w-16 h-16 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center mx-auto text-red-500 shadow-lg">
+              <Trash2 size={32} />
+            </div>
+            
+            <div className="space-y-3" id="g8s1tm">
+              <h3 className="text-lg font-black text-text-main tracking-tight leading-snug">
+                Are you sure you want to clear all Goals and Tasks?
+              </h3>
+              <p className="text-xs font-bold text-text-muted">
+                This will create a fresh new start.
+              </p>
+              <p className="text-xs font-black text-red-500 uppercase tracking-widest mt-1">
+                This action cannot be undone.
+              </p>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-3 pt-2">
+              <button 
+                onClick={() => setShowClearConfirm(false)} 
+                className="flex-1 py-3 rounded-xl bg-bg-input text-text-main font-black text-xs uppercase tracking-wider hover:bg-bg-input/80 transition-all active:scale-[0.98]"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleClearConfirm}
+                className="flex-1 py-3 rounded-xl bg-red-500 hover:bg-red-600 active:scale-[0.98] text-white font-black text-xs tracking-wider uppercase transition-all shadow-md shadow-red-500/20"
+              >
+                Yes, Clear Data
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
 
       {/* Badge Detail Modal */}
       {selectedBadge && (

@@ -2,7 +2,6 @@ import React from 'react';
 import { useAppContext } from '../context/AppContext';
 import { 
   Sparkles, 
-  AlertTriangle, 
   CheckCircle2, 
   Target, 
   Award, 
@@ -10,7 +9,9 @@ import {
   TrendingUp, 
   X,
   ArrowRight,
-  ShieldAlert
+  ShieldAlert,
+  AlertTriangle,
+  Lightbulb
 } from 'lucide-react';
 
 const AIInsights = () => {
@@ -29,69 +30,47 @@ const AIInsights = () => {
 
   const getIcon = (type) => {
     switch (type) {
-      case 'burnout': 
-        return <AlertTriangle className="text-rose-500 dark:text-rose-400" size={18} />;
-      case 'peak_performance': 
-        return <TrendingUp className="text-teal-600 dark:text-teal-400" size={18} />;
       case 'recovery': 
-        return <ShieldAlert className="text-amber-600 dark:text-amber-400" size={18} />;
+        return <ShieldAlert className="text-amber-500 dark:text-amber-400" size={18} />;
+      case 'improvement': 
+        return <TrendingUp className="text-emerald-500 dark:text-emerald-400" size={18} />;
+      case 'coaching': 
+        return <Sparkles className="text-indigo-500 dark:text-purple-400" size={18} />;
       default: 
-        return <Sparkles className="text-purple-600 dark:text-purple-400" size={18} />;
-    }
-  };
-
-  const getPriorityColor = (priority) => {
-    const isLight = theme === 'light';
-    switch (priority) {
-      case 'high':
-        return isLight
-          ? 'border-rose-200/80 bg-rose-50/90 text-rose-950 hover:border-rose-300 hover:bg-rose-100/50'
-          : 'border-rose-500/15 bg-rose-500/5 text-rose-100 hover:border-rose-500/25';
-      case 'medium':
-        return isLight
-          ? 'border-amber-200/80 bg-amber-50/90 text-amber-950 hover:border-amber-300 hover:bg-amber-100/50'
-          : 'border-amber-500/15 bg-amber-500/5 text-amber-100 hover:border-amber-500/25';
-      default:
-        return isLight
-          ? 'border-indigo-200/80 bg-indigo-50/90 text-indigo-950 hover:border-indigo-300 hover:bg-indigo-100/50'
-          : 'border-indigo-500/15 bg-indigo-500/5 text-indigo-100 hover:border-indigo-500/25';
+        return <Lightbulb className="text-indigo-500 dark:text-purple-400" size={18} />;
     }
   };
 
   const getInsightCardStyle = (type) => {
     const isLight = theme === 'light';
     switch (type) {
-      case 'burnout':
-        return isLight
-          ? 'border-rose-200/80 bg-rose-50/90 text-rose-950 hover:border-rose-300 hover:bg-rose-100/50 border'
-          : 'border-rose-500/10 bg-rose-500/5 hover:bg-rose-500/10 text-rose-100 hover:border-rose-500/20 border';
-      case 'peak_performance':
-        return isLight
-          ? 'border-teal-200/80 bg-teal-50/90 text-teal-950 hover:border-teal-300 hover:bg-teal-100/50 border'
-          : 'border-teal-500/15 bg-teal-500/5 hover:bg-teal-500/10 text-teal-100 hover:border-teal-500/25 border';
       case 'recovery':
         return isLight
-          ? 'border-amber-200/80 bg-amber-50/90 text-amber-950 hover:border-amber-300 hover:bg-amber-100/50 border'
-          : 'border-amber-500/15 bg-amber-500/5 hover:bg-amber-500/10 text-amber-100 hover:border-amber-500/25 border';
+          ? 'border-amber-200 bg-amber-50/70 text-amber-950 hover:border-amber-300 hover:bg-amber-100/50'
+          : 'border-amber-500/15 bg-gradient-to-br from-amber-500/5 to-orange-500/5 text-amber-100 hover:border-amber-500/25';
+      case 'improvement':
+        return isLight
+          ? 'border-emerald-200 bg-emerald-50/70 text-emerald-950 hover:border-emerald-300 hover:bg-emerald-100/50'
+          : 'border-emerald-500/15 bg-gradient-to-br from-emerald-500/5 to-teal-500/5 text-emerald-100 hover:border-emerald-500/25';
+      case 'coaching':
       default:
         return isLight
-          ? 'border-purple-200/80 bg-purple-50/90 text-purple-950 hover:border-purple-300 hover:bg-purple-100/50 border'
-          : 'border-purple-500/15 bg-gradient-to-br from-purple-500/5 to-indigo-500/5 hover:from-purple-500/8 hover:to-indigo-500/8 text-purple-100 hover:border-purple-500/25 border';
+          ? 'border-indigo-200 bg-indigo-50/70 text-indigo-950 hover:border-indigo-300 hover:bg-indigo-100/50'
+          : 'border-indigo-500/15 bg-gradient-to-br from-indigo-500/5 to-purple-500/5 text-indigo-100 hover:border-indigo-500/25';
     }
   };
 
-  const getMessageColor = (type, priority = null) => {
+  const getMessageColor = (type) => {
     const isLight = theme === 'light';
-    if (priority === 'high' || type === 'burnout') {
-      return isLight ? 'text-rose-900/90 font-black' : 'text-rose-100/75';
+    switch (type) {
+      case 'recovery':
+        return isLight ? 'text-amber-900/90 font-medium' : 'text-amber-100/80';
+      case 'improvement':
+        return isLight ? 'text-emerald-900/90 font-medium' : 'text-emerald-100/80';
+      case 'coaching':
+      default:
+        return isLight ? 'text-indigo-900/90 font-medium' : 'text-indigo-100/80';
     }
-    if (priority === 'medium' || type === 'recovery') {
-      return isLight ? 'text-amber-900/90 font-black' : 'text-amber-100/75';
-    }
-    if (type === 'peak_performance') {
-      return isLight ? 'text-teal-900/90 font-black' : 'text-teal-100/75';
-    }
-    return isLight ? 'text-purple-900/90 font-black' : 'text-purple-100/75';
   };
 
   return (
@@ -120,8 +99,8 @@ const AIInsights = () => {
                 <Zap size={14} className="fill-indigo-500/10 dark:fill-indigo-400/20" />
                 <span className="text-[10px] font-black uppercase tracking-[0.15em]">{smartSuggestions.title}</span>
               </div>
-              <p className={`text-xs font-black leading-relaxed ${
-                theme === 'light' ? 'text-indigo-950/90' : 'text-indigo-100/80'
+              <p className={`text-xs leading-relaxed ${
+                theme === 'light' ? 'text-indigo-950/80 font-medium' : 'text-indigo-100/80'
               }`}>
                 {smartSuggestions.message}
               </p>
@@ -131,12 +110,12 @@ const AIInsights = () => {
 
         {/* Recovery Strategies */}
         {recoveryStrategies.map((strategy) => {
-          const priorityColor = getPriorityColor(strategy.priority);
-          const messageColor = getMessageColor(strategy.type, strategy.priority);
+          const cardStyle = getInsightCardStyle(strategy.type);
+          const messageColor = getMessageColor(strategy.type);
           return (
             <div 
               key={strategy.id}
-              className={`p-5 rounded-3xl border backdrop-blur-md transition-all duration-300 hover:shadow-lg ${priorityColor}`}
+              className={`p-5 rounded-3xl border backdrop-blur-md transition-all duration-300 hover:shadow-lg ${cardStyle}`}
             >
               <div className="flex justify-between items-start mb-4">
                 <div className="flex items-center gap-3">
@@ -146,7 +125,7 @@ const AIInsights = () => {
                   <div>
                     <h3 className="font-black text-sm text-text-main tracking-tight">{strategy.title}</h3>
                     <p className="text-[9px] font-black uppercase tracking-wider text-text-muted mt-0.5">
-                      {strategy.priority === 'high' ? '⚠️ Emergency Action' : '⚡ Recommended Action'}
+                      {strategy.priority === 'high' ? '🌱 Healing Focus' : '⚡ Guided Restoration'}
                     </p>
                   </div>
                 </div>
@@ -202,7 +181,10 @@ const AIInsights = () => {
                 {insight.message}
               </p>
               {insight.actionLabel && (
-                <button className="mt-4 text-[10px] font-black text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5 hover:gap-2.5 transition-all uppercase tracking-widest active:scale-95">
+                <button 
+                  onClick={() => dismissInsight(insight.id)}
+                  className="mt-4 text-[10px] font-black text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5 hover:gap-2.5 transition-all uppercase tracking-widest active:scale-95"
+                >
                   {insight.actionLabel} <ArrowRight size={12} strokeWidth={2.5} />
                 </button>
               )}
