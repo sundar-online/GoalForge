@@ -1,3 +1,13 @@
+export const parseLocalDate = (dateStr) => {
+  if (!dateStr) return new Date();
+  if (dateStr instanceof Date) return dateStr;
+  const parts = dateStr.split('T')[0].split('-');
+  if (parts.length !== 3) return new Date(dateStr); // fallback
+  const [year, month, day] = parts.map(Number);
+  if (isNaN(year) || isNaN(month) || isNaN(day)) return new Date(dateStr);
+  return new Date(year, month - 1, day);
+};
+
 export const TODAY = () => {
   const d = new Date();
   const year = d.getFullYear();
@@ -17,6 +27,8 @@ export const TOMORROW = () => {
 
 export const addDays = (dateStr, n) => {
   if (!dateStr || dateStr === 'NaN-NaN-NaN') dateStr = TODAY();
+  const parts = dateStr.split('T')[0].split('-');
+  if (parts.length !== 3) dateStr = TODAY();
   const [year, month, day] = dateStr.split('-').map(Number);
   if (isNaN(year) || isNaN(month) || isNaN(day)) return TODAY();
   
@@ -33,14 +45,15 @@ export const getTodayDate = () => TODAY();
 export const isSameDay = (d1, d2) => d1 === d2;
 
 export const formatDate = (dateStr) => {
-  const d = new Date(dateStr);
+  if (!dateStr) return '';
+  const d = parseLocalDate(dateStr);
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 };
 
 export const getDaysLeft = (dateStr) => {
   if (!dateStr) return null;
-  const today = new Date(TODAY());
-  const target = new Date(dateStr);
+  const today = parseLocalDate(TODAY());
+  const target = parseLocalDate(dateStr);
   const diffTime = target - today;
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   return Math.max(0, diffDays);
@@ -48,9 +61,10 @@ export const getDaysLeft = (dateStr) => {
 
 export const diffDays = (d1, d2) => {
   if (!d1 || !d2) return 1;
-  const t1 = new Date(d1).getTime();
-  const t2 = new Date(d2).getTime();
+  const t1 = parseLocalDate(d1).getTime();
+  const t2 = parseLocalDate(d2).getTime();
   const diff = Math.abs(t2 - t1);
   return Math.max(1, Math.round(diff / (1000 * 60 * 60 * 24)) + 1);
 };
+
 

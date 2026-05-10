@@ -1,4 +1,4 @@
-import { TODAY, addDays, diffDays } from './dateUtils';
+import { TODAY, addDays, diffDays, parseLocalDate } from './dateUtils';
 
 // Day abbreviations match the picker: ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
 const DAY_ABBRS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -176,11 +176,13 @@ export const getSmartAlerts = (accuracy, goals = [], tasks = [], weeklyReport = 
 };
 
 export const calculateStreakFromHistory = (completedDates, scheduleDays = [], parentGoalCompletedDates = [], habitCreatedAt = null) => {
-  if (!completedDates) return 0;
+  // Area 2 & 3: New habits must start at 0d streak until genuinely completed.
+  if (!completedDates || completedDates.length === 0) return 0;
 
   const completedSet = new Set(completedDates);
   const todayStr = TODAY();
 
+  // Area 3: Inherit goal completion history before habit creation date safely
   if (habitCreatedAt && parentGoalCompletedDates && parentGoalCompletedDates.length > 0) {
     const habitCreatedDateStr = habitCreatedAt.split('T')[0];
     parentGoalCompletedDates.forEach(date => {
@@ -206,28 +208,26 @@ export const calculateStreakFromHistory = (completedDates, scheduleDays = [], pa
     const isCompleted = completedSet.has(currentDateStr);
     
     // Check if scheduled
-    const [y, m, d] = currentDateStr.split('-').map(Number);
-    const dateObj = new Date(y, m - 1, d);
+    const dateObj = parseLocalDate(currentDateStr);
     const dayName = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dateObj.getDay()];
     const isScheduled = scheduleDays.length === 0 || scheduleDays.includes(dayName);
 
-    if (isScheduled) {
-      if (isCompleted) {
-        // Resume/increment streak
-        streak++;
-        consecutiveMissedDays = 0;
-      } else {
-        // Today itself (TODAY()) does not count as missed if not completed yet (since it's ongoing)
-        if (currentDateStr !== todayStr) {
-          consecutiveMissedDays++;
-          // Apply gradual decay rules:
-          // - missing 1 or 2 days -> streak remains protected
-          // - after 3 consecutive missed days -> streak decreases by 1
-          // - every additional 2 missed consecutive days -> streak decreases by another 1
-          if (consecutiveMissedDays >= 3) {
-            if ((consecutiveMissedDays - 3) % 2 === 0) {
-              streak = Math.max(0, streak - 1);
-            }
+    // Dynamic Centralized Calculation Logic:
+    // Completed days always build/sustain streaks instantly (even on off-schedule days).
+    if (isCompleted) {
+      streak++;
+      consecutiveMissedDays = 0;
+    } else if (isScheduled) {
+      // Today itself (TODAY()) does not count as missed if not completed yet (since it's ongoing)
+      if (currentDateStr !== todayStr) {
+        consecutiveMissedDays++;
+        // Apply gradual decay rules:
+        // - missing 1 or 2 days -> streak remains protected
+        // - after 3 consecutive missed days -> streak decreases by 1
+        // - every additional 2 missed consecutive days -> streak decreases by another 1
+        if (consecutiveMissedDays >= 3) {
+          if ((consecutiveMissedDays - 3) % 2 === 0) {
+            streak = Math.max(0, streak - 1);
           }
         }
       }
@@ -235,5 +235,121 @@ export const calculateStreakFromHistory = (completedDates, scheduleDays = [], pa
   }
 
   return streak;
+};
+
+/**
+ * Derives the exact list of completed dates for a Goal based on its habits' histories.
+ */
+export const recalculateGoalCompletedDates = (goal) => {
+  const habits = goal?.habits || [];
+  if (habits.length === 0) return goal?.completedDates || [];
+
+  const allCompletedDates = habits.flatMap(h => h.completedDates || []);
+  const datesToTest = new Set(allCompletedDates);
+  
+  const todayStr = TODAY();
+  datesToTest.add(todayStr);
+
+  let startStr = goal.startDate || goal.createdAt || todayStr;
+  if (startStr.includes('T')) startStr = startStr.split('T')[0];
+  if (allCompletedDates.length > 0) {
+    const earliestHabitDate = [...allCompletedDates].sort()[0];
+    if (earliestHabitDate < startStr) {
+      startStr = earliestHabitDate;
+    }
+  }
+
+  const diff = diffDays(todayStr, startStr);
+  const daysCount = Math.min(1000, Math.max(30, diff));
+  for (let i = 0; i <= daysCount; i++) {
+    datesToTest.add(addDays(todayStr, -i));
+  }
+
+  const completedDates = [];
+  for (const dateStr of datesToTest) {
+    const scheduledHabits = habits.filter(h => {
+      if (!h.scheduleDays || h.scheduleDays.length === 0) return true;
+      const dateObj = parseLocalDate(dateStr);
+      const dayName = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dateObj.getDay()];
+      return h.scheduleDays.includes(dayName);
+    });
+
+    if (scheduledHabits.length === 0) {
+      continue; // rest day = doesn't count as completion, but doesn't break streak either
+    }
+
+    const doneHabitsCount = scheduledHabits.filter(h => {
+      const dates = h.completedDates || [];
+      return dates.includes(dateStr);
+    }).length;
+
+    let isDone = false;
+    if (goal.mode === 'ANY') {
+      isDone = doneHabitsCount > 0;
+    } else if (goal.mode === 'CUSTOM') {
+      isDone = doneHabitsCount >= Math.min(goal.minHabits || 1, scheduledHabits.length);
+    } else { // ALL
+      isDone = doneHabitsCount === scheduledHabits.length;
+    }
+
+    if (isDone) {
+      completedDates.push(dateStr);
+    }
+  }
+
+  return [...new Set(completedDates)].sort();
+};
+
+/**
+ * Calculates the exact consecutive missed days for a habit.
+ */
+export const calculateConsecutiveMissedDays = (completedDates, scheduleDays = []) => {
+  if (!completedDates || completedDates.length === 0) return 0;
+  const completedSet = new Set(completedDates);
+  const todayStr = TODAY();
+
+  let missed = 0;
+  let checkDate = addDays(todayStr, -1);
+  
+  for (let i = 1; i <= 30; i++) {
+    const isCompleted = completedSet.has(checkDate);
+    const dateObj = parseLocalDate(checkDate);
+    const dayName = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dateObj.getDay()];
+    const isScheduled = scheduleDays.length === 0 || scheduleDays.includes(dayName);
+
+    if (isScheduled) {
+      if (isCompleted) {
+        break;
+      } else {
+        missed++;
+      }
+    }
+    checkDate = addDays(checkDate, -1);
+  }
+
+  return missed;
+};
+
+/**
+ * Calculates the consecutive missed days for a goal.
+ */
+export const calculateGoalConsecutiveMissedDays = (goalCompletedDates) => {
+  if (!goalCompletedDates || goalCompletedDates.length === 0) return 0;
+  const completedSet = new Set(goalCompletedDates);
+  const todayStr = TODAY();
+
+  let missed = 0;
+  let checkDate = addDays(todayStr, -1);
+  
+  for (let i = 1; i <= 30; i++) {
+    if (completedSet.has(checkDate)) {
+      break;
+    } else {
+      missed++;
+    }
+    checkDate = addDays(checkDate, -1);
+  }
+  
+  return missed;
 };
 

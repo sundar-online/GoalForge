@@ -3,7 +3,7 @@ import * as db from '../lib/firebaseDb';
 import { fireDb } from '../lib/firebase';
 import { onSnapshot, query, collection, doc, orderBy, getDocs } from 'firebase/firestore';
 import { useAuth } from './AuthContext';
-import { TODAY, addDays, diffDays } from '../utils/dateUtils';
+import { TODAY, addDays, diffDays, parseLocalDate } from '../utils/dateUtils';
 import {
   isGoalDoneToday,
   isTaskDone,
@@ -14,7 +14,10 @@ import {
   calculateWeeklyReport,
   getSmartAlerts,
   isHabitScheduledToday,
-  calculateStreakFromHistory
+  calculateStreakFromHistory,
+  recalculateGoalCompletedDates,
+  calculateConsecutiveMissedDays,
+  calculateGoalConsecutiveMissedDays
 } from '../utils/calculationUtils';
 import { XP_SOURCES, getLevelFromXP, evaluateBadges, getNewlyEarnedBadges } from '../utils/gamificationEngine';
 import { scheduleLocalNotification } from '../utils/notificationUtils';
@@ -416,9 +419,21 @@ export const AppProvider = ({ children }) => {
         setGoals(prev => {
           return goalsList.map(g => {
             const existing = prev.find(p => p.id === g.id);
+            if (!existing) return { ...g, habits: [] };
+
+            const localTime = existing.lastActionTimestamp ? new Date(existing.lastActionTimestamp).getTime() : 0;
+            const snapTime = g.updatedAt || g.updated_at ? new Date(g.updatedAt || g.updated_at).getTime() : 0;
+
+            if (localTime > snapTime) {
+              return {
+                ...g,
+                ...existing,
+                habits: existing.habits || []
+              };
+            }
             return {
               ...g,
-              habits: existing ? existing.habits : []
+              habits: existing.habits || []
             };
           });
         });
@@ -448,6 +463,7 @@ export const AppProvider = ({ children }) => {
                   isRecovering: hd.is_recovering ?? false,
                   originalTarget: hd.original_target || null,
                   createdAt: hd.created_at || hd.updated_at || new Date().toISOString(),
+                  updated_at: hd.updated_at || null,
                   syncPending: hDoc.metadata.hasPendingWrites,
                 };
               });
@@ -461,9 +477,50 @@ export const AppProvider = ({ children }) => {
                       return g;
                     }
                   }
+
+                  const localHabits = g.habits || [];
+                  const merged = [];
+                  const snapMap = new Map(habitsList.map(h => [String(h.id), h]));
+                  const processedIds = new Set();
+
+                  for (const lh of localHabits) {
+                    const lId = String(lh.id);
+                    const sh = snapMap.get(lId);
+
+                    if (!sh) {
+                      if (lh.syncPending || !lh.lastActionTimestamp) {
+                        merged.push(lh);
+                        processedIds.add(lId);
+                      }
+                      continue;
+                    }
+
+                    processedIds.add(lId);
+
+                    const localTime = lh.lastActionTimestamp ? new Date(lh.lastActionTimestamp).getTime() : 0;
+                    const snapTime = sh.updated_at ? new Date(sh.updated_at).getTime() : 0;
+
+                    if (localTime > snapTime) {
+                      merged.push({
+                        ...sh,
+                        ...lh,
+                        syncPending: true
+                      });
+                    } else {
+                      merged.push(sh);
+                    }
+                  }
+
+                  for (const sh of habitsList) {
+                    const sId = String(sh.id);
+                    if (!processedIds.has(sId)) {
+                      merged.push(sh);
+                    }
+                  }
+
                   return {
                     ...g,
-                    habits: habitsList
+                    habits: merged
                   };
                 }
                 return g;
@@ -646,154 +703,141 @@ export const AppProvider = ({ children }) => {
 
     if (lastActive === todayStr) return; // Already reset for today
 
-    // 1. Calculate updated goals
-    const updatedGoals = goals.map(goal => {
-      const gLastActive = goal.lastActiveDate || lastActive;
-      const start = new Date(gLastActive);
-      const end = new Date(todayStr);
-      let daysDiff = 0;
-      if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
-        daysDiff = Math.floor((end - start) / (1000 * 60 * 60 * 24));
-      }
+    // Update settings first to mark reset complete
+    setSettings(prev => ({ ...prev, focusTimeToday: 0, lastActiveDate: todayStr }));
 
-      if (daysDiff <= 0) return goal;
-
-      const updatedHabits = (goal.habits || []).map(h => {
-        let updatedH = { ...h };
-        const wasDone = updatedH.completed ||
-                        (updatedH.type === 'time' && (updatedH.timeSpent ?? 0) >= (updatedH.targetTime ?? 15)) ||
-                        (updatedH.type === 'count' && (updatedH.currentCount ?? 0) >= (updatedH.targetCount ?? 10));
-
-        // Check if yesterday (gLastActive) was a scheduled day for this habit
-        const lastActiveDay = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date(gLastActive).getDay()];
-        const wasScheduled = !h.scheduleDays || h.scheduleDays.length === 0 || h.scheduleDays.includes(lastActiveDay);
-
-        if (!wasScheduled) {
-          // Rest day — no miss, no streak impact
-        } else if (!wasDone) {
-          updatedH.missedDays = (updatedH.missedDays || 0) + 1;
-        } else {
-          updatedH.missedDays = 0;
-        }
-
-        // Handle multi-day gaps: count only scheduled days in the gap
-        if (daysDiff > 1) {
-          for (let gap = 1; gap < daysDiff; gap++) {
-            const gapDate = new Date(gLastActive);
-            gapDate.setDate(gapDate.getDate() + gap);
-            const gapDay = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][gapDate.getDay()];
-            const gapScheduled = !h.scheduleDays || h.scheduleDays.length === 0 || h.scheduleDays.includes(gapDay);
-            if (gapScheduled) updatedH.missedDays += 1;
-          }
-        }
-
-        // Apply 3-day failure rule
-        if (updatedH.missedDays >= 3) {
-          updatedH.streak = 0;
-          updatedH.missedDays = Math.min(3, updatedH.missedDays);
-        }
-
-        return { ...updatedH, timeSpent: 0, completed: false, currentCount: 0, lastActiveDate: todayStr };
-      });
-
-      // Update goal level missed days
-      const doneOnLastActive = (goal.mode === 'ANY' && updatedHabits.some(h => h.lastCompletedDate === gLastActive)) ||
-        (goal.mode === 'ALL' && updatedHabits.every(h => h.lastCompletedDate === gLastActive)) ||
-        (goal.mode === 'CUSTOM' && updatedHabits.filter(h => h.lastCompletedDate === gLastActive).length >= (goal.minHabits || 1));
-
-      let newGoalMissed = goal.missedDays || 0;
-      let newGoalStreak = goal.streak || 0;
-      let newDaysCompleted = goal.daysCompleted || 0;
-
-      if (!doneOnLastActive) {
-        newGoalMissed += 1;
-      } else {
-        newGoalMissed = 0;
-        newDaysCompleted += 1;
-      }
-
-      // Process goal gap
-      if (daysDiff > 1) {
-        for (let i = 1; i < daysDiff; i++) {
-          newGoalMissed += 1;
-        }
-      }
-
-      // RESILIENCE RULE: Goal streak only resets to 0 if ALL habits have failed (missedDays >= 3)
-      const allHabitsFailed = updatedHabits.length > 0 && updatedHabits.every(h => (h.missedDays || 0) >= 3);
-      if (allHabitsFailed) {
-        newGoalStreak = 0;
-        newGoalMissed = Math.max(3, newGoalMissed); // Ensure goal missedDays also reflects failure
-      }
-
-      const totalDays = Math.max(1, diffDays(goal.startDate || goal.createdAt || todayStr, goal.deadline || addDays(todayStr, 30)));
-      const progress = Math.min(100, Math.round((newDaysCompleted / totalDays) * 100));
-
-      return {
-        ...goal,
-        habits: updatedHabits,
-        missedDays: newGoalMissed,
-        streak: newGoalStreak,
-        daysCompleted: newDaysCompleted,
-        progress,
-        lastActiveDate: todayStr
-      };
-    });
-
-    // 2. Calculate updated tasks
-    const updatedTasks = tasks.map(t => {
-      if ((t.schedule_type || t.type) === 'daily') {
-        const tLastActive = t.lastActiveDate || lastActive;
-        const start = new Date(tLastActive);
-        const end = new Date(todayStr);
+    // Reset goals using functional updater to avoid dependency issues
+    setGoals(prevGoals => {
+      return prevGoals.map(goal => {
+        const gLastActive = goal.lastActiveDate || lastActive;
+        const start = parseLocalDate(gLastActive);
+        const end = parseLocalDate(todayStr);
         let daysDiff = 0;
         if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
           daysDiff = Math.floor((end - start) / (1000 * 60 * 60 * 24));
         }
-        if (daysDiff <= 0) return t;
 
-        let newMissed = t.missedDays || 0;
-        let newStreak = t.currentStreak || 0;
+        if (daysDiff <= 0) return goal;
 
-        if (!t.completed &&
-          !(t.completionType === 'count' && (t.currentCount || 0) >= (t.targetCount || 10)) &&
-          !(t.completionType === 'time' && (t.timeSpent ?? 0) >= (t.targetTime ?? 30))) {
-          newMissed += 1;
-        } else {
-          newMissed = 0;
-        }
+        const updatedHabits = (goal.habits || []).map(h => {
+          let updatedH = { ...h };
+          const wasDone = updatedH.completed ||
+                          (updatedH.type === 'time' && (updatedH.timeSpent ?? 0) >= (updatedH.targetTime ?? 15)) ||
+                          (updatedH.type === 'count' && (updatedH.currentCount ?? 0) >= (updatedH.targetCount ?? 10));
 
-        if (daysDiff > 1) {
-          for (let i = 1; i < daysDiff; i++) {
-            newMissed += 1;
-            if (newMissed >= 3) { newStreak = 0; newMissed = 0; }
+          // Check if yesterday (gLastActive) was a scheduled day for this habit
+          const lastActiveDay = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][parseLocalDate(gLastActive).getDay()];
+          const wasScheduled = !h.scheduleDays || h.scheduleDays.length === 0 || h.scheduleDays.includes(lastActiveDay);
+
+          let updatedDates = h.completedDates ? [...h.completedDates] : [];
+          if (wasDone && wasScheduled && !updatedDates.includes(gLastActive)) {
+            updatedDates.push(gLastActive);
           }
-        }
-        if (newMissed >= 3) { newStreak = 0; newMissed = 0; }
 
-        return { ...t, timeSpent: 0, currentCount: 0, completed: false, currentStreak: newStreak, missedDays: newMissed, lastActiveDate: todayStr };
-      }
-      return t;
+          // Calculate new missed days and streak dynamically using the simulation engine
+          const newMissed = calculateConsecutiveMissedDays(updatedDates, h.scheduleDays);
+          const newStreak = calculateStreakFromHistory(updatedDates, h.scheduleDays, goal.completedDates, h.createdAt);
+
+          return {
+            ...h,
+            completedDates: updatedDates,
+            timeSpent: 0,
+            completed: false,
+            currentCount: 0,
+            streak: newStreak,
+            missedDays: newMissed,
+            lastActiveDate: todayStr,
+            lastActionTimestamp: new Date().toISOString()
+          };
+        });
+
+        // Recalculate goal completed dates, streak, and missed days dynamically from habits
+        const updatedGoalWithoutDates = { ...goal, habits: updatedHabits };
+        const updatedGoalDates = recalculateGoalCompletedDates(updatedGoalWithoutDates);
+        const newGoalStreak = calculateStreakFromHistory(updatedGoalDates, []);
+        const newGoalMissed = calculateGoalConsecutiveMissedDays(updatedGoalDates);
+
+        const totalDays = Math.max(1, diffDays(goal.startDate || goal.createdAt || todayStr, goal.deadline || addDays(todayStr, 30)));
+        const progress = Math.min(100, Math.round(((updatedGoalDates || []).length / totalDays) * 100));
+
+        const finalGoal = {
+          ...goal,
+          habits: updatedHabits,
+          completedDates: updatedGoalDates,
+          missedDays: newGoalMissed,
+          streak: newGoalStreak,
+          progress,
+          lastActiveDate: todayStr,
+          lastActionTimestamp: new Date().toISOString()
+        };
+
+        // Write to DB asynchronously
+        if (user) {
+          db.upsertGoal(user.id, finalGoal);
+          updatedHabits.forEach(h => db.upsertHabit(user.id, goal.id, h));
+        }
+
+        return finalGoal;
+      });
     });
 
-    // 3. Update states
-    setGoals(updatedGoals);
-    setTasks(updatedTasks);
-    setSettings(prev => ({ ...prev, focusTimeToday: 0, lastActiveDate: todayStr }));
+    // Reset daily tasks using functional updater
+    setTasks(prevTasks => {
+      return prevTasks.map(t => {
+        if ((t.schedule_type || t.type) === 'daily') {
+          const tLastActive = t.lastActiveDate || lastActive;
+          const start = parseLocalDate(tLastActive);
+          const end = parseLocalDate(todayStr);
+          let daysDiff = 0;
+          if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+            daysDiff = Math.floor((end - start) / (1000 * 60 * 60 * 24));
+          }
+          if (daysDiff <= 0) return t;
 
-    // 4. Persist to DB
+          let newMissed = t.missedDays || 0;
+          let newStreak = t.currentStreak || 0;
+
+          const isCompleted = t.completed ||
+            (t.completionType === 'count' && (t.currentCount || 0) >= (t.targetCount || 10)) ||
+            (t.completionType === 'time' && (t.timeSpent ?? 0) >= (t.targetTime ?? 30));
+
+          if (!isCompleted) {
+            newMissed += 1;
+          } else {
+            newMissed = 0;
+          }
+
+          if (daysDiff > 1) {
+            for (let i = 1; i < daysDiff; i++) {
+              newMissed += 1;
+              if (newMissed >= 3) { newStreak = 0; newMissed = 0; }
+            }
+          }
+          if (newMissed >= 3) { newStreak = 0; newMissed = 0; }
+
+          const finalTask = {
+            ...t,
+            timeSpent: 0,
+            currentCount: 0,
+            completed: false,
+            currentStreak: newStreak,
+            missedDays: newMissed,
+            lastActiveDate: todayStr,
+            lastActionTimestamp: new Date().toISOString()
+          };
+
+          if (user) db.upsertTask(user.id, finalTask);
+          return finalTask;
+        }
+        return t;
+      });
+    });
+
     if (user) {
-      updatedGoals.forEach(g => {
-        db.upsertGoal(user.id, g);
-        g.habits.forEach(h => db.upsertHabit(user.id, g.id, h));
-      });
-      updatedTasks.forEach(t => {
-        if ((t.schedule_type || t.type) === 'daily') db.upsertTask(user.id, t);
-      });
       db.upsertUserSettings(user.id, { theme, focusTimeToday: 0, lastReset: todayStr });
     }
 
-  }, [loading, user, settings.lastActiveDate, currentDate, goals, tasks]);
+  }, [loading, user, settings.lastActiveDate, currentDate]);
 
   // ── Automatic Daily Summary Sync ─────────────────────────
   useEffect(() => {
@@ -934,7 +978,11 @@ export const AppProvider = ({ children }) => {
   const updateGoal = (id, updates) => {
     setGoals(prev => prev.map(g => {
       if (g.id === id) {
-        const updated = { ...g, ...updates };
+        const updated = {
+          ...g,
+          ...updates,
+          lastActionTimestamp: new Date().toISOString()
+        };
         if (user) db.upsertGoal(user.id, updated);
         return updated;
       }
@@ -963,19 +1011,19 @@ export const AppProvider = ({ children }) => {
         // Brand new staging habit added during editing
         const hId = String(h.id || (Date.now() + Math.random()));
         const hCreatedAt = new Date().toISOString();
-        const initialStreak = calculateStreakFromHistory([], h.scheduleDays || [], targetGoal.completedDates || [], hCreatedAt);
         return {
           ...h,
           id: hId,
           timeSpent: 0,
           currentCount: 0,
           completed: false,
-          streak: initialStreak,
+          streak: 0,
           lastCompletedDate: null,
           completedDates: [],
           missedDays: 0,
           lastActiveDate: TODAY(),
-          createdAt: hCreatedAt
+          createdAt: hCreatedAt,
+          lastActionTimestamp: new Date().toISOString()
         };
       } else {
         // Preserving tracker details but modifying target config
@@ -986,6 +1034,8 @@ export const AppProvider = ({ children }) => {
         const targetCount = Number(h.targetCount ?? existing.targetCount ?? 10);
         const targetTime = Number(h.targetTime ?? existing.targetTime ?? 15);
         let completed = existing.completed;
+        let completedDates = existing.completedDates ? [...existing.completedDates] : [];
+
         if (typeChanged || targetCount !== existing.targetCount || targetTime !== existing.targetTime) {
           if (h.type === 'check') {
             completed = existing.completed || false;
@@ -996,6 +1046,9 @@ export const AppProvider = ({ children }) => {
           }
         }
 
+        const newStreak = calculateStreakFromHistory(completedDates, h.scheduleDays || [], targetGoal.completedDates || [], existing.createdAt);
+        const newMissed = calculateConsecutiveMissedDays(completedDates, h.scheduleDays || []);
+
         return {
           ...existing,
           title: h.title,
@@ -1005,7 +1058,10 @@ export const AppProvider = ({ children }) => {
           scheduleDays: h.scheduleDays || [],
           currentCount,
           timeSpent,
-          completed
+          completed,
+          streak: newStreak,
+          missedDays: newMissed,
+          lastActionTimestamp: new Date().toISOString()
         };
       }
     });
@@ -1016,32 +1072,20 @@ export const AppProvider = ({ children }) => {
       habits: mappedHabits
     };
 
-    // Recalculate daily progress, completion dates, streak and overall progress
+    // Recalculate goal-level variables dynamically
     const today = TODAY();
-    const isGoalDone = isGoalDoneToday(updatedGoal);
-    let updatedGoalDates = updatedGoal.completedDates ? [...updatedGoal.completedDates] : [];
-    if (updatedGoal.lastCompletedDate && !updatedGoalDates.includes(updatedGoal.lastCompletedDate)) {
-      updatedGoalDates.push(updatedGoal.lastCompletedDate);
-    }
-
-    if (isGoalDone) {
-      if (!updatedGoalDates.includes(today)) {
-        updatedGoalDates.push(today);
-      }
-    } else {
-      updatedGoalDates = updatedGoalDates.filter(d => d !== today);
-    }
-
+    const updatedGoalDates = recalculateGoalCompletedDates(updatedGoal);
     const newGoalStreak = calculateStreakFromHistory(updatedGoalDates, []);
+    const newGoalMissed = calculateGoalConsecutiveMissedDays(updatedGoalDates);
     const sortedGoalDates = [...updatedGoalDates].sort((a, b) => b.localeCompare(a));
     const newGoalLastCompleted = sortedGoalDates.length > 0 ? sortedGoalDates[0] : null;
 
     updatedGoal.completedDates = updatedGoalDates;
     updatedGoal.streak = newGoalStreak;
+    updatedGoal.missedDays = newGoalMissed;
     updatedGoal.lastCompletedDate = newGoalLastCompleted;
-    if (isGoalDone) {
-      updatedGoal.missedDays = 0;
-    }
+    updatedGoal.lastActionTimestamp = new Date().toISOString();
+
     updatedGoal.progress = calculateOverallProgress(updatedGoal);
 
     // Save locally
@@ -1124,7 +1168,7 @@ export const AppProvider = ({ children }) => {
       return;
     }
     const hCreatedAt = new Date().toISOString();
-    const initialStreak = calculateStreakFromHistory([], habit.scheduleDays || [], targetGoal.completedDates || [], hCreatedAt);
+    const initialStreak = 0;
 
     const newH = {
       ...habit,
@@ -1137,7 +1181,8 @@ export const AppProvider = ({ children }) => {
       completedDates: [],
       missedDays: 0,
       lastActiveDate: TODAY(),
-      createdAt: hCreatedAt
+      createdAt: hCreatedAt,
+      lastActionTimestamp: new Date().toISOString()
     };
     
     setGoals(prev => prev.map(g => {
@@ -1146,32 +1191,18 @@ export const AppProvider = ({ children }) => {
         const updatedHabits = [...(g.habits || []), newH];
         const updatedGoal = { ...g, habits: updatedHabits };
 
-        // Recalculate Goal progress, today's status, and streak
-        const today = TODAY();
-        const isGoalDone = isGoalDoneToday(updatedGoal);
-        let updatedGoalDates = g.completedDates ? [...g.completedDates] : [];
-        if (g.lastCompletedDate && !updatedGoalDates.includes(g.lastCompletedDate)) {
-          updatedGoalDates.push(g.lastCompletedDate);
-        }
-
-        if (isGoalDone) {
-          if (!updatedGoalDates.includes(today)) {
-            updatedGoalDates.push(today);
-          }
-        } else {
-          updatedGoalDates = updatedGoalDates.filter(d => d !== today);
-        }
-
+        // Recalculate Goal progress, today's status, and streak using robust helpers
+        const updatedGoalDates = recalculateGoalCompletedDates(updatedGoal);
         const newGoalStreak = calculateStreakFromHistory(updatedGoalDates, []);
+        const newGoalMissed = calculateGoalConsecutiveMissedDays(updatedGoalDates);
         const sortedGoalDates = [...updatedGoalDates].sort((a, b) => b.localeCompare(a));
         const newGoalLastCompleted = sortedGoalDates.length > 0 ? sortedGoalDates[0] : null;
 
         updatedGoal.completedDates = updatedGoalDates;
         updatedGoal.streak = newGoalStreak;
+        updatedGoal.missedDays = newGoalMissed;
         updatedGoal.lastCompletedDate = newGoalLastCompleted;
-        if (isGoalDone) {
-          updatedGoal.missedDays = 0;
-        }
+        updatedGoal.lastActionTimestamp = new Date().toISOString();
 
         updatedGoal.progress = calculateOverallProgress(updatedGoal);
         if (user) db.upsertGoal(user.id, updatedGoal);
@@ -1188,32 +1219,18 @@ export const AppProvider = ({ children }) => {
         const updatedHabits = g.habits.filter(h => h.id !== habitId);
         const updatedGoal = { ...g, habits: updatedHabits };
 
-        // Recalculate Goal progress, today's status, and streak
-        const today = TODAY();
-        const isGoalDone = isGoalDoneToday(updatedGoal);
-        let updatedGoalDates = g.completedDates ? [...g.completedDates] : [];
-        if (g.lastCompletedDate && !updatedGoalDates.includes(g.lastCompletedDate)) {
-          updatedGoalDates.push(g.lastCompletedDate);
-        }
-
-        if (isGoalDone) {
-          if (!updatedGoalDates.includes(today)) {
-            updatedGoalDates.push(today);
-          }
-        } else {
-          updatedGoalDates = updatedGoalDates.filter(d => d !== today);
-        }
-
+        // Recalculate Goal progress, today's status, and streak using robust helpers
+        const updatedGoalDates = recalculateGoalCompletedDates(updatedGoal);
         const newGoalStreak = calculateStreakFromHistory(updatedGoalDates, []);
+        const newGoalMissed = calculateGoalConsecutiveMissedDays(updatedGoalDates);
         const sortedGoalDates = [...updatedGoalDates].sort((a, b) => b.localeCompare(a));
         const newGoalLastCompleted = sortedGoalDates.length > 0 ? sortedGoalDates[0] : null;
 
         updatedGoal.completedDates = updatedGoalDates;
         updatedGoal.streak = newGoalStreak;
+        updatedGoal.missedDays = newGoalMissed;
         updatedGoal.lastCompletedDate = newGoalLastCompleted;
-        if (isGoalDone) {
-          updatedGoal.missedDays = 0;
-        }
+        updatedGoal.lastActionTimestamp = new Date().toISOString();
 
         updatedGoal.progress = calculateOverallProgress(updatedGoal);
         if (user) db.upsertGoal(user.id, updatedGoal);
@@ -1249,6 +1266,7 @@ export const AppProvider = ({ children }) => {
           }
 
           const newStreak = calculateStreakFromHistory(updatedDates, h.scheduleDays || [], goal.completedDates || [], h.createdAt);
+          const newMissed = calculateConsecutiveMissedDays(updatedDates, h.scheduleDays || []);
           const sortedDates = [...updatedDates].sort((a, b) => b.localeCompare(a));
           const newLastCompleted = sortedDates.length > 0 ? sortedDates[0] : null;
 
@@ -1259,7 +1277,8 @@ export const AppProvider = ({ children }) => {
             completedDates: updatedDates,
             streak: newStreak,
             lastCompletedDate: newLastCompleted,
-            missedDays: isDone ? 0 : h.missedDays,
+            missedDays: newMissed,
+            lastActionTimestamp: new Date().toISOString()
           };
 
           if (isDone && !wasCompleted) {
@@ -1276,37 +1295,27 @@ export const AppProvider = ({ children }) => {
         return h;
       });
 
-      const updatedGoal = { ...goal, habits: updatedHabits };
-
-      // Goal-level streak recalculation
-      const isGoalDone = isGoalDoneToday(updatedGoal);
-      let updatedGoalDates = goal.completedDates ? [...goal.completedDates] : [];
-      if (goal.lastCompletedDate && !updatedGoalDates.includes(goal.lastCompletedDate)) {
-        updatedGoalDates.push(goal.lastCompletedDate);
-      }
-
-      if (isGoalDone) {
-        if (!updatedGoalDates.includes(today)) {
-          updatedGoalDates.push(today);
-        }
-      } else {
-        updatedGoalDates = updatedGoalDates.filter(d => d !== today);
-      }
-
+      const updatedGoalWithoutDates = { ...goal, habits: updatedHabits };
+      const updatedGoalDates = recalculateGoalCompletedDates(updatedGoalWithoutDates);
       const newGoalStreak = calculateStreakFromHistory(updatedGoalDates, []);
+      const newGoalMissed = calculateGoalConsecutiveMissedDays(updatedGoalDates);
       const sortedGoalDates = [...updatedGoalDates].sort((a, b) => b.localeCompare(a));
       const newGoalLastCompleted = sortedGoalDates.length > 0 ? sortedGoalDates[0] : null;
 
-      updatedGoal.completedDates = updatedGoalDates;
-      updatedGoal.streak = newGoalStreak;
-      updatedGoal.lastCompletedDate = newGoalLastCompleted;
-      if (isGoalDone) {
-        updatedGoal.missedDays = 0;
-      }
+      const finalGoal = {
+        ...goal,
+        habits: updatedHabits,
+        completedDates: updatedGoalDates,
+        streak: newGoalStreak,
+        missedDays: newGoalMissed,
+        lastCompletedDate: newGoalLastCompleted,
+        lastActiveDate: today,
+        lastActionTimestamp: new Date().toISOString()
+      };
 
-      updatedGoal.progress = calculateOverallProgress(updatedGoal);
-      if (user) db.upsertGoal(user.id, updatedGoal);
-      return updatedGoal;
+      finalGoal.progress = calculateOverallProgress(finalGoal);
+      if (user) db.upsertGoal(user.id, finalGoal);
+      return finalGoal;
     }));
   };
 
@@ -1356,15 +1365,15 @@ export const AppProvider = ({ children }) => {
           }
 
           const newStreak = calculateStreakFromHistory(updatedDates, h.scheduleDays || [], goal.completedDates || [], h.createdAt);
+          const newMissed = calculateConsecutiveMissedDays(updatedDates, h.scheduleDays || []);
           const sortedDates = [...updatedDates].sort((a, b) => b.localeCompare(a));
           const newLastCompleted = sortedDates.length > 0 ? sortedDates[0] : null;
 
           updatedH.completedDates = updatedDates;
           updatedH.streak = newStreak;
           updatedH.lastCompletedDate = newLastCompleted;
-          if (isDone) {
-            updatedH.missedDays = 0;
-          }
+          updatedH.missedDays = newMissed;
+          updatedH.lastActionTimestamp = new Date().toISOString();
 
           if (isDone && !wasCompleted) {
             awardXP(XP_SOURCES.HABIT_COMPLETE, `Completed: ${h.title}`);
@@ -1378,37 +1387,27 @@ export const AppProvider = ({ children }) => {
         return h;
       });
 
-      const updatedGoal = { ...goal, habits: updatedHabits };
-
-      // Goal-level streak recalculation
-      const isGoalDone = isGoalDoneToday(updatedGoal);
-      let updatedGoalDates = goal.completedDates ? [...goal.completedDates] : [];
-      if (goal.lastCompletedDate && !updatedGoalDates.includes(goal.lastCompletedDate)) {
-        updatedGoalDates.push(goal.lastCompletedDate);
-      }
-
-      if (isGoalDone) {
-        if (!updatedGoalDates.includes(today)) {
-          updatedGoalDates.push(today);
-        }
-      } else {
-        updatedGoalDates = updatedGoalDates.filter(d => d !== today);
-      }
-
+      const updatedGoalWithoutDates = { ...goal, habits: updatedHabits };
+      const updatedGoalDates = recalculateGoalCompletedDates(updatedGoalWithoutDates);
       const newGoalStreak = calculateStreakFromHistory(updatedGoalDates, []);
+      const newGoalMissed = calculateGoalConsecutiveMissedDays(updatedGoalDates);
       const sortedGoalDates = [...updatedGoalDates].sort((a, b) => b.localeCompare(a));
       const newGoalLastCompleted = sortedGoalDates.length > 0 ? sortedGoalDates[0] : null;
 
-      updatedGoal.completedDates = updatedGoalDates;
-      updatedGoal.streak = newGoalStreak;
-      updatedGoal.lastCompletedDate = newGoalLastCompleted;
-      if (isGoalDone) {
-        updatedGoal.missedDays = 0;
-      }
+      const finalGoal = {
+        ...goal,
+        habits: updatedHabits,
+        completedDates: updatedGoalDates,
+        streak: newGoalStreak,
+        missedDays: newGoalMissed,
+        lastCompletedDate: newGoalLastCompleted,
+        lastActiveDate: today,
+        lastActionTimestamp: new Date().toISOString()
+      };
 
-      updatedGoal.progress = calculateOverallProgress(updatedGoal);
-      if (user) db.upsertGoal(user.id, updatedGoal);
-      return updatedGoal;
+      finalGoal.progress = calculateOverallProgress(finalGoal);
+      if (user) db.upsertGoal(user.id, finalGoal);
+      return finalGoal;
     }));
   };
 
@@ -1438,6 +1437,7 @@ export const AppProvider = ({ children }) => {
           }
 
           const newStreak = calculateStreakFromHistory(updatedDates, h.scheduleDays || [], goal.completedDates || [], h.createdAt);
+          const newMissed = calculateConsecutiveMissedDays(updatedDates, h.scheduleDays || []);
           const sortedDates = [...updatedDates].sort((a, b) => b.localeCompare(a));
           const newLastCompleted = sortedDates.length > 0 ? sortedDates[0] : null;
 
@@ -1448,7 +1448,8 @@ export const AppProvider = ({ children }) => {
             completedDates: updatedDates,
             streak: newStreak,
             lastCompletedDate: newLastCompleted,
-            missedDays: isDone ? 0 : h.missedDays,
+            missedDays: newMissed,
+            lastActionTimestamp: new Date().toISOString()
           };
 
           if (isDone && !wasCompleted) {
@@ -1463,37 +1464,27 @@ export const AppProvider = ({ children }) => {
         return h;
       });
 
-      const updatedGoal = { ...goal, habits: updatedHabits };
-
-      // Goal-level streak recalculation
-      const isGoalDone = isGoalDoneToday(updatedGoal);
-      let updatedGoalDates = goal.completedDates ? [...goal.completedDates] : [];
-      if (goal.lastCompletedDate && !updatedGoalDates.includes(goal.lastCompletedDate)) {
-        updatedGoalDates.push(goal.lastCompletedDate);
-      }
-
-      if (isGoalDone) {
-        if (!updatedGoalDates.includes(today)) {
-          updatedGoalDates.push(today);
-        }
-      } else {
-        updatedGoalDates = updatedGoalDates.filter(d => d !== today);
-      }
-
+      const updatedGoalWithoutDates = { ...goal, habits: updatedHabits };
+      const updatedGoalDates = recalculateGoalCompletedDates(updatedGoalWithoutDates);
       const newGoalStreak = calculateStreakFromHistory(updatedGoalDates, []);
+      const newGoalMissed = calculateGoalConsecutiveMissedDays(updatedGoalDates);
       const sortedGoalDates = [...updatedGoalDates].sort((a, b) => b.localeCompare(a));
       const newGoalLastCompleted = sortedGoalDates.length > 0 ? sortedGoalDates[0] : null;
 
-      updatedGoal.completedDates = updatedGoalDates;
-      updatedGoal.streak = newGoalStreak;
-      updatedGoal.lastCompletedDate = newGoalLastCompleted;
-      if (isGoalDone) {
-        updatedGoal.missedDays = 0;
-      }
+      const finalGoal = {
+        ...goal,
+        habits: updatedHabits,
+        completedDates: updatedGoalDates,
+        streak: newGoalStreak,
+        missedDays: newGoalMissed,
+        lastCompletedDate: newGoalLastCompleted,
+        lastActiveDate: today,
+        lastActionTimestamp: new Date().toISOString()
+      };
 
-      updatedGoal.progress = calculateOverallProgress(updatedGoal);
-      if (user) db.upsertGoal(user.id, updatedGoal);
-      return updatedGoal;
+      finalGoal.progress = calculateOverallProgress(finalGoal);
+      if (user) db.upsertGoal(user.id, finalGoal);
+      return finalGoal;
     }));
   };
 
