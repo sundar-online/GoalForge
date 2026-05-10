@@ -696,8 +696,12 @@ export const GoalsPage = () => {
         </div>
       )}
 
-      {/* Goal Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+      {/* Goal Cards Grid / Accordion List */}
+      <div className={
+        expandedGoalIds.length > 1 
+          ? "flex flex-col gap-5 max-w-3xl mx-auto w-full" 
+          : "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6"
+      }>
         {goals
           .sort((a, b) => {
             const aDone = isGoalDoneToday(a);
