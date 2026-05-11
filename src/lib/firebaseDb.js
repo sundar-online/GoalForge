@@ -153,6 +153,37 @@ export async function smartWrite(docRef, payload, pathKey, useBatch = false, del
   });
 }
 
+// Helper to calculate exact delta changes between cached state and new payload
+export function getDeltaPayload(cached, payload) {
+  if (!cached) return payload; // If not cached, write everything
+
+  const delta = {};
+  let hasChanges = false;
+
+  for (const key of Object.keys(payload)) {
+    const newVal = payload[key];
+    const oldVal = cached[key];
+
+    // If key doesn't exist in cached, or value is not deeply equal
+    if (!(key in cached) || !isDeepEqual(oldVal, newVal)) {
+      delta[key] = newVal;
+      hasChanges = true;
+    }
+  }
+
+  // If there are actual changes, we must also preserve operational updates like updated_at
+  if (hasChanges) {
+    if ('updated_at' in payload) {
+      delta['updated_at'] = payload['updated_at'];
+    }
+    if ('clientTimestamp' in payload) {
+      delta['clientTimestamp'] = payload['clientTimestamp'];
+    }
+  }
+
+  return delta;
+}
+
 // Executes buffered single write after debounce delay
 async function executeBufferedWrite(docRef, pathKey) {
   const pending = pendingWriteTimers.get(pathKey);
@@ -160,8 +191,17 @@ async function executeBufferedWrite(docRef, pathKey) {
   pendingWriteTimers.delete(pathKey);
 
   try {
-    debugLog(`[Buffered Write] Committing to Firestore: ${pathKey}`, pending.payload);
-    await setDoc(docRef, pending.payload, { merge: true });
+    const cached = writeCache.get(pathKey);
+    const deltaPayload = getDeltaPayload(cached, pending.payload);
+
+    if (cached && Object.keys(deltaPayload).length === 0) {
+      debugLog(`[Buffered Write] Aborted: No delta changes for path: ${pathKey}`);
+      pending.resolves.forEach(r => r.resolve());
+      return;
+    }
+
+    debugLog(`[Buffered Write] Committing delta to Firestore: ${pathKey}`, deltaPayload);
+    await setDoc(docRef, deltaPayload, { merge: true });
     writeCache.set(pathKey, pending.payload); // Lock successfully committed state to cache
     debugLog(`[Buffered Write] SUCCESS: ${pathKey}`);
     pending.resolves.forEach(r => r.resolve());
@@ -183,7 +223,17 @@ async function executeBatchWrites() {
   if (currentBatch.length === 1) {
     const item = currentBatch[0];
     try {
-      await setDoc(item.docRef, item.payload, { merge: true });
+      const cached = writeCache.get(item.pathKey);
+      const deltaPayload = getDeltaPayload(cached, item.payload);
+
+      if (cached && Object.keys(deltaPayload).length === 0) {
+        debugLog(`[Batch Engine] Single Batch Write Aborted: No delta changes for path: ${item.pathKey}`);
+        item.resolves.forEach(r => r.resolve());
+        return;
+      }
+
+      debugLog(`[Batch Engine] Committing single batch delta to Firestore: ${item.pathKey}`, deltaPayload);
+      await setDoc(item.docRef, deltaPayload, { merge: true });
       writeCache.set(item.pathKey, item.payload);
       debugLog(`[Batch Engine] Single Batched Write SUCCESS: ${item.pathKey}`);
       item.resolves.forEach(r => r.resolve());
@@ -195,20 +245,37 @@ async function executeBatchWrites() {
   }
 
   const batch = writeBatch(fireDb);
+  const activeBatchItems = [];
+
   currentBatch.forEach(item => {
-    batch.set(item.docRef, item.payload, { merge: true });
+    const cached = writeCache.get(item.pathKey);
+    const deltaPayload = getDeltaPayload(cached, item.payload);
+
+    if (cached && Object.keys(deltaPayload).length === 0) {
+      debugLog(`[Batch Engine] Batch item skipped: No delta changes for path: ${item.pathKey}`);
+      item.resolves.forEach(r => r.resolve());
+      return;
+    }
+
+    batch.set(item.docRef, deltaPayload, { merge: true });
+    activeBatchItems.push(item);
   });
+
+  if (activeBatchItems.length === 0) {
+    debugLog(`[Batch Engine] Batch execution aborted: All batch items had empty deltas.`);
+    return;
+  }
 
   try {
     await batch.commit();
-    currentBatch.forEach(item => {
+    activeBatchItems.forEach(item => {
       writeCache.set(item.pathKey, item.payload);
       debugLog(`[Batch Engine] Batched Write SUCCESS: ${item.pathKey}`);
       item.resolves.forEach(r => r.resolve());
     });
   } catch (err) {
     errorLog(`[Batch Engine] Batched Transaction FAILURE`, err);
-    currentBatch.forEach(item => {
+    activeBatchItems.forEach(item => {
       item.resolves.forEach(r => r.reject(err));
     });
   }
