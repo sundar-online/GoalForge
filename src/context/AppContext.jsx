@@ -149,6 +149,7 @@ export const AppProvider = ({ children }) => {
 
   const [xpData, setXpData] = useState(() => ({ ...DEFAULT_XP_DATA, ...safeParse(STORAGE_KEYS.XP, DEFAULT_XP_DATA) }));
   const lastSyncedXpRef = useRef(xpData.totalXP);
+  const lastSavedSummaryRef = useRef(null);
   const [levelUpEvent, setLevelUpEvent] = useState(null);   // { level, title }
   const [badgeUnlockEvent, setBadgeUnlockEvent] = useState(null); // badge definition object
   // Queue to handle multiple badge unlocks in sequence
@@ -317,6 +318,7 @@ export const AppProvider = ({ children }) => {
       const unsubTasks = onSnapshot(tasksQuery, { includeMetadataChanges: true }, (snapshot) => {
         const updatedTasks = snapshot.docs.map(doc => {
           const t = doc.data();
+          db.updateCache(`users/${user.id}/tasks/${doc.id}`, t);
           return {
             id: doc.id,
             title: t.title,
@@ -371,6 +373,7 @@ export const AppProvider = ({ children }) => {
       const unsubNotes = onSnapshot(notesQuery, { includeMetadataChanges: true }, (snapshot) => {
         const updatedNotes = snapshot.docs.map(doc => {
           const n = doc.data();
+          db.updateCache(`users/${user.id}/notes/${doc.id}`, n);
           return {
             id: doc.id,
             title: n.title || '',
@@ -411,6 +414,7 @@ export const AppProvider = ({ children }) => {
       const unsubGoals = onSnapshot(goalsQuery, { includeMetadataChanges: true }, (snapshot) => {
         const goalsList = snapshot.docs.map(docSnap => {
           const g = docSnap.data();
+          db.updateCache(`users/${user.id}/goals/${docSnap.id}`, g);
           if (g.deleted || g.isDeleted || deletedGoalIdsRef.current.includes(String(docSnap.id))) {
             return null;
           }
@@ -480,6 +484,7 @@ export const AppProvider = ({ children }) => {
             const unsubHabit = onSnapshot(habitsQuery, { includeMetadataChanges: true }, (habitsSnapshot) => {
                const habitsList = habitsSnapshot.docs.map(hDoc => {
                 const hd = hDoc.data();
+                db.updateCache(`users/${user.id}/goals/${goal.id}/habits/${hDoc.id}`, hd);
                 return {
                   id: hDoc.id,
                   title: hd.title,
@@ -587,6 +592,7 @@ export const AppProvider = ({ children }) => {
         const logs = {};
         snapshot.docs.forEach(doc => {
           const row = doc.data();
+          db.updateCache(`users/${user.id}/task_logs/${doc.id}`, row);
           logs[row.date] = {
             date: row.date,
             total_tasks: row.total_tasks || 0,
@@ -606,7 +612,9 @@ export const AppProvider = ({ children }) => {
       const unsubFocus = onSnapshot(focusQuery, (snapshot) => {
         const history = {};
         snapshot.docs.forEach(doc => {
-          history[doc.id] = doc.data().seconds;
+          const fd = doc.data();
+          db.updateCache(`users/${user.id}/focus_history/${doc.id}`, fd);
+          history[doc.id] = fd.seconds;
         });
         setSettings(prev => ({ ...prev, focusHistory: history }));
       }, (error) => {
@@ -619,6 +627,7 @@ export const AppProvider = ({ children }) => {
       const unsubSettings = onSnapshot(settingsDocRef, (docSnap) => {
         if (docSnap.exists()) {
           const s = docSnap.data();
+          db.updateCache(`users/${user.id}/settings/preferences`, s);
           setSettings(prev => ({
             ...prev,
             theme: s.theme || prev.theme,
@@ -636,6 +645,7 @@ export const AppProvider = ({ children }) => {
       const unsubXp = onSnapshot(xpDocRef, (docSnap) => {
         if (docSnap.exists()) {
           const x = docSnap.data();
+          db.updateCache(`users/${user.id}/xp/profile`, x);
           const serverXP = x.total_xp || 0;
           lastSyncedXpRef.current = serverXP; // Shield against echo write loops
           setXpData({
@@ -660,6 +670,7 @@ export const AppProvider = ({ children }) => {
       const unsubMemories = onSnapshot(memoriesQuery, { includeMetadataChanges: true }, (snapshot) => {
         const updatedMemories = snapshot.docs.map(doc => {
           const m = doc.data();
+          db.updateCache(`users/${user.id}/memories/${doc.id}`, m);
           return {
             id: doc.id,
             goalId: m.goalId || '',
@@ -876,7 +887,7 @@ export const AppProvider = ({ children }) => {
 
   // ── Automatic Daily Summary Sync ─────────────────────────
   useEffect(() => {
-    if (loading) return;
+    if (loading || !user) return;
     const today = TODAY();
     const summary = {
       date: today,
@@ -886,12 +897,20 @@ export const AppProvider = ({ children }) => {
       auto_completed: true
     };
 
-    setTaskLogs(prev => {
-      const current = prev[today];
-      if (current && current.total_tasks === summary.total_tasks && current.completed_tasks === summary.completed_tasks && current.time_spent === summary.time_spent) return prev;
-      return { ...prev, [today]: summary };
-    });
-    if (user) db.upsertTaskLog(user.id, summary);
+    const last = lastSavedSummaryRef.current;
+    const isSame = last && 
+                   last.date === summary.date &&
+                   last.total_tasks === summary.total_tasks && 
+                   last.completed_tasks === summary.completed_tasks && 
+                   last.time_spent === summary.time_spent;
+
+    if (!isSame) {
+      lastSavedSummaryRef.current = summary;
+      setTaskLogs(prev => ({ ...prev, [today]: summary }));
+      db.upsertTaskLog(user.id, summary).catch(err => {
+        console.error('[Realtime Sync] Failed to upsert task log summary:', err);
+      });
+    }
   }, [completedItems, totalItems, loading, user]);
 
   // ── AI Analysis Effect ───────────────────────────────────

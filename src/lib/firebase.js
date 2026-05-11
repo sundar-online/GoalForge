@@ -7,6 +7,7 @@ import {
   initializeFirestore, 
   persistentLocalCache, 
   persistentMultipleTabManager,
+  persistentSingleTabManager,
   getFirestore
 } from 'firebase/firestore';
 
@@ -27,16 +28,21 @@ export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: 'select_account' });
 
-// Firestore initialization with resilient multi-tab offline persistence & fallback
+// Firestore initialization with resilient offline persistence & fallback
 let dbInstance;
 try {
   console.log('[Firestore] Attempting to initialize with persistent local cache...');
+  const isMobile = typeof window !== 'undefined' && (
+    !!window.Capacitor || 
+    /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+  );
+
   dbInstance = initializeFirestore(app, {
     localCache: persistentLocalCache({
-      tabManager: persistentMultipleTabManager()
+      tabManager: isMobile ? persistentSingleTabManager() : persistentMultipleTabManager()
     })
   });
-  console.log('✓ Firestore initialized successfully with persistent multiple-tab cache.');
+  console.log(`✓ Firestore initialized successfully with persistent cache (tabManager: ${isMobile ? 'single' : 'multiple'}).`);
 } catch (err) {
   console.warn('⚠️ Failed to initialize persistent local cache, falling back to standard getFirestore:', err);
   try {

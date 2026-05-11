@@ -48,6 +48,172 @@ export function cleanPayload(obj) {
 const userCol = (userId, colName) => collection(fireDb, 'users', userId, colName);
 const userDoc = (userId, colName, docId) => doc(fireDb, 'users', userId, colName, docId);
 
+// ═══════════════════════════════════════════════════════
+// ── WRITES OPTIMIZATION & DECOMPRESSION ENGINE (BUFERED) ──
+// ═══════════════════════════════════════════════════════
+
+const writeCache = new Map();
+const pendingWriteTimers = new Map();
+const batchQueue = [];
+let batchTimer = null;
+
+// Helper: Clear cache on delete or updates
+export function updateCache(pathKey, payload) {
+  writeCache.set(pathKey, cleanPayload(payload));
+}
+
+function invalidateCache(pathKey) {
+  writeCache.delete(pathKey);
+  if (pendingWriteTimers.has(pathKey)) {
+    const pending = pendingWriteTimers.get(pathKey);
+    clearTimeout(pending.timerId);
+    pendingWriteTimers.delete(pathKey);
+    pending.resolves.forEach(r => r.resolve());
+  }
+}
+
+// Deep Comparison of objects ignoring timestamps to prevent echo updates
+export function isDeepEqual(obj1, obj2) {
+  if (obj1 === obj2) return true;
+  if (obj1 == null || obj2 == null) return false;
+  if (typeof obj1 !== typeof obj2) return false;
+
+  if (Array.isArray(obj1)) {
+    if (!Array.isArray(obj2) || obj1.length !== obj2.length) return false;
+    for (let i = 0; i < obj1.length; i++) {
+      if (!isDeepEqual(obj1[i], obj2[i])) return false;
+    }
+    return true;
+  }
+
+  if (typeof obj1 === 'object') {
+    const ignoredKeys = new Set(['updated_at', 'lastActionTimestamp', 'last_action_timestamp', 'clientTimestamp', 'connectedAt']);
+    const keys1 = Object.keys(obj1).filter(k => !ignoredKeys.has(k));
+    const keys2 = Object.keys(obj2).filter(k => !ignoredKeys.has(k));
+
+    if (keys1.length !== keys2.length) return false;
+    for (const key of keys1) {
+      if (!keys2.includes(key)) return false;
+      if (!isDeepEqual(obj1[key], obj2[key])) return false;
+    }
+    return true;
+  }
+
+  return false;
+}
+
+// Centralized Write Router: Buffers, Debounces, and Batches Writes
+export async function smartWrite(docRef, payload, pathKey, useBatch = false, delay = 1500) {
+  return new Promise((resolve, reject) => {
+    const clean = cleanPayload(payload);
+
+    // 1. Structural deep equality comparison check
+    const cached = writeCache.get(pathKey);
+    if (cached && isDeepEqual(cached, clean)) {
+      debugLog(`[Deduplication Shield] Write SKIPPED for path: ${pathKey} (No changes detected)`);
+      resolve();
+      return;
+    }
+
+    if (useBatch) {
+      // Add to transactional writeBatch queue
+      const existingIndex = batchQueue.findIndex(item => item.pathKey === pathKey);
+      if (existingIndex !== -1) {
+        batchQueue[existingIndex].payload = clean;
+        batchQueue[existingIndex].resolves.push({ resolve, reject });
+      } else {
+        batchQueue.push({
+          docRef,
+          payload: clean,
+          pathKey,
+          resolves: [{ resolve, reject }]
+        });
+      }
+
+      if (batchTimer) clearTimeout(batchTimer);
+      batchTimer = setTimeout(executeBatchWrites, 800); // 800ms debounce for batched task updates
+    } else {
+      // Standard debounced write
+      if (pendingWriteTimers.has(pathKey)) {
+        const pending = pendingWriteTimers.get(pathKey);
+        clearTimeout(pending.timerId);
+        pending.payload = clean;
+        pending.resolves.push({ resolve, reject });
+        pending.timerId = setTimeout(() => executeBufferedWrite(docRef, pathKey), delay);
+      } else {
+        const pending = {
+          payload: clean,
+          resolves: [{ resolve, reject }],
+          timerId: null
+        };
+        pending.timerId = setTimeout(() => executeBufferedWrite(docRef, pathKey), delay);
+        pendingWriteTimers.set(pathKey, pending);
+      }
+    }
+  });
+}
+
+// Executes buffered single write after debounce delay
+async function executeBufferedWrite(docRef, pathKey) {
+  const pending = pendingWriteTimers.get(pathKey);
+  if (!pending) return;
+  pendingWriteTimers.delete(pathKey);
+
+  try {
+    debugLog(`[Buffered Write] Committing to Firestore: ${pathKey}`, pending.payload);
+    await setDoc(docRef, pending.payload, { merge: true });
+    writeCache.set(pathKey, pending.payload); // Lock successfully committed state to cache
+    debugLog(`[Buffered Write] SUCCESS: ${pathKey}`);
+    pending.resolves.forEach(r => r.resolve());
+  } catch (err) {
+    errorLog(`[Buffered Write] FAILURE: ${pathKey}`, err);
+    pending.resolves.forEach(r => r.reject(err));
+  }
+}
+
+// Commits all queued batch writes in a single Firestore writeBatch transaction
+async function executeBatchWrites() {
+  if (batchQueue.length === 0) return;
+  const currentBatch = [...batchQueue];
+  batchQueue.length = 0; // Clear queue
+
+  debugLog(`[Batch Engine] Committing transactional batch for ${currentBatch.length} operations...`);
+
+  // Optimize: If only 1 document is in the queue, perform standard setDoc to avoid transaction overhead
+  if (currentBatch.length === 1) {
+    const item = currentBatch[0];
+    try {
+      await setDoc(item.docRef, item.payload, { merge: true });
+      writeCache.set(item.pathKey, item.payload);
+      debugLog(`[Batch Engine] Single Batched Write SUCCESS: ${item.pathKey}`);
+      item.resolves.forEach(r => r.resolve());
+    } catch (err) {
+      errorLog(`[Batch Engine] Single Batched Write FAILURE: ${item.pathKey}`, err);
+      item.resolves.forEach(r => r.reject(err));
+    }
+    return;
+  }
+
+  const batch = writeBatch(fireDb);
+  currentBatch.forEach(item => {
+    batch.set(item.docRef, item.payload, { merge: true });
+  });
+
+  try {
+    await batch.commit();
+    currentBatch.forEach(item => {
+      writeCache.set(item.pathKey, item.payload);
+      debugLog(`[Batch Engine] Batched Write SUCCESS: ${item.pathKey}`);
+      item.resolves.forEach(r => r.resolve());
+    });
+  } catch (err) {
+    errorLog(`[Batch Engine] Batched Transaction FAILURE`, err);
+    currentBatch.forEach(item => {
+      item.resolves.forEach(r => r.reject(err));
+    });
+  }
+}
+
 // ── Goals ──────────────────────────────────────────────
 export async function fetchGoals(userId) {
   try {
@@ -58,10 +224,17 @@ export async function fetchGoals(userId) {
     for (const goalDoc of snap.docs) {
       const g = goalDoc.data();
       if (g.deleted || g.isDeleted) continue;
+      
+      const goalPathKey = `users/${userId}/goals/${goalDoc.id}`;
+      writeCache.set(goalPathKey, cleanPayload(g)); // Cache primed value
+
       // Fetch nested habits sub-collection
       const habitsSnap = await getDocs(collection(goalDoc.ref, 'habits'));
       const habits = habitsSnap.docs.map(h => {
         const hd = h.data();
+        const habitPathKey = `users/${userId}/goals/${goalDoc.id}/habits/${h.id}`;
+        writeCache.set(habitPathKey, cleanPayload(hd)); // Cache primed value
+        
         return {
           id: h.id,
           title: hd.title,
@@ -112,7 +285,7 @@ export async function fetchGoals(userId) {
 }
 
 export async function upsertGoal(userId, goal) {
-  const payload = cleanPayload({
+  const payload = {
     title: goal.title,
     description: goal.description ?? '',
     mode: goal.mode ?? 'ALL',
@@ -130,28 +303,29 @@ export async function upsertGoal(userId, goal) {
     extensions: goal.extensions || [],
     created_at: goal.createdAt || new Date().toISOString(),
     updated_at: new Date().toISOString(),
-  });
+  };
 
-  try {
-    debugLog(`Write START: upsertGoal [id=${goal.id}]`, payload);
-    await setDoc(userDoc(userId, 'goals', String(goal.id)), payload, { merge: true });
-    debugLog(`Write SUCCESS: upsertGoal [id=${goal.id}]`);
-  } catch (err) {
-    errorLog(`Write FAILURE: upsertGoal [id=${goal.id}]`, err);
-  }
+  const pathKey = `users/${userId}/goals/${goal.id}`;
+  const docRef = userDoc(userId, 'goals', String(goal.id));
+  return smartWrite(docRef, payload, pathKey, true, 1000);
 }
 
 export async function deleteGoalDb(userId, goalId) {
   try {
     debugLog(`Write START: deleteGoalDb [id=${goalId}]`);
     const goalRef = userDoc(userId, 'goals', String(goalId));
+    invalidateCache(`users/${userId}/goals/${goalId}`);
+
     // Soft-delete markers updated first to preempt cache snapshot triggers in other tabs or offline
     await setDoc(goalRef, { deleted: true, isDeleted: true }, { merge: true });
 
     // Delete all habits in sub-collection first
     const habitsSnap = await getDocs(collection(fireDb, 'users', userId, 'goals', String(goalId), 'habits'));
     const batch = writeBatch(fireDb);
-    habitsSnap.docs.forEach(h => batch.delete(h.ref));
+    habitsSnap.docs.forEach(h => {
+      invalidateCache(`users/${userId}/goals/${goalId}/habits/${h.id}`);
+      batch.delete(h.ref);
+    });
     batch.delete(goalRef);
     await batch.commit();
     debugLog(`Write SUCCESS: deleteGoalDb [id=${goalId}]`);
@@ -162,7 +336,7 @@ export async function deleteGoalDb(userId, goalId) {
 
 // ── Habits ─────────────────────────────────────────────
 export async function upsertHabit(userId, goalId, habit) {
-  const payload = cleanPayload({
+  const payload = {
     title: habit.title,
     type: habit.type ?? 'time',
     time_spent: habit.timeSpent ?? 0,
@@ -172,7 +346,7 @@ export async function upsertHabit(userId, goalId, habit) {
     completed: habit.completed ?? false,
     streak: habit.streak ?? 0,
     last_completed_date: habit.lastCompletedDate || null,
-    completed_dates: habit.completedDates || [],
+    completed_dates: habit.completed_dates || habit.completedDates || [],
     missed_days: habit.missedDays ?? 0,
     schedule_days: habit.scheduleDays || [],
     last_active_date: habit.lastActiveDate || null,
@@ -180,21 +354,17 @@ export async function upsertHabit(userId, goalId, habit) {
     original_target: habit.originalTarget || null,
     created_at: habit.createdAt || new Date().toISOString(),
     updated_at: new Date().toISOString(),
-  });
+  };
 
-  try {
-    debugLog(`Write START: upsertHabit [goalId=${goalId}, habitId=${habit.id}]`, payload);
-    const habitRef = doc(fireDb, 'users', userId, 'goals', String(goalId), 'habits', String(habit.id));
-    await setDoc(habitRef, payload, { merge: true });
-    debugLog(`Write SUCCESS: upsertHabit [goalId=${goalId}, habitId=${habit.id}]`);
-  } catch (err) {
-    errorLog(`Write FAILURE: upsertHabit [goalId=${goalId}, habitId=${habit.id}]`, err);
-  }
+  const pathKey = `users/${userId}/goals/${goalId}/habits/${habit.id}`;
+  const habitRef = doc(fireDb, 'users', userId, 'goals', String(goalId), 'habits', String(habit.id));
+  return smartWrite(habitRef, payload, pathKey, true, 1000);
 }
 
 export async function deleteHabitDb(userId, goalId, habitId) {
   try {
     debugLog(`Write START: deleteHabitDb [goalId=${goalId}, habitId=${habitId}]`);
+    invalidateCache(`users/${userId}/goals/${goalId}/habits/${habitId}`);
     await deleteDoc(doc(fireDb, 'users', userId, 'goals', String(goalId), 'habits', String(habitId)));
     debugLog(`Write SUCCESS: deleteHabitDb [goalId=${goalId}, habitId=${habitId}]`);
   } catch (err) {
@@ -203,33 +373,21 @@ export async function deleteHabitDb(userId, goalId, habitId) {
 }
 
 export async function updateHabitTime(userId, goalId, habitId, timeSpent) {
-  try {
-    debugLog(`Write START: updateHabitTime [goalId=${goalId}, habitId=${habitId}]`);
-    await setDoc(doc(fireDb, 'users', userId, 'goals', goalId, 'habits', habitId), { time_spent: timeSpent }, { merge: true });
-    debugLog(`Write SUCCESS: updateHabitTime [goalId=${goalId}, habitId=${habitId}]`);
-  } catch (err) {
-    errorLog(`Write FAILURE: updateHabitTime [goalId=${goalId}, habitId=${habitId}]`, err);
-  }
+  const pathKey = `users/${userId}/goals/${goalId}/habits/${habitId}`;
+  const docRef = doc(fireDb, 'users', userId, 'goals', goalId, 'habits', habitId);
+  return smartWrite(docRef, { time_spent: timeSpent }, pathKey, true, 1200);
 }
 
 export async function updateHabitCount(userId, goalId, habitId, currentCount) {
-  try {
-    debugLog(`Write START: updateHabitCount [goalId=${goalId}, habitId=${habitId}]`);
-    await setDoc(doc(fireDb, 'users', userId, 'goals', goalId, 'habits', habitId), { current_count: currentCount }, { merge: true });
-    debugLog(`Write SUCCESS: updateHabitCount [goalId=${goalId}, habitId=${habitId}]`);
-  } catch (err) {
-    errorLog(`Write FAILURE: updateHabitCount [goalId=${goalId}, habitId=${habitId}]`, err);
-  }
+  const pathKey = `users/${userId}/goals/${goalId}/habits/${habitId}`;
+  const docRef = doc(fireDb, 'users', userId, 'goals', goalId, 'habits', habitId);
+  return smartWrite(docRef, { current_count: currentCount }, pathKey, true, 1200);
 }
 
 export async function updateHabitCheck(userId, goalId, habitId, completed) {
-  try {
-    debugLog(`Write START: updateHabitCheck [goalId=${goalId}, habitId=${habitId}]`);
-    await setDoc(doc(fireDb, 'users', userId, 'goals', goalId, 'habits', habitId), { completed }, { merge: true });
-    debugLog(`Write SUCCESS: updateHabitCheck [goalId=${goalId}, habitId=${habitId}]`);
-  } catch (err) {
-    errorLog(`Write FAILURE: updateHabitCheck [goalId=${goalId}, habitId=${habitId}]`, err);
-  }
+  const pathKey = `users/${userId}/goals/${goalId}/habits/${habitId}`;
+  const docRef = doc(fireDb, 'users', userId, 'goals', goalId, 'habits', habitId);
+  return smartWrite(docRef, { completed }, pathKey, true, 1000);
 }
 
 // ── Tasks ──────────────────────────────────────────────
@@ -239,6 +397,9 @@ export async function fetchTasks(userId) {
     const snap = await getDocs(q);
     return snap.docs.map(d => {
       const t = d.data();
+      const pathKey = `users/${userId}/tasks/${d.id}`;
+      writeCache.set(pathKey, cleanPayload(t)); // Prime values in cache
+
       return {
         id: d.id,
         title: t.title,
@@ -269,7 +430,7 @@ export async function fetchTasks(userId) {
 }
 
 export async function upsertTask(userId, task) {
-  const payload = cleanPayload({
+  const payload = {
     title: task.title,
     type: task.type ?? 'daily',
     completion_type: task.completionType ?? 'time',
@@ -291,20 +452,17 @@ export async function upsertTask(userId, task) {
     original_target: task.originalTarget || null,
     created_at: task.createdAt || new Date().toISOString(),
     updated_at: new Date().toISOString(),
-  });
+  };
 
-  try {
-    debugLog(`Write START: upsertTask [id=${task.id}]`, payload);
-    await setDoc(userDoc(userId, 'tasks', task.id), payload, { merge: true });
-    debugLog(`Write SUCCESS: upsertTask [id=${task.id}]`);
-  } catch (err) {
-    errorLog(`Write FAILURE: upsertTask [id=${task.id}]`, err);
-  }
+  const pathKey = `users/${userId}/tasks/${task.id}`;
+  const docRef = userDoc(userId, 'tasks', task.id);
+  return smartWrite(docRef, payload, pathKey, true, 1000);
 }
 
 export async function deleteTaskDb(userId, taskId) {
   try {
     debugLog(`Write START: deleteTaskDb [id=${taskId}]`);
+    invalidateCache(`users/${userId}/tasks/${taskId}`);
     await deleteDoc(userDoc(userId, 'tasks', taskId));
     debugLog(`Write SUCCESS: deleteTaskDb [id=${taskId}]`);
   } catch (err) {
@@ -319,6 +477,8 @@ export async function fetchFocusHistory(userId) {
     const history = {};
     snap.docs.forEach(d => {
       const data = d.data();
+      const pathKey = `users/${userId}/focus_history/${d.id}`;
+      writeCache.set(pathKey, cleanPayload(data)); // Prime values in cache
       history[d.id] = data.seconds;
     });
     return history;
@@ -329,14 +489,10 @@ export async function fetchFocusHistory(userId) {
 }
 
 export async function upsertFocusHistory(userId, date, seconds) {
-  const payload = cleanPayload({ seconds, updated_at: new Date().toISOString() });
-  try {
-    debugLog(`Write START: upsertFocusHistory [date=${date}]`, payload);
-    await setDoc(userDoc(userId, 'focus_history', date), payload, { merge: true });
-    debugLog(`Write SUCCESS: upsertFocusHistory [date=${date}]`);
-  } catch (err) {
-    errorLog(`Write FAILURE: upsertFocusHistory [date=${date}]`, err);
-  }
+  const payload = { seconds, updated_at: new Date().toISOString() };
+  const pathKey = `users/${userId}/focus_history/${date}`;
+  const docRef = userDoc(userId, 'focus_history', date);
+  return smartWrite(docRef, payload, pathKey, false, 3000);
 }
 
 // ── Task Logs ──────────────────────────────────────────
@@ -347,6 +503,8 @@ export async function fetchTaskLogs(userId) {
     const logs = {};
     snap.docs.forEach(d => {
       const row = d.data();
+      const pathKey = `users/${userId}/task_logs/${d.id}`;
+      writeCache.set(pathKey, cleanPayload(row)); // Prime values in cache
       logs[row.date] = {
         date: row.date,
         total_tasks: row.total_tasks || 0,
@@ -363,21 +521,17 @@ export async function fetchTaskLogs(userId) {
 }
 
 export async function upsertTaskLog(userId, summary) {
-  const payload = cleanPayload({
+  const payload = {
     date: summary.date,
     total_tasks: summary.total_tasks,
     completed_tasks: summary.completed_tasks,
     time_spent: summary.time_spent,
     auto_completed: summary.auto_completed || false,
     updated_at: new Date().toISOString(),
-  });
-  try {
-    debugLog(`Write START: upsertTaskLog [date=${summary.date}]`, payload);
-    await setDoc(userDoc(userId, 'task_logs', summary.date), payload, { merge: true });
-    debugLog(`Write SUCCESS: upsertTaskLog [date=${summary.date}]`);
-  } catch (err) {
-    errorLog(`Write FAILURE: upsertTaskLog [date=${summary.date}]`, err);
-  }
+  };
+  const pathKey = `users/${userId}/task_logs/${summary.date}`;
+  const docRef = userDoc(userId, 'task_logs', summary.date);
+  return smartWrite(docRef, payload, pathKey, false, 3000);
 }
 
 // ── User Settings ──────────────────────────────────────
@@ -385,7 +539,13 @@ export async function fetchUserSettings(userId) {
   try {
     const snap = await getDocs(userCol(userId, 'settings'));
     if (snap.empty) return null;
-    const data = snap.docs[0].data();
+    const prefDoc = snap.docs.find(d => d.id === 'preferences');
+    if (!prefDoc) return null;
+    
+    const data = prefDoc.data();
+    const pathKey = `users/${userId}/settings/preferences`;
+    writeCache.set(pathKey, cleanPayload(data)); // Prime value in cache
+
     return {
       theme: data.theme || 'dark',
       focusTimeToday: data.focus_time_today || 0,
@@ -398,19 +558,15 @@ export async function fetchUserSettings(userId) {
 }
 
 export async function upsertUserSettings(userId, settings) {
-  const payload = cleanPayload({
+  const payload = {
     theme: settings.theme,
     focus_time_today: settings.focusTimeToday ?? 0,
     last_reset: settings.lastReset,
     updated_at: new Date().toISOString(),
-  });
-  try {
-    debugLog(`Write START: upsertUserSettings`, payload);
-    await setDoc(userDoc(userId, 'settings', 'preferences'), payload, { merge: true });
-    debugLog(`Write SUCCESS: upsertUserSettings`);
-  } catch (err) {
-    errorLog(`Write FAILURE: upsertUserSettings`, err);
-  }
+  };
+  const pathKey = `users/${userId}/settings/preferences`;
+  const docRef = userDoc(userId, 'settings', 'preferences');
+  return smartWrite(docRef, payload, pathKey, false, 2000);
 }
 
 // ── Notes ──────────────────────────────────────────────
@@ -420,6 +576,9 @@ export async function fetchNotes(userId) {
     const snap = await getDocs(q);
     return snap.docs.map(d => {
       const n = d.data();
+      const pathKey = `users/${userId}/notes/${d.id}`;
+      writeCache.set(pathKey, cleanPayload(n)); // Prime value in cache
+
       return {
         id: d.id,
         title: n.title || '',
@@ -440,7 +599,7 @@ export async function fetchNotes(userId) {
 }
 
 export async function upsertNote(userId, note) {
-  const payload = cleanPayload({
+  const payload = {
     title: note.title || '',
     content: note.content || '',
     tags: note.tags || [],
@@ -450,19 +609,17 @@ export async function upsertNote(userId, note) {
     folder: note.folder || '',
     created_at: note.created_at || new Date().toISOString(),
     updated_at: note.updated_at || new Date().toISOString(),
-  });
-  try {
-    debugLog(`Write START: upsertNote [id=${note.id}]`, payload);
-    await setDoc(userDoc(userId, 'notes', note.id), payload, { merge: true });
-    debugLog(`Write SUCCESS: upsertNote [id=${note.id}]`);
-  } catch (err) {
-    errorLog(`Write FAILURE: upsertNote [id=${note.id}]`, err);
-  }
+  };
+
+  const pathKey = `users/${userId}/notes/${note.id}`;
+  const docRef = userDoc(userId, 'notes', note.id);
+  return smartWrite(docRef, payload, pathKey, false, 1500);
 }
 
 export async function deleteNoteDb(userId, noteId) {
   try {
     debugLog(`Write START: deleteNoteDb [id=${noteId}]`);
+    invalidateCache(`users/${userId}/notes/${noteId}`);
     await deleteDoc(userDoc(userId, 'notes', noteId));
     debugLog(`Write SUCCESS: deleteNoteDb [id=${noteId}]`);
   } catch (err) {
@@ -475,7 +632,13 @@ export async function fetchXpData(userId) {
   try {
     const snap = await getDocs(userCol(userId, 'xp'));
     if (snap.empty) return null;
-    const data = snap.docs[0].data();
+    const profileDoc = snap.docs.find(d => d.id === 'profile');
+    if (!profileDoc) return null;
+
+    const data = profileDoc.data();
+    const pathKey = `users/${userId}/xp/profile`;
+    writeCache.set(pathKey, cleanPayload(data)); // Prime value in cache
+
     return {
       totalXP: data.total_xp || 0,
       level: data.level || 1,
@@ -494,7 +657,7 @@ export async function fetchXpData(userId) {
 }
 
 export async function upsertXpData(userId, xpData) {
-  const payload = cleanPayload({
+  const payload = {
     total_xp: xpData.totalXP || 0,
     level: xpData.level || 1,
     earned_badges: xpData.earnedBadges || [],
@@ -505,36 +668,30 @@ export async function upsertXpData(userId, xpData) {
     last_xp_date: xpData.lastXPDate || '',
     xp_history: (xpData.xpHistory || []).slice(0, 50),
     updated_at: new Date().toISOString(),
-  });
-  try {
-    debugLog(`Write START: upsertXpData`, payload);
-    await setDoc(userDoc(userId, 'xp', 'profile'), payload, { merge: true });
-    debugLog(`Write SUCCESS: upsertXpData`);
-  } catch (err) {
-    errorLog(`Write FAILURE: upsertXpData`, err);
-  }
+  };
+
+  const pathKey = `users/${userId}/xp/profile`;
+  const docRef = userDoc(userId, 'xp', 'profile');
+  return smartWrite(docRef, payload, pathKey, false, 3000);
 }
 
 // ── User Profile ───────────────────────────────────────
 export async function upsertUserProfile(userId, profile) {
-  const payload = cleanPayload({
+  const payload = {
     display_name: profile.displayName || '',
     email: profile.email || '',
     photo_url: profile.photoURL || '',
     updated_at: new Date().toISOString(),
-  });
-  try {
-    debugLog(`Write START: upsertUserProfile`, payload);
-    await setDoc(doc(fireDb, 'users', userId), payload, { merge: true });
-    debugLog(`Write SUCCESS: upsertUserProfile`);
-  } catch (err) {
-    errorLog(`Write FAILURE: upsertUserProfile`, err);
-  }
+  };
+
+  const pathKey = `users/${userId}/profile`;
+  const docRef = doc(fireDb, 'users', userId);
+  return smartWrite(docRef, payload, pathKey, false, 2000);
 }
 
 // ── Story Moment Memories ──────────────────────────────────
 export async function upsertMemory(userId, memory) {
-  const payload = cleanPayload({
+  const payload = {
     goalId: memory.goalId || '',
     title: memory.title || '',
     completionDate: memory.completionDate || '',
@@ -545,19 +702,17 @@ export async function upsertMemory(userId, memory) {
     achievementStats: memory.achievementStats || {},
     createdAt: memory.createdAt || new Date().toISOString(),
     updatedAt: new Date().toISOString()
-  });
-  try {
-    debugLog(`Write START: upsertMemory [id=${memory.id}]`, payload);
-    await setDoc(userDoc(userId, 'memories', memory.id), payload, { merge: true });
-    debugLog(`Write SUCCESS: upsertMemory [id=${memory.id}]`);
-  } catch (err) {
-    errorLog(`Write FAILURE: upsertMemory [id=${memory.id}]`, err);
-  }
+  };
+
+  const pathKey = `users/${userId}/memories/${memory.id}`;
+  const docRef = userDoc(userId, 'memories', memory.id);
+  return smartWrite(docRef, payload, pathKey, false, 1500);
 }
 
 export async function deleteMemoryDb(userId, memoryId) {
   try {
     debugLog(`Write START: deleteMemoryDb [id=${memoryId}]`);
+    invalidateCache(`users/${userId}/memories/${memoryId}`);
     await deleteDoc(userDoc(userId, 'memories', memoryId));
     debugLog(`Write SUCCESS: deleteMemoryDb [id=${memoryId}]`);
   } catch (err) {
@@ -574,32 +729,64 @@ export async function clearUserDataDb(userId) {
     const goalsSnap = await getDocs(userCol(userId, 'goals'));
     for (const goalDoc of goalsSnap.docs) {
       const habitsSnap = await getDocs(collection(goalDoc.ref, 'habits'));
-      habitsSnap.docs.forEach(h => batch.delete(h.ref));
+      habitsSnap.docs.forEach(h => {
+        invalidateCache(`users/${userId}/goals/${goalDoc.id}/habits/${h.id}`);
+        batch.delete(h.ref);
+      });
+      invalidateCache(`users/${userId}/goals/${goalDoc.id}`);
       batch.delete(goalDoc.ref);
     }
 
     // 2. Delete all tasks
     const tasksSnap = await getDocs(userCol(userId, 'tasks'));
-    tasksSnap.docs.forEach(t => batch.delete(t.ref));
+    tasksSnap.docs.forEach(t => {
+      invalidateCache(`users/${userId}/tasks/${t.id}`);
+      batch.delete(t.ref);
+    });
 
     // 3. Delete all task_logs
     const taskLogsSnap = await getDocs(userCol(userId, 'task_logs'));
-    taskLogsSnap.docs.forEach(l => batch.delete(l.ref));
+    taskLogsSnap.docs.forEach(l => {
+      invalidateCache(`users/${userId}/task_logs/${l.id}`);
+      batch.delete(l.ref);
+    });
 
     // 4. Delete all focus_history
     const focusHistorySnap = await getDocs(userCol(userId, 'focus_history'));
-    focusHistorySnap.docs.forEach(f => batch.delete(f.ref));
+    focusHistorySnap.docs.forEach(f => {
+      invalidateCache(`users/${userId}/focus_history/${f.id}`);
+      batch.delete(f.ref);
+    });
 
     // 5. Delete all memories
     const memoriesSnap = await getDocs(userCol(userId, 'memories'));
-    memoriesSnap.docs.forEach(m => batch.delete(m.ref));
+    memoriesSnap.docs.forEach(m => {
+      invalidateCache(`users/${userId}/memories/${m.id}`);
+      batch.delete(m.ref);
+    });
 
     // Commit deletions
     await batch.commit();
 
+    // Clear memory write timers
+    const prefix = `users/${userId}/`;
+    for (const key of pendingWriteTimers.keys()) {
+      if (key.startsWith(prefix)) {
+        const pending = pendingWriteTimers.get(key);
+        clearTimeout(pending.timerId);
+        pendingWriteTimers.delete(key);
+        pending.resolves.forEach(r => r.resolve());
+      }
+    }
+    for (const key of writeCache.keys()) {
+      if (key.startsWith(prefix)) {
+        writeCache.delete(key);
+      }
+    }
+
     // 6. Reset XP Profile
     const xpRef = userDoc(userId, 'xp', 'profile');
-    await setDoc(xpRef, {
+    const xpPayload = {
       total_xp: 0,
       level: 1,
       earned_badges: [],
@@ -610,7 +797,9 @@ export async function clearUserDataDb(userId) {
       last_xp_date: '',
       xp_history: [],
       updated_at: new Date().toISOString()
-    });
+    };
+    await setDoc(xpRef, xpPayload, { merge: true });
+    writeCache.set(`users/${userId}/xp/profile`, cleanPayload(xpPayload));
 
     // 7. Reset Settings preferences (keep theme, reset others)
     const settingsRef = userDoc(userId, 'settings', 'preferences');
@@ -622,12 +811,14 @@ export async function clearUserDataDb(userId) {
         currentTheme = prefDoc.data()?.theme || 'dark';
       }
     }
-    await setDoc(settingsRef, {
+    const settingsPayload = {
       theme: currentTheme,
       focus_time_today: 0,
       last_reset: '',
       updated_at: new Date().toISOString()
-    });
+    };
+    await setDoc(settingsRef, settingsPayload, { merge: true });
+    writeCache.set(`users/${userId}/settings/preferences`, cleanPayload(settingsPayload));
 
   } catch (err) {
     console.error('[FirestoreDB] Error clearing user data:', err);
@@ -690,4 +881,3 @@ export function enableNetworkReconnectSync(onReconnectCallback) {
     window.removeEventListener('offline', handleOffline);
   };
 }
-
