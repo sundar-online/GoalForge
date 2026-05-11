@@ -239,3 +239,45 @@ body {
   box-shadow: none !important;
 }
 
+/* Fix random white line/flicker issue on card edges during edit, scroll, or re-render */
+.rich-editor-canvas,
+.notes-card-stable {
+  position: relative;
+  background-clip: padding-box !important;
+  isolation: isolate;
+  contain: paint; /* Enforces strict paint containment, preventing any children or content from rendering outside the bounds */
+  
+  /* Prevent word/content overflow and text bleeding */
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+.notes-card-stable {
+  overflow: hidden !important;
+}
+
+.rich-editor-canvas {
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+}
+
+/* Remove all animations, scaling, and transitions inside Notes Page */
+.notes-page-root,
+.notes-page-root *,
+.notes-page-root *:before,
+.notes-page-root *:after {
+  transition: none !important;
+  transition-property: none !important;
+  animation: none !important;
+  animation-duration: 0s !important;
+  animation-delay: 0s !important;
+}
+
+/* Also disable all hover/active scales and zoom states in the notes section */
+.notes-page-root *:hover,
+.notes-page-root *:active {
+  transform: none !important;
+  scale: none !important;
+}
+
+

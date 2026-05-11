@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { useNotes } from '../context/AppContext';
 import {
   Plus, ArrowLeft, Trash2, CheckSquare, Square, Check,
@@ -22,7 +21,47 @@ const fmtDate = (iso) => {
 
 const stripHtml = (html) => {
   if (!html) return '';
-  return html.replace(/<[^>]*>/g, ' ');
+  let text = html
+    .replace(/<\/?(?:p|div|br|tr|td|li|h[1-6])[^>]*>/gi, ' ')
+    .replace(/<[^>]*>/g, ' ');
+
+  const entities = {
+    '&nbsp;': ' ',
+    '&amp;': '&',
+    '&lt;': '<',
+    '&gt;': '>',
+    '&quot;': '"',
+    '&#39;': "'",
+    '&apos;': "'",
+    '&cent;': '¢',
+    '&pound;': '£',
+    '&yen;': '¥',
+    '&euro;': '€',
+    '&copy;': '©',
+    '&reg;': '®'
+  };
+
+  text = text.replace(/&[a-z0-9#]+;/gi, (match) => {
+    const lower = match.toLowerCase();
+    if (entities[lower]) {
+      return entities[lower];
+    }
+    if (lower.startsWith('&#')) {
+      try {
+        const num = lower.startsWith('&#x') 
+          ? parseInt(lower.substring(3, lower.length - 1), 16)
+          : parseInt(lower.substring(2, lower.length - 1), 10);
+        if (!isNaN(num)) {
+          return String.fromCharCode(num);
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+    return match;
+  });
+
+  return text;
 };
 
 const getPreview = (note) => {
@@ -66,6 +105,17 @@ export const NotesPage = () => {
   const saveTimeoutRef = useRef(null);
   const editorRef = useRef(null);
 
+  const latestContentRef = useRef('');
+  const latestNoteRef = useRef(null);
+
+  useEffect(() => {
+    latestContentRef.current = localContent;
+  }, [localContent]);
+
+  useEffect(() => {
+    latestNoteRef.current = activeNote;
+  }, [activeNote]);
+
   // Sync localContent when activeNote ID changes
   useEffect(() => {
     if (activeNote) {
@@ -75,11 +125,12 @@ export const NotesPage = () => {
     }
   }, [activeNote?.id]);
 
-  // Sync editor innerHTML when activeNote ID changes
+  // Sync editor innerHTML when activeNote ID changes (including clearing on exit)
   useEffect(() => {
-    if (editorRef.current && activeNote) {
-      if (editorRef.current.innerHTML !== activeNote.content) {
-        editorRef.current.innerHTML = activeNote.content || '';
+    if (editorRef.current) {
+      const targetContent = activeNote ? (activeNote.content || '') : '';
+      if (editorRef.current.innerHTML !== targetContent) {
+        editorRef.current.innerHTML = targetContent;
       }
     }
   }, [activeNote?.id]);
@@ -89,6 +140,12 @@ export const NotesPage = () => {
     return () => {
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
+        if (latestNoteRef.current) {
+          updateNote(latestNoteRef.current.id, {
+            content: latestContentRef.current,
+            updated_at: new Date().toISOString()
+          });
+        }
       }
     };
   }, [activeNote?.id]);
@@ -285,11 +342,9 @@ export const NotesPage = () => {
   useEffect(() => {
     if (view === 'new') setTimeout(() => titleRef.current?.focus(), 100);
   }, [view]);
-
-  // ── RENDER: New Note ──────────────────────────────────
   if (view === 'new') {
     return (
-      <div className="flex flex-col gap-6">
+      <div key="notes-new-view" className="flex flex-col gap-6 notes-page-root">
         <header className="flex items-center gap-4">
           <button 
             onClick={() => setView('list')}
@@ -398,10 +453,8 @@ export const NotesPage = () => {
     const doneCount = isChecklist ? activeNote.checklist.filter(c => c.completed).length : 0;
     const totalCount = isChecklist ? activeNote.checklist.length : 0;
     const progressPct = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;
-
     return (
-      <div className="flex flex-col gap-6 pb-32 md:pb-10">
-        {/* Header */}
+      <div key={`notes-detail-${activeNote?.id}`} className="flex flex-col gap-6 pb-32 md:pb-10 notes-page-root">
         <header className="flex items-center gap-4">
           <button onClick={handleGoBack}
             className="w-11 h-11 rounded-xl bg-bg-card border border-border-light flex items-center justify-center text-text-main hover:bg-bg-input transition-all active:scale-90 shadow-sm flex-shrink-0">
@@ -557,42 +610,36 @@ export const NotesPage = () => {
         {/* Checklist Items */}
         {isChecklist && (
           <div className="flex flex-col gap-3">
-            <AnimatePresence initial={false}>
-              {[...activeNote.checklist]
-                .sort((a, b) => Number(a.completed) - Number(b.completed))
-                .map((item) => (
-                  <motion.div 
-                    layout
-                    key={item.id} 
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.95 }}
-                    className={`bg-bg-card border p-4 rounded-2xl flex items-center gap-4 transition-all ${item.completed ? 'border-border-med opacity-60' : 'border-border-light shadow-xs'}`}
+            {[...activeNote.checklist]
+              .sort((a, b) => Number(a.completed) - Number(b.completed))
+              .map((item) => (
+                <div 
+                  key={item.id} 
+                  className={`bg-bg-card border p-4 rounded-2xl flex items-center gap-4 transition-all ${item.completed ? 'border-border-med opacity-60' : 'border-border-light shadow-xs'}`}
+                >
+                  <button
+                    onClick={() => handleToggleItem(item.id)}
+                    className={`w-7 h-7 rounded-lg border-2 flex items-center justify-center transition-all ${
+                      item.completed 
+                      ? 'bg-accent-blue border-accent-blue' 
+                      : 'bg-bg-input border-border-med'
+                    }`}
                   >
-                    <button
-                      onClick={() => handleToggleItem(item.id)}
-                      className={`w-7 h-7 rounded-lg border-2 flex items-center justify-center transition-all ${
-                        item.completed 
-                        ? 'bg-accent-blue border-accent-blue' 
-                        : 'bg-bg-input border-border-med'
-                      }`}
-                    >
-                      {item.completed && <Check size={14} strokeWidth={4} className="text-white" />}
-                    </button>
-                    <input
-                      value={item.text}
-                      onChange={e => handleUpdateItemText(item.id, e.target.value)}
-                      className={`flex-1 bg-transparent border-none text-sm font-bold text-text-main outline-hidden p-0 ${item.completed ? 'line-through' : ''}`}
-                    />
-                    <button
-                      onClick={() => handleDeleteItem(item.id)}
-                      className="text-text-muted opacity-30 hover:opacity-100 hover:text-red-500 transition-all p-1"
-                    >
-                      <X size={14} />
-                    </button>
-                  </motion.div>
-                ))}
-            </AnimatePresence>
+                    {item.completed && <Check size={14} strokeWidth={4} className="text-white" />}
+                  </button>
+                  <input
+                    value={item.text}
+                    onChange={e => handleUpdateItemText(item.id, e.target.value)}
+                    className={`flex-1 bg-transparent border-none text-sm font-bold text-text-main outline-hidden p-0 ${item.completed ? 'line-through' : ''}`}
+                  />
+                  <button
+                    onClick={() => handleDeleteItem(item.id)}
+                    className="text-text-muted opacity-30 hover:opacity-100 hover:text-red-500 transition-all p-1"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              ))}
 
             <div className="bg-bg-card border-2 border-dashed border-border-med p-4 rounded-2xl flex items-center gap-4 group focus-within:border-accent-blue transition-colors">
               <div className="w-7 h-7 rounded-lg border-2 border-dashed border-border-med flex items-center justify-center">
@@ -622,7 +669,7 @@ export const NotesPage = () => {
         {!isChecklist && (
           <div className="flex flex-col gap-4">
             {/* Rich Text Toolbar */}
-            <div className="bg-bg-card border border-border-light rounded-2xl p-2.5 flex items-center gap-1.5 overflow-x-auto scrollbar-none shadow-sm select-none">
+            <div className="bg-bg-card border border-border-light rounded-2xl p-2.5 flex flex-wrap items-center gap-1.5 shadow-sm select-none">
               
               {/* Headings */}
               <button
@@ -785,7 +832,7 @@ export const NotesPage = () => {
                 {showColorPopover && (
                   <>
                     <div className="fixed inset-0 z-40" onMouseDown={e => e.preventDefault()} onClick={() => setShowColorPopover(false)} />
-                    <div className="absolute top-10 left-0 bg-bg-card border border-border-med rounded-xl shadow-xl z-50 p-2 flex gap-1.5 items-center animate-in fade-in zoom-in-95 duration-150">
+                    <div className="absolute top-10 left-0 bg-bg-card border border-border-med rounded-xl shadow-xl z-50 p-2 flex gap-1.5 items-center">
                       {[
                         { color: 'inherit', label: 'Default', bg: 'bg-text-main' },
                         { color: '#5a85ff', label: 'Blue', bg: 'bg-accent-blue' },
@@ -820,7 +867,7 @@ export const NotesPage = () => {
                 {showHighlightPopover && (
                   <>
                     <div className="fixed inset-0 z-40" onMouseDown={e => e.preventDefault()} onClick={() => setShowHighlightPopover(false)} />
-                    <div className="absolute top-10 left-0 bg-bg-card border border-border-med rounded-xl shadow-xl z-50 p-2 flex gap-1.5 items-center animate-in fade-in zoom-in-95 duration-150">
+                    <div className="absolute top-10 left-0 bg-bg-card border border-border-med rounded-xl shadow-xl z-50 p-2 flex gap-1.5 items-center">
                       {[
                         { color: 'transparent', label: 'Clear', bg: 'bg-bg-input border-dashed' },
                         { color: 'rgba(90, 133, 255, 0.2)', label: 'Blue', bg: 'bg-accent-blue/30' },
@@ -889,7 +936,7 @@ export const NotesPage = () => {
       <div
         key={note.id}
         onClick={() => openNote(note)}
-        className={`bg-bg-card border p-5 rounded-2xl shadow-xs hover:shadow-md transition-all cursor-pointer group active:scale-[0.99] relative ${
+        className={`notes-card-stable bg-bg-card border p-5 rounded-2xl shadow-xs hover:shadow-md transition-all cursor-pointer group active:scale-[0.99] relative ${
           note.pinned 
             ? 'border-accent-blue/30 bg-gradient-to-br from-bg-card to-accent-blue/[0.02]' 
             : 'border-border-light hover:border-accent-blue/30'
@@ -942,7 +989,7 @@ export const NotesPage = () => {
                 </button>
                 
                 {menuId === note.id && (
-                  <div className="absolute top-10 right-0 w-40 bg-bg-card border border-border-light rounded-xl shadow-float z-50 p-1 animate-in fade-in zoom-in-95">
+                  <div className="absolute top-10 right-0 w-40 bg-bg-card border border-border-light rounded-xl shadow-float z-50 p-1">
                     <button
                       onClick={(e) => { e.stopPropagation(); handleTogglePin(note); setMenuId(null); }}
                       className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-text-main hover:bg-bg-input text-xs font-black transition-colors"
@@ -983,8 +1030,7 @@ export const NotesPage = () => {
 
   // -- RENDER: Notes List --
   return (
-    <div className="flex flex-col gap-6 pb-24">
-      {/* Header */}
+    <div key="notes-list-view" className="flex flex-col gap-6 pb-24 notes-page-root">
       <header className="flex justify-between items-end">
         <div>
           <h1 className="text-3xl font-black text-text-main tracking-tight">System Logs</h1>
@@ -1067,7 +1113,7 @@ export const NotesPage = () => {
       ) : (
         <div className="space-y-6">
           {pinnedNotes.length > 0 && (
-            <div className="space-y-3 animate-in fade-in slide-in-from-top-4 duration-300">
+            <div className="space-y-3">
               <div className="flex items-center gap-1.5 px-1">
                 <Pin size={12} className="text-accent-blue rotate-45 fill-current" />
                 <span className="text-[10px] font-black text-text-muted uppercase tracking-[0.15em]">Pinned Logs</span>
