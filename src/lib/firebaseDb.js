@@ -8,7 +8,41 @@ import {
 // Firestore Database Helper — GoalForge
 // ═══════════════════════════════════════════════════════
 
-const log = (msg, err) => console.error(`[FirestoreDB] ${msg}`, err?.message || err);
+export const debugLog = (msg, data) => {
+  console.log(`%c[FirestoreDB] ${msg}`, 'color: #3b82f6; font-weight: bold;', data !== undefined ? data : '');
+};
+
+export const errorLog = (msg, err) => {
+  console.error(`%c[FirestoreDB ERROR] ${msg}`, 'color: #ef4444; font-weight: bold;', err?.message || err);
+};
+
+const log = (msg, err) => errorLog(msg, err);
+
+// ── Helper: Deep Clean Payloads to prevent undefined/NaN errors ──
+export function cleanPayload(obj) {
+  if (obj === null || obj === undefined) return null;
+  if (Array.isArray(obj)) {
+    return obj.map(cleanPayload);
+  }
+  if (typeof obj === 'object') {
+    const cleaned = {};
+    for (const key of Object.keys(obj)) {
+      const val = obj[key];
+      if (val === undefined) {
+        cleaned[key] = null;
+      } else if (typeof val === 'number' && isNaN(val)) {
+        cleaned[key] = 0;
+      } else {
+        cleaned[key] = cleanPayload(val);
+      }
+    }
+    return cleaned;
+  }
+  if (typeof obj === 'number' && isNaN(obj)) {
+    return 0;
+  }
+  return obj;
+}
 
 // ── Helper: user-scoped collection ref ──────────────────
 const userCol = (userId, colName) => collection(fireDb, 'users', userId, colName);
@@ -78,33 +112,38 @@ export async function fetchGoals(userId) {
 }
 
 export async function upsertGoal(userId, goal) {
+  const payload = cleanPayload({
+    title: goal.title,
+    description: goal.description ?? '',
+    mode: goal.mode ?? 'ALL',
+    min_habits: goal.minHabits ?? 1,
+    tag: goal.tag ?? 'General',
+    deadline: goal.deadline || null,
+    progress: goal.progress ?? 0,
+    streak: goal.streak ?? 0,
+    completed_dates: goal.completedDates || [],
+    missed_days: goal.missedDays ?? 0,
+    last_active_date: goal.lastActiveDate || null,
+    last_completed_date: goal.lastCompletedDate || null,
+    days_completed: goal.daysCompleted ?? 0,
+    start_date: goal.startDate || null,
+    extensions: goal.extensions || [],
+    created_at: goal.createdAt || new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  });
+
   try {
-    await setDoc(userDoc(userId, 'goals', String(goal.id)), {
-      title: goal.title,
-      description: goal.description ?? '',
-      mode: goal.mode ?? 'ALL',
-      min_habits: goal.minHabits ?? 1,
-      tag: goal.tag ?? 'General',
-      deadline: goal.deadline || null,
-      progress: goal.progress ?? 0,
-      streak: goal.streak ?? 0,
-      completed_dates: goal.completedDates || [],
-      missed_days: goal.missedDays ?? 0,
-      last_active_date: goal.lastActiveDate || null,
-      last_completed_date: goal.lastCompletedDate || null,
-      days_completed: goal.daysCompleted ?? 0,
-      start_date: goal.startDate || null,
-      extensions: goal.extensions || [],
-      created_at: goal.createdAt,
-      updated_at: new Date().toISOString(),
-    }, { merge: true });
+    debugLog(`Write START: upsertGoal [id=${goal.id}]`, payload);
+    await setDoc(userDoc(userId, 'goals', String(goal.id)), payload, { merge: true });
+    debugLog(`Write SUCCESS: upsertGoal [id=${goal.id}]`);
   } catch (err) {
-    log('upsertGoal', err);
+    errorLog(`Write FAILURE: upsertGoal [id=${goal.id}]`, err);
   }
 }
 
 export async function deleteGoalDb(userId, goalId) {
   try {
+    debugLog(`Write START: deleteGoalDb [id=${goalId}]`);
     const goalRef = userDoc(userId, 'goals', String(goalId));
     // Soft-delete markers updated first to preempt cache snapshot triggers in other tabs or offline
     await setDoc(goalRef, { deleted: true, isDeleted: true }, { merge: true });
@@ -115,68 +154,81 @@ export async function deleteGoalDb(userId, goalId) {
     habitsSnap.docs.forEach(h => batch.delete(h.ref));
     batch.delete(goalRef);
     await batch.commit();
+    debugLog(`Write SUCCESS: deleteGoalDb [id=${goalId}]`);
   } catch (err) {
-    log('deleteGoal', err);
+    errorLog(`Write FAILURE: deleteGoalDb [id=${goalId}]`, err);
   }
 }
 
 // ── Habits ─────────────────────────────────────────────
 export async function upsertHabit(userId, goalId, habit) {
+  const payload = cleanPayload({
+    title: habit.title,
+    type: habit.type ?? 'time',
+    time_spent: habit.timeSpent ?? 0,
+    target_time: habit.targetTime ?? 15,
+    target_count: habit.targetCount ?? 10,
+    current_count: habit.currentCount ?? 0,
+    completed: habit.completed ?? false,
+    streak: habit.streak ?? 0,
+    last_completed_date: habit.lastCompletedDate || null,
+    completed_dates: habit.completedDates || [],
+    missed_days: habit.missedDays ?? 0,
+    schedule_days: habit.scheduleDays || [],
+    last_active_date: habit.lastActiveDate || null,
+    is_recovering: habit.isRecovering ?? false,
+    original_target: habit.originalTarget || null,
+    created_at: habit.createdAt || new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  });
+
   try {
+    debugLog(`Write START: upsertHabit [goalId=${goalId}, habitId=${habit.id}]`, payload);
     const habitRef = doc(fireDb, 'users', userId, 'goals', String(goalId), 'habits', String(habit.id));
-    await setDoc(habitRef, {
-      title: habit.title,
-      type: habit.type ?? 'time',
-      time_spent: habit.timeSpent ?? 0,
-      target_time: habit.targetTime ?? 15,
-      target_count: habit.targetCount ?? 10,
-      current_count: habit.currentCount ?? 0,
-      completed: habit.completed ?? false,
-      streak: habit.streak ?? 0,
-      last_completed_date: habit.lastCompletedDate || null,
-      completed_dates: habit.completedDates || [],
-      missed_days: habit.missedDays ?? 0,
-      schedule_days: habit.scheduleDays || [],
-      last_active_date: habit.lastActiveDate || null,
-      is_recovering: habit.isRecovering ?? false,
-      original_target: habit.originalTarget || null,
-      created_at: habit.createdAt || new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    }, { merge: true });
+    await setDoc(habitRef, payload, { merge: true });
+    debugLog(`Write SUCCESS: upsertHabit [goalId=${goalId}, habitId=${habit.id}]`);
   } catch (err) {
-    log('upsertHabit', err);
+    errorLog(`Write FAILURE: upsertHabit [goalId=${goalId}, habitId=${habit.id}]`, err);
   }
 }
 
 export async function deleteHabitDb(userId, goalId, habitId) {
   try {
+    debugLog(`Write START: deleteHabitDb [goalId=${goalId}, habitId=${habitId}]`);
     await deleteDoc(doc(fireDb, 'users', userId, 'goals', String(goalId), 'habits', String(habitId)));
+    debugLog(`Write SUCCESS: deleteHabitDb [goalId=${goalId}, habitId=${habitId}]`);
   } catch (err) {
-    log('deleteHabit', err);
+    errorLog(`Write FAILURE: deleteHabitDb [goalId=${goalId}, habitId=${habitId}]`, err);
   }
 }
 
 export async function updateHabitTime(userId, goalId, habitId, timeSpent) {
   try {
+    debugLog(`Write START: updateHabitTime [goalId=${goalId}, habitId=${habitId}]`);
     await setDoc(doc(fireDb, 'users', userId, 'goals', goalId, 'habits', habitId), { time_spent: timeSpent }, { merge: true });
+    debugLog(`Write SUCCESS: updateHabitTime [goalId=${goalId}, habitId=${habitId}]`);
   } catch (err) {
-    log('updateHabitTime', err);
+    errorLog(`Write FAILURE: updateHabitTime [goalId=${goalId}, habitId=${habitId}]`, err);
   }
 }
 
 export async function updateHabitCount(userId, goalId, habitId, currentCount) {
   try {
+    debugLog(`Write START: updateHabitCount [goalId=${goalId}, habitId=${habitId}]`);
     await setDoc(doc(fireDb, 'users', userId, 'goals', goalId, 'habits', habitId), { current_count: currentCount }, { merge: true });
+    debugLog(`Write SUCCESS: updateHabitCount [goalId=${goalId}, habitId=${habitId}]`);
   } catch (err) {
-    log('updateHabitCount', err);
+    errorLog(`Write FAILURE: updateHabitCount [goalId=${goalId}, habitId=${habitId}]`, err);
   }
 }
 
 export async function updateHabitCheck(userId, goalId, habitId, completed) {
   try {
+    debugLog(`Write START: updateHabitCheck [goalId=${goalId}, habitId=${habitId}]`);
     await setDoc(doc(fireDb, 'users', userId, 'goals', goalId, 'habits', habitId), { completed }, { merge: true });
+    debugLog(`Write SUCCESS: updateHabitCheck [goalId=${goalId}, habitId=${habitId}]`);
   } catch (err) {
-    log('updateHabitCheck', err);
+    errorLog(`Write FAILURE: updateHabitCheck [goalId=${goalId}, habitId=${habitId}]`, err);
   }
 }
 
@@ -217,40 +269,46 @@ export async function fetchTasks(userId) {
 }
 
 export async function upsertTask(userId, task) {
+  const payload = cleanPayload({
+    title: task.title,
+    type: task.type ?? 'daily',
+    completion_type: task.completionType ?? 'time',
+    target_time: task.targetTime ?? 15,
+    time_spent: task.timeSpent ?? 0,
+    completed: task.completed ?? false,
+    target_date: task.targetDate || null,
+    start_date: task.startDate || null,
+    end_date: task.endDate || null,
+    current_streak: task.currentStreak ?? 0,
+    missed_days: task.missedDays ?? 0,
+    last_completed_date: task.lastCompletedDate || null,
+    completed_dates: task.completedDates || [],
+    last_active_date: task.lastActiveDate || null,
+    priority: task.priority ?? 'Medium',
+    target_count: task.targetCount ?? 10,
+    current_count: task.currentCount ?? 0,
+    is_recovering: task.isRecovering ?? false,
+    original_target: task.originalTarget || null,
+    created_at: task.createdAt || new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  });
+
   try {
-    await setDoc(userDoc(userId, 'tasks', task.id), {
-      title: task.title,
-      type: task.type ?? 'daily',
-      completion_type: task.completionType ?? 'time',
-      target_time: task.targetTime ?? 15,
-      time_spent: task.timeSpent ?? 0,
-      completed: task.completed ?? false,
-      target_date: task.targetDate || null,
-      start_date: task.startDate || null,
-      end_date: task.endDate || null,
-      current_streak: task.currentStreak ?? 0,
-      missed_days: task.missedDays ?? 0,
-      last_completed_date: task.lastCompletedDate || null,
-      completed_dates: task.completedDates || [],
-      last_active_date: task.lastActiveDate || null,
-      priority: task.priority ?? 'Medium',
-      target_count: task.targetCount ?? 10,
-      current_count: task.currentCount ?? 0,
-      is_recovering: task.isRecovering ?? false,
-      original_target: task.originalTarget || null,
-      created_at: task.createdAt || new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    }, { merge: true });
+    debugLog(`Write START: upsertTask [id=${task.id}]`, payload);
+    await setDoc(userDoc(userId, 'tasks', task.id), payload, { merge: true });
+    debugLog(`Write SUCCESS: upsertTask [id=${task.id}]`);
   } catch (err) {
-    log('upsertTask', err);
+    errorLog(`Write FAILURE: upsertTask [id=${task.id}]`, err);
   }
 }
 
 export async function deleteTaskDb(userId, taskId) {
   try {
+    debugLog(`Write START: deleteTaskDb [id=${taskId}]`);
     await deleteDoc(userDoc(userId, 'tasks', taskId));
+    debugLog(`Write SUCCESS: deleteTaskDb [id=${taskId}]`);
   } catch (err) {
-    log('deleteTask', err);
+    errorLog(`Write FAILURE: deleteTaskDb [id=${taskId}]`, err);
   }
 }
 
@@ -271,10 +329,13 @@ export async function fetchFocusHistory(userId) {
 }
 
 export async function upsertFocusHistory(userId, date, seconds) {
+  const payload = cleanPayload({ seconds, updated_at: new Date().toISOString() });
   try {
-    await setDoc(userDoc(userId, 'focus_history', date), { seconds, updated_at: new Date().toISOString() }, { merge: true });
+    debugLog(`Write START: upsertFocusHistory [date=${date}]`, payload);
+    await setDoc(userDoc(userId, 'focus_history', date), payload, { merge: true });
+    debugLog(`Write SUCCESS: upsertFocusHistory [date=${date}]`);
   } catch (err) {
-    log('upsertFocusHistory', err);
+    errorLog(`Write FAILURE: upsertFocusHistory [date=${date}]`, err);
   }
 }
 
@@ -302,18 +363,20 @@ export async function fetchTaskLogs(userId) {
 }
 
 export async function upsertTaskLog(userId, summary) {
+  const payload = cleanPayload({
+    date: summary.date,
+    total_tasks: summary.total_tasks,
+    completed_tasks: summary.completed_tasks,
+    time_spent: summary.time_spent,
+    auto_completed: summary.auto_completed || false,
+    updated_at: new Date().toISOString(),
+  });
   try {
-    // Use date as doc ID for natural dedup
-    await setDoc(userDoc(userId, 'task_logs', summary.date), {
-      date: summary.date,
-      total_tasks: summary.total_tasks,
-      completed_tasks: summary.completed_tasks,
-      time_spent: summary.time_spent,
-      auto_completed: summary.auto_completed || false,
-      updated_at: new Date().toISOString(),
-    }, { merge: true });
+    debugLog(`Write START: upsertTaskLog [date=${summary.date}]`, payload);
+    await setDoc(userDoc(userId, 'task_logs', summary.date), payload, { merge: true });
+    debugLog(`Write SUCCESS: upsertTaskLog [date=${summary.date}]`);
   } catch (err) {
-    log('upsertTaskLog', err);
+    errorLog(`Write FAILURE: upsertTaskLog [date=${summary.date}]`, err);
   }
 }
 
@@ -335,15 +398,18 @@ export async function fetchUserSettings(userId) {
 }
 
 export async function upsertUserSettings(userId, settings) {
+  const payload = cleanPayload({
+    theme: settings.theme,
+    focus_time_today: settings.focusTimeToday ?? 0,
+    last_reset: settings.lastReset,
+    updated_at: new Date().toISOString(),
+  });
   try {
-    await setDoc(userDoc(userId, 'settings', 'preferences'), {
-      theme: settings.theme,
-      focus_time_today: settings.focusTimeToday ?? 0,
-      last_reset: settings.lastReset,
-      updated_at: new Date().toISOString(),
-    }, { merge: true });
+    debugLog(`Write START: upsertUserSettings`, payload);
+    await setDoc(userDoc(userId, 'settings', 'preferences'), payload, { merge: true });
+    debugLog(`Write SUCCESS: upsertUserSettings`);
   } catch (err) {
-    log('upsertUserSettings', err);
+    errorLog(`Write FAILURE: upsertUserSettings`, err);
   }
 }
 
@@ -374,28 +440,33 @@ export async function fetchNotes(userId) {
 }
 
 export async function upsertNote(userId, note) {
+  const payload = cleanPayload({
+    title: note.title || '',
+    content: note.content || '',
+    tags: note.tags || [],
+    color: note.color || '',
+    checklist: note.checklist || null,
+    pinned: note.pinned || false,
+    folder: note.folder || '',
+    created_at: note.created_at || new Date().toISOString(),
+    updated_at: note.updated_at || new Date().toISOString(),
+  });
   try {
-    await setDoc(userDoc(userId, 'notes', note.id), {
-      title: note.title || '',
-      content: note.content || '',
-      tags: note.tags || [],
-      color: note.color || '',
-      checklist: note.checklist || null,
-      pinned: note.pinned || false,
-      folder: note.folder || '',
-      created_at: note.created_at || new Date().toISOString(),
-      updated_at: note.updated_at || new Date().toISOString(),
-    }, { merge: true });
+    debugLog(`Write START: upsertNote [id=${note.id}]`, payload);
+    await setDoc(userDoc(userId, 'notes', note.id), payload, { merge: true });
+    debugLog(`Write SUCCESS: upsertNote [id=${note.id}]`);
   } catch (err) {
-    log('upsertNote', err);
+    errorLog(`Write FAILURE: upsertNote [id=${note.id}]`, err);
   }
 }
 
 export async function deleteNoteDb(userId, noteId) {
   try {
+    debugLog(`Write START: deleteNoteDb [id=${noteId}]`);
     await deleteDoc(userDoc(userId, 'notes', noteId));
+    debugLog(`Write SUCCESS: deleteNoteDb [id=${noteId}]`);
   } catch (err) {
-    log('deleteNote', err);
+    errorLog(`Write FAILURE: deleteNoteDb [id=${noteId}]`, err);
   }
 }
 
@@ -423,63 +494,74 @@ export async function fetchXpData(userId) {
 }
 
 export async function upsertXpData(userId, xpData) {
+  const payload = cleanPayload({
+    total_xp: xpData.totalXP || 0,
+    level: xpData.level || 1,
+    earned_badges: xpData.earnedBadges || [],
+    badge_unlock_dates: xpData.badgeUnlockDates || {},
+    perfect_days: xpData.perfectDays || 0,
+    comeback_count: xpData.comebackCount || 0,
+    total_completions: xpData.totalCompletions || 0,
+    last_xp_date: xpData.lastXPDate || '',
+    xp_history: (xpData.xpHistory || []).slice(0, 50),
+    updated_at: new Date().toISOString(),
+  });
   try {
-    await setDoc(userDoc(userId, 'xp', 'profile'), {
-      total_xp: xpData.totalXP || 0,
-      level: xpData.level || 1,
-      earned_badges: xpData.earnedBadges || [],
-      badge_unlock_dates: xpData.badgeUnlockDates || {},
-      perfect_days: xpData.perfectDays || 0,
-      comeback_count: xpData.comebackCount || 0,
-      total_completions: xpData.totalCompletions || 0,
-      last_xp_date: xpData.lastXPDate || '',
-      xp_history: (xpData.xpHistory || []).slice(0, 50),
-      updated_at: new Date().toISOString(),
-    }, { merge: true });
+    debugLog(`Write START: upsertXpData`, payload);
+    await setDoc(userDoc(userId, 'xp', 'profile'), payload, { merge: true });
+    debugLog(`Write SUCCESS: upsertXpData`);
   } catch (err) {
-    log('upsertXpData', err);
+    errorLog(`Write FAILURE: upsertXpData`, err);
   }
 }
 
 // ── User Profile ───────────────────────────────────────
 export async function upsertUserProfile(userId, profile) {
+  const payload = cleanPayload({
+    display_name: profile.displayName || '',
+    email: profile.email || '',
+    photo_url: profile.photoURL || '',
+    updated_at: new Date().toISOString(),
+  });
   try {
-    await setDoc(doc(fireDb, 'users', userId), {
-      display_name: profile.displayName || '',
-      email: profile.email || '',
-      photo_url: profile.photoURL || '',
-      updated_at: new Date().toISOString(),
-    }, { merge: true });
+    debugLog(`Write START: upsertUserProfile`, payload);
+    await setDoc(doc(fireDb, 'users', userId), payload, { merge: true });
+    debugLog(`Write SUCCESS: upsertUserProfile`);
   } catch (err) {
-    log('upsertUserProfile', err);
+    errorLog(`Write FAILURE: upsertUserProfile`, err);
   }
 }
 
 // ── Story Moment Memories ──────────────────────────────────
 export async function upsertMemory(userId, memory) {
+  const payload = cleanPayload({
+    goalId: memory.goalId || '',
+    title: memory.title || '',
+    completionDate: memory.completionDate || '',
+    streak: memory.streak || 0,
+    consistency: memory.consistency || 100,
+    userNote: memory.userNote || '',
+    userPhoto: memory.userPhoto || '',
+    achievementStats: memory.achievementStats || {},
+    createdAt: memory.createdAt || new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  });
   try {
-    await setDoc(userDoc(userId, 'memories', memory.id), {
-      goalId: memory.goalId || '',
-      title: memory.title || '',
-      completionDate: memory.completionDate || '',
-      streak: memory.streak || 0,
-      consistency: memory.consistency || 100,
-      userNote: memory.userNote || '',
-      userPhoto: memory.userPhoto || '',
-      achievementStats: memory.achievementStats || {},
-      createdAt: memory.createdAt || new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    }, { merge: true });
+    debugLog(`Write START: upsertMemory [id=${memory.id}]`, payload);
+    await setDoc(userDoc(userId, 'memories', memory.id), payload, { merge: true });
+    debugLog(`Write SUCCESS: upsertMemory [id=${memory.id}]`);
   } catch (err) {
-    log('upsertMemory', err);
+    errorLog(`Write FAILURE: upsertMemory [id=${memory.id}]`, err);
   }
 }
 
 export async function deleteMemoryDb(userId, memoryId) {
   try {
+    debugLog(`Write START: deleteMemoryDb [id=${memoryId}]`);
     await deleteDoc(userDoc(userId, 'memories', memoryId));
+    debugLog(`Write SUCCESS: deleteMemoryDb [id=${memoryId}]`);
   } catch (err) {
-    log('deleteMemoryDb', err);
+    errorLog(`Write FAILURE: deleteMemoryDb [id=${memoryId}]`, err);
   }
 }
 
@@ -551,5 +633,61 @@ export async function clearUserDataDb(userId) {
     console.error('[FirestoreDB] Error clearing user data:', err);
     throw err;
   }
+}
+
+// ── Diagnostics: Firestore Connection & Write Test ───────
+export async function testFirestoreWrite(userId) {
+  try {
+    debugLog(`[Connection Test] Write START for user ${userId}`);
+    const testRef = doc(fireDb, 'users', userId, '_connection_test', 'status');
+    const payload = {
+      connectedAt: new Date().toISOString(),
+      clientTimestamp: Date.now(),
+      status: 'success'
+    };
+    await setDoc(testRef, payload, { merge: true });
+    debugLog('[Connection Test] Write SUCCESS! Firestore connection is active and healthy.');
+    return { success: true };
+  } catch (err) {
+    errorLog('[Connection Test] Write FAILURE! Security rules or connection error:', err);
+    return { success: false, error: err };
+  }
+}
+
+// ── Resilient Sync: Retry Operation with Exponential Backoff ────
+export async function retryAsyncOperation(fn, retries = 3, delay = 2000) {
+  try {
+    return await fn();
+  } catch (err) {
+    if (retries <= 0) {
+      console.error('[Sync Retry] Maximum retries reached. Operation aborted.');
+      throw err;
+    }
+    console.warn(`[Sync Retry] Failed. Retrying in ${delay}ms... (${retries} attempts left)`);
+    await new Promise(resolve => setTimeout(resolve, delay));
+    return retryAsyncOperation(fn, retries - 1, delay * 2);
+  }
+}
+
+// ── Connection Safety: Reconnect Trigger Observer ────────
+export function enableNetworkReconnectSync(onReconnectCallback) {
+  if (typeof window === 'undefined') return () => {};
+
+  const handleOnline = () => {
+    console.log('%c[Network Observer] Device is back ONLINE! Triggering automatic database sync retry.', 'color: #22c55e; font-weight: bold;');
+    if (onReconnectCallback) onReconnectCallback();
+  };
+
+  const handleOffline = () => {
+    console.warn('[Network Observer] Device went OFFLINE. Operations will be queued locally.');
+  };
+
+  window.addEventListener('online', handleOnline);
+  window.addEventListener('offline', handleOffline);
+
+  return () => {
+    window.removeEventListener('online', handleOnline);
+    window.removeEventListener('offline', handleOffline);
+  };
 }
 

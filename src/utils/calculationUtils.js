@@ -333,7 +333,7 @@ export const calculateConsecutiveMissedDays = (completedDates, scheduleDays = []
 /**
  * Calculates the consecutive missed days for a goal.
  */
-export const calculateGoalConsecutiveMissedDays = (goalCompletedDates) => {
+export const calculateGoalConsecutiveMissedDays = (goalCompletedDates, scheduleDays = []) => {
   if (!goalCompletedDates || goalCompletedDates.length === 0) return 0;
   const completedSet = new Set(goalCompletedDates);
   const todayStr = TODAY();
@@ -342,14 +342,79 @@ export const calculateGoalConsecutiveMissedDays = (goalCompletedDates) => {
   let checkDate = addDays(todayStr, -1);
   
   for (let i = 1; i <= 30; i++) {
-    if (completedSet.has(checkDate)) {
-      break;
-    } else {
-      missed++;
+    const isCompleted = completedSet.has(checkDate);
+    const dateObj = parseLocalDate(checkDate);
+    const dayName = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dateObj.getDay()];
+    const isScheduled = scheduleDays.length === 0 || scheduleDays.includes(dayName);
+
+    if (isScheduled) {
+      if (isCompleted) {
+        break;
+      } else {
+        missed++;
+      }
     }
     checkDate = addDays(checkDate, -1);
   }
   
   return missed;
 };
+
+/**
+ * Returns the list of days of the week scheduled for a Goal based on its habits.
+ */
+export const getGoalScheduledDays = (goal) => {
+  const habits = goal?.habits || [];
+  if (habits.length === 0) return [];
+  
+  const allDays = new Set();
+  for (const h of habits) {
+    if (!h.scheduleDays || h.scheduleDays.length === 0) {
+      return []; // empty means scheduled every day, so union is also every day
+    }
+    h.scheduleDays.forEach(day => allDays.add(day));
+  }
+  return [...allDays];
+};
+
+/**
+ * Calculates the exact goal streak (consecutive scheduled days fully completed).
+ * Standard streak rules: resets to 0 if a scheduled day is missed.
+ */
+export const calculateGoalStreak = (completedDates, scheduleDays = []) => {
+  if (!completedDates || completedDates.length === 0) return 0;
+
+  const completedSet = new Set(completedDates);
+  const todayStr = TODAY();
+
+  // Find the earliest date to set a dynamic simulation window
+  const sorted = [...completedSet].sort();
+  const earliestDate = sorted[0];
+  const diff = diffDays(todayStr, earliestDate);
+  const startDaysAgo = Math.min(1000, Math.max(30, diff));
+
+  let streak = 0;
+
+  for (let i = startDaysAgo; i >= 0; i--) {
+    const currentDateStr = addDays(todayStr, -i);
+    const isCompleted = completedSet.has(currentDateStr);
+    
+    // Check if scheduled
+    const dateObj = parseLocalDate(currentDateStr);
+    const dayName = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dateObj.getDay()];
+    const isScheduled = scheduleDays.length === 0 || scheduleDays.includes(dayName);
+
+    if (isCompleted) {
+      streak++;
+    } else if (isScheduled) {
+      // Today itself (TODAY()) does not count as missed if not completed yet (since it's ongoing)
+      if (currentDateStr !== todayStr) {
+        streak = 0; // standard streak resets on missed scheduled day
+      }
+    }
+  }
+
+  return streak;
+};
+
 
