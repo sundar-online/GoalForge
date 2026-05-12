@@ -251,7 +251,7 @@ export const ProfilePage = () => {
 
             {memories.length === 0 ? (
               <div className="bg-bg-card border border-border-light rounded-[32px] p-8 text-center space-y-4">
-                <div className="w-16 h-16 rounded-2xl bg-white/[0.02] border border-white/5 flex items-center justify-center mx-auto text-3xl">
+                <div className="w-16 h-16 rounded-2xl bg-bg-input border border-border-light flex items-center justify-center mx-auto text-3xl">
                   📖
                 </div>
                 <div className="space-y-1">
@@ -262,7 +262,7 @@ export const ProfilePage = () => {
                 </div>
               </div>
             ) : (
-              <div className="relative border-l border-white/10 ml-4 pl-6 space-y-6">
+              <div className="relative border-l border-border-med ml-4 pl-6 space-y-6">
                 {memories.map((memory) => {
                   return (
                     <div key={memory.id} className="relative group animate-in fade-in slide-in-from-bottom-2 duration-300">
@@ -270,14 +270,14 @@ export const ProfilePage = () => {
                       <div className="absolute -left-[31px] top-1.5 w-4 h-4 rounded-full bg-bg-app border-2 border-accent-blue flex items-center justify-center shadow-lg group-hover:scale-125 transition-transform" />
 
                       {/* Memory Polaroid Card */}
-                      <div className="bg-bg-card border border-border-light hover:border-white/20 rounded-[28px] p-5 shadow-sm hover:shadow-xl transition-all duration-300 relative overflow-hidden">
+                      <div className="bg-bg-card border border-border-light hover:border-border-med rounded-[28px] p-5 shadow-sm hover:shadow-xl transition-all duration-300 relative overflow-hidden">
                         {/* Header color accent glow */}
                         <div className="absolute top-0 right-0 w-32 h-32 bg-accent-blue/5 rounded-full blur-2xl pointer-events-none" />
 
                         <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between relative z-10">
                           {/* Left Profile details */}
                           <div className="flex items-center gap-3.5 min-w-0">
-                            <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-white/[0.03] to-white/[0.08] border border-white/10 flex items-center justify-center text-2xl shadow-inner select-none">
+                            <div className="w-12 h-12 rounded-xl bg-bg-input border border-border-med flex items-center justify-center text-2xl shadow-inner select-none">
                               {memory.userPhoto || '🏆'}
                             </div>
                             <div className="min-w-0">
@@ -303,7 +303,7 @@ export const ProfilePage = () => {
 
                         {/* Journal reflection notes */}
                         {memory.userNote && (
-                          <div className="mt-4 p-3 bg-white/[0.02] border-l-2 border-accent-blue/30 rounded-r-xl">
+                          <div className="mt-4 p-3 bg-bg-input/40 border-l-2 border-accent-blue/30 rounded-r-xl">
                             <p className="text-xs text-text-muted italic leading-relaxed font-medium">
                               "{memory.userNote}"
                             </p>
@@ -311,7 +311,7 @@ export const ProfilePage = () => {
                         )}
 
                         {/* Actions line */}
-                        <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between">
+                        <div className="mt-4 pt-3 border-t border-border-light flex items-center justify-between">
                           <button
                             onClick={() => setActiveReplayMemory(memory)}
                             className="text-[10px] font-black text-accent-blue uppercase tracking-widest hover:text-indigo-400 flex items-center gap-1 transition-colors"

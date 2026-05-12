@@ -294,6 +294,11 @@ export const NotesPage = () => {
   const execCmd = (command, value = null) => {
     if (editorRef.current) {
       editorRef.current.focus();
+      try {
+        document.execCommand('styleWithCSS', false, true);
+      } catch (e) {
+        console.warn('[Rich Editor] styleWithCSS not supported', e);
+      }
       document.execCommand(command, false, value);
       triggerAutosave(editorRef.current.innerHTML);
     }
@@ -834,7 +839,7 @@ export const NotesPage = () => {
                     <div className="fixed inset-0 z-40" onMouseDown={e => e.preventDefault()} onClick={() => setShowColorPopover(false)} />
                     <div className="absolute top-10 left-0 bg-bg-card border border-border-med rounded-xl shadow-xl z-50 p-2 flex gap-1.5 items-center">
                       {[
-                        { color: 'inherit', label: 'Default', bg: 'bg-text-main' },
+                        { color: 'var(--text-main)', label: 'Default', bg: 'bg-text-main' },
                         { color: '#5a85ff', label: 'Blue', bg: 'bg-accent-blue' },
                         { color: '#10b981', label: 'Emerald', bg: 'bg-emerald-500' },
                         { color: '#8b5cf6', label: 'Purple', bg: 'bg-violet-500' },

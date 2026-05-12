@@ -138,7 +138,7 @@ export const Dashboard = ({ setView }) => {
         <div className="lg:col-span-8 flex flex-col gap-6 lg:gap-8">
           
           {/* Discipline + XP Hero Card */}
-          <section className="bg-linear-to-br from-bg-dark-elem to-[#1e1e2e] rounded-[32px] p-6 md:p-8 shadow-2xl relative overflow-hidden group">
+          <section className="bg-gradient-to-br from-bg-dark-elem to-[#1e1e2e] rounded-[32px] p-6 md:p-8 shadow-2xl relative overflow-hidden group">
             <div className="absolute -top-10 -right-10 opacity-10 group-hover:scale-110 group-hover:rotate-12 transition-transform duration-700">
               <Trophy size={200} className="text-white" />
             </div>

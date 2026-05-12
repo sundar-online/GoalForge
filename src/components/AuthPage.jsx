@@ -63,7 +63,7 @@ export const AuthPage = () => {
       <div className="absolute bottom-[-10%] right-[-10%] w-[50%] aspect-square bg-accent-blue/5 rounded-full blur-[120px]" />
 
       {/* MOBILE / APP VIEW (Single card container) */}
-      <div className="lg:hidden w-full max-w-md bg-bg-card/70 backdrop-blur-2xl rounded-[40px] p-10 md:p-12 shadow-2xl border border-white/10 animate-in fade-in zoom-in-95 duration-500 relative z-10">
+      <div className="lg:hidden w-full max-w-md bg-bg-card/70 backdrop-blur-2xl rounded-[40px] p-10 md:p-12 shadow-2xl border border-border-light animate-in fade-in zoom-in-95 duration-500 relative z-10">
         {/* Header */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-accent-blue text-white mb-6 shadow-lg shadow-accent-blue/40 ring-4 ring-accent-blue/10">
@@ -84,7 +84,7 @@ export const AuthPage = () => {
               type="button"
               onClick={handleGoogleSignIn}
               disabled={loading || !!socialLoading}
-              className="w-full py-4 rounded-2xl bg-white/5 border border-white/10 text-text-main text-sm font-black uppercase tracking-wider flex items-center justify-center gap-3 hover:bg-white/10 hover:-translate-y-0.5 active:translate-y-0 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+              className="w-full py-4 rounded-2xl bg-bg-input border border-border-med text-text-main text-sm font-black uppercase tracking-wider flex items-center justify-center gap-3 hover:bg-bg-input/80 hover:-translate-y-0.5 active:translate-y-0 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             >
               {socialLoading === 'google' ? (
                 <Loader2 size={20} className="animate-spin" />
@@ -243,9 +243,9 @@ export const AuthPage = () => {
       <div className="hidden lg:flex lg:flex-row lg:gap-8 lg:max-w-4xl lg:w-full lg:items-stretch lg:justify-center animate-in fade-in zoom-in-95 duration-500 relative z-10">
         
         {/* Left Side Frame: Neural Interface Title Frame & Secure Stats */}
-        <div className="flex-1 bg-bg-card/70 backdrop-blur-2xl rounded-[40px] p-10 border border-white/10 flex flex-col justify-between shadow-2xl">
+        <div className="flex-1 bg-bg-card/70 backdrop-blur-2xl rounded-[40px] p-10 border border-border-light flex flex-col justify-between shadow-2xl">
           {/* Framed Title Block */}
-          <div className="border border-white/10 rounded-2xl p-6 bg-white/5 text-center relative overflow-hidden shadow-inner">
+          <div className="border border-border-light rounded-2xl p-6 bg-bg-input/50 text-center relative overflow-hidden shadow-inner">
             <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-accent-blue text-white mb-4 shadow-lg shadow-accent-blue/40">
               <Rocket size={22} className="animate-bounce" />
             </div>
@@ -265,7 +265,7 @@ export const AuthPage = () => {
                   type="button"
                   onClick={handleGoogleSignIn}
                   disabled={loading || !!socialLoading}
-                  className="w-full py-4 rounded-2xl bg-white/5 border border-white/10 text-text-main text-sm font-black uppercase tracking-wider flex items-center justify-center gap-3 hover:bg-white/10 hover:-translate-y-0.5 active:translate-y-0 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shadow-sm"
+                  className="w-full py-4 rounded-2xl bg-bg-input border border-border-med text-text-main text-sm font-black uppercase tracking-wider flex items-center justify-center gap-3 hover:bg-bg-input/80 hover:-translate-y-0.5 active:translate-y-0 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shadow-sm"
                 >
                   {socialLoading === 'google' ? (
                     <Loader2 size={20} className="animate-spin" />
@@ -283,14 +283,14 @@ export const AuthPage = () => {
                 </button>
 
                 <div className="flex items-center gap-3">
-                  <div className="flex-1 h-[1px] bg-white/5" />
+                  <div className="flex-1 h-[1px] bg-border-light" />
                   <span className="text-[9px] font-black text-text-muted/60 uppercase tracking-[0.2em]">Or system info</span>
-                  <div className="flex-1 h-[1px] bg-white/5" />
+                  <div className="flex-1 h-[1px] bg-border-light" />
                 </div>
               </div>
             )}
 
-            <div className="border border-white/5 rounded-2xl p-5 bg-white/[0.02] space-y-3">
+            <div className="border border-border-light rounded-2xl p-5 bg-bg-input/20 space-y-3">
               <div className="flex items-center gap-2 text-accent-blue">
                 <span className="w-1.5 h-1.5 rounded-full bg-accent-blue animate-ping" />
                 <p className="text-[10px] font-black uppercase tracking-widest">SYSTEM STATUS: READY</p>
@@ -307,9 +307,9 @@ export const AuthPage = () => {
         </div>
 
         {/* Right Side Frame: Email Authentication Frame Heading & Form */}
-        <div className="flex-1 bg-bg-card/70 backdrop-blur-2xl rounded-[40px] p-10 border border-white/10 flex flex-col justify-between shadow-2xl">
+        <div className="flex-1 bg-bg-card/70 backdrop-blur-2xl rounded-[40px] p-10 border border-border-light flex flex-col justify-between shadow-2xl">
           {/* Framed Heading Block */}
-          <div className="border border-white/10 rounded-2xl p-6 bg-white/5 text-center relative overflow-hidden shadow-inner">
+          <div className="border border-border-light rounded-2xl p-6 bg-bg-input/50 text-center relative overflow-hidden shadow-inner">
             <span className="text-xs font-black text-text-muted uppercase tracking-[0.25em]">
               {isForgot ? 'Security Verification' : 'Email Authentication'}
             </span>

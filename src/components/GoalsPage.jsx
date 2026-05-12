@@ -55,10 +55,10 @@ const DayPicker = ({ value, onChange }) => {
 
 const TAG_COLORS = {
   Engineering: { bg: 'bg-accent-blue-light', color: 'text-accent-blue' },
-  Learning:    { bg: 'bg-orange-500/10',     color: 'text-orange-600' },
-  Fitness:     { bg: 'bg-emerald-500/10',    color: 'text-emerald-600' },
-  Creative:    { bg: 'bg-purple-500/10',     color: 'text-purple-600' },
-  Business:    { bg: 'bg-amber-500/10',      color: 'text-amber-600' },
+  Learning:    { bg: 'bg-orange-500/10 dark:bg-orange-500/20',     color: 'text-orange-600 dark:text-orange-400' },
+  Fitness:     { bg: 'bg-emerald-500/10 dark:bg-emerald-500/20',    color: 'text-emerald-600 dark:text-emerald-400' },
+  Creative:    { bg: 'bg-purple-500/10 dark:bg-purple-500/20',     color: 'text-purple-600 dark:text-purple-400' },
+  Business:    { bg: 'bg-amber-500/10 dark:bg-amber-500/20',      color: 'text-amber-600 dark:text-amber-400' },
   General:     { bg: 'bg-bg-input',          color: 'text-text-muted' },
 };
 

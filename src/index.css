@@ -138,7 +138,8 @@ body {
   margin: 1.25rem 0;
   border-radius: 0 12px 12px 0;
   font-style: italic;
-  color: var(--text-muted);
+  color: var(--text-main);
+  opacity: 0.85;
 }
 .rich-editor pre {
   background: var(--bg-input);
@@ -261,13 +262,13 @@ body {
   overflow-y: auto !important;
 }
 
-/* Remove all animations, scaling, and transitions inside Notes Page */
+/* Remove layout transitions, scaling, and layout shifts inside Notes Page,
+   but allow color and background color changes to transition smoothly on theme switch */
 .notes-page-root,
 .notes-page-root *,
 .notes-page-root *:before,
 .notes-page-root *:after {
-  transition: none !important;
-  transition-property: none !important;
+  transition: color 200ms ease, background-color 200ms ease, border-color 200ms ease, opacity 200ms ease !important;
   animation: none !important;
   animation-duration: 0s !important;
   animation-delay: 0s !important;
