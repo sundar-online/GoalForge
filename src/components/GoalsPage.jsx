@@ -927,13 +927,13 @@ export const GoalsPage = () => {
       />
       
       {goals.length === 0 && !showAddGoal && (
-        <div className="flex flex-col items-center justify-center py-32 text-text-muted/50">
-          <div className="w-24 h-24 rounded-full bg-bg-input flex items-center justify-center mb-6">
-            <Target size={48} strokeWidth={1.5} />
+        <div className="flex flex-col items-center justify-center text-text-muted/50 py-10 pb-24">
+          <div className="w-20 h-20 rounded-full bg-bg-input flex items-center justify-center mb-5">
+            <Target size={40} strokeWidth={1.5} />
           </div>
           <p className="text-xl font-black tracking-tight text-text-muted">No Systems Forged Yet</p>
           <p className="text-sm font-bold mt-2">Forge your first goal to start your journey.</p>
-          <button onClick={() => setShowAddGoal(true)} className="mt-8 px-8 py-4 rounded-2xl bg-accent-blue text-white font-black shadow-lg shadow-accent-blue/20 hover:opacity-90 transition-all active:scale-95">Forge Now</button>
+          <button onClick={() => setShowAddGoal(true)} className="mt-6 px-8 py-4 rounded-2xl bg-accent-blue text-white font-black shadow-lg shadow-accent-blue/20 hover:opacity-90 transition-all active:scale-95">Forge Now</button>
         </div>
       )}
     </div>
