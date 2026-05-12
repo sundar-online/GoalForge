@@ -1,10 +1,27 @@
 // public/sw.js
+// ─── Cache version ── Bump this string on every deploy to bust stale caches ──
+const CACHE_VERSION = 'v20260512';
+const CACHE_NAME = `goalforge-${CACHE_VERSION}`;
+
 self.addEventListener('install', (event) => {
+  // Take control immediately without waiting for old SW to be dismissed
   self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(self.clients.claim());
+  // Delete ALL caches that don't match the current version
+  event.waitUntil(
+    caches.keys().then((cacheNames) =>
+      Promise.all(
+        cacheNames
+          .filter((name) => name !== CACHE_NAME)
+          .map((name) => {
+            console.log('[SW] Deleting stale cache:', name);
+            return caches.delete(name);
+          })
+      )
+    ).then(() => self.clients.claim()) // Claim all open tabs immediately
+  );
 });
 
 self.addEventListener('push', (event) => {
@@ -36,15 +53,12 @@ self.addEventListener('notificationclick', (event) => {
   
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
-      // Check if there is already a window/tab open with the target URL
       for (let i = 0; i < windowClients.length; i++) {
         const client = windowClients[i];
-        // If so, just focus it.
         if (client.url === urlToOpen && 'focus' in client) {
           return client.focus();
         }
       }
-      // If not, then open the target URL in a new window/tab.
       if (self.clients.openWindow) {
         return self.clients.openWindow(urlToOpen);
       }

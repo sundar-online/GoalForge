@@ -241,8 +241,7 @@ body {
 }
 
 /* Fix random white line/flicker issue on card edges during edit, scroll, or re-render */
-.rich-editor-canvas,
-.notes-card-stable {
+.rich-editor-canvas {
   position: relative;
   background-clip: padding-box !important;
   isolation: isolate;
@@ -254,7 +253,9 @@ body {
 }
 
 .notes-card-stable {
-  overflow: hidden !important;
+  position: relative;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .rich-editor-canvas {
