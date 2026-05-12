@@ -1,26 +1,39 @@
 // public/sw.js
-// ─── Cache version ── Bump this string on every deploy to bust stale caches ──
-const CACHE_VERSION = 'v20260512';
+// ─── Cache version ── Bump on every deploy to bust ALL stale client caches ───
+const CACHE_VERSION = 'v20260512-2';
 const CACHE_NAME = `goalforge-${CACHE_VERSION}`;
 
 self.addEventListener('install', (event) => {
-  // Take control immediately without waiting for old SW to be dismissed
+  // Skip waiting immediately — do not wait for old SW to be unregistered
   self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
-  // Delete ALL caches that don't match the current version
   event.waitUntil(
-    caches.keys().then((cacheNames) =>
-      Promise.all(
-        cacheNames
-          .filter((name) => name !== CACHE_NAME)
-          .map((name) => {
-            console.log('[SW] Deleting stale cache:', name);
-            return caches.delete(name);
-          })
+    // 1. Delete all old caches
+    caches.keys()
+      .then((cacheNames) =>
+        Promise.all(
+          cacheNames
+            .filter((name) => name !== CACHE_NAME)
+            .map((name) => {
+              console.log('[SW] Purging stale cache:', name);
+              return caches.delete(name);
+            })
+        )
       )
-    ).then(() => self.clients.claim()) // Claim all open tabs immediately
+      .then(() => {
+        // 2. Immediately claim ALL open browser tabs/windows
+        return self.clients.claim();
+      })
+      .then(() => {
+        // 3. Tell every open client to hard-reload so they get fresh assets
+        return self.clients.matchAll({ type: 'window' }).then((clients) => {
+          clients.forEach((client) => {
+            client.postMessage({ type: 'SW_UPDATED' });
+          });
+        });
+      })
   );
 });
 

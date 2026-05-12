@@ -33,6 +33,15 @@ function AppInner() {
 
   React.useEffect(() => {
     registerServiceWorker();
+
+    // Listen for SW cache-bust signal → reload to get latest assets
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', (event) => {
+        if (event.data?.type === 'SW_UPDATED') {
+          window.location.reload();
+        }
+      });
+    }
   }, []);
 
   if (loading) {
