@@ -853,7 +853,7 @@ export const NotesPage = () => {
                 {showColorPopover && (
                   <>
                     <div className="fixed inset-0 z-40" onMouseDown={e => e.preventDefault()} onClick={() => setShowColorPopover(false)} />
-                    <div className="absolute top-10 right-0 md:right-auto md:left-0 bg-bg-card border border-border-med rounded-xl shadow-xl z-50 p-2 flex gap-1.5 items-center">
+                    <div className="absolute bottom-full mb-1 right-0 md:right-auto md:left-0 bg-bg-input border border-border-med ring-1 ring-white/10 rounded-xl shadow-float z-50 p-2.5 flex gap-2 items-center">
                       {[
                         { color: 'var(--text-main)', label: 'Default', bg: 'bg-text-main' },
                         { color: '#5a85ff', label: 'Blue', bg: 'bg-accent-blue' },
@@ -888,7 +888,7 @@ export const NotesPage = () => {
                 {showHighlightPopover && (
                   <>
                     <div className="fixed inset-0 z-40" onMouseDown={e => e.preventDefault()} onClick={() => setShowHighlightPopover(false)} />
-                    <div className="absolute top-10 right-0 md:right-auto md:left-0 bg-bg-card border border-border-med rounded-xl shadow-xl z-50 p-2 flex gap-1.5 items-center">
+                    <div className="absolute bottom-full mb-1 right-0 md:right-auto md:left-0 bg-bg-input border border-border-med ring-1 ring-white/10 rounded-xl shadow-float z-50 p-2.5 flex gap-2 items-center">
                       {[
                         { color: 'transparent', label: 'Clear', bg: 'bg-bg-input border-dashed' },
                         { color: 'rgba(90, 133, 255, 0.2)', label: 'Blue', bg: 'bg-accent-blue/30' },
