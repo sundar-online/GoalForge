@@ -1008,10 +1008,10 @@ export const NotesPage = () => {
                 </button>
 
                 {menuId === note.id && (
-                  <div className="absolute top-10 right-0 w-40 bg-bg-card border border-border-light rounded-xl shadow-float z-50 p-1">
+                  <div className="absolute bottom-full mb-1 right-0 w-40 bg-bg-input border border-border-med ring-1 ring-white/10 rounded-xl shadow-float z-50 p-1">
                     <button
                       onClick={(e) => { e.stopPropagation(); handleTogglePin(note); setMenuId(null); }}
-                      className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-text-main hover:bg-bg-input text-xs font-black transition-colors"
+                      className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-text-main hover:bg-bg-card text-xs font-black transition-colors"
                     >
                       <Pin size={14} className="rotate-45" /> {note.pinned ? 'Unpin' : 'Pin'}
                     </button>
