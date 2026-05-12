@@ -85,6 +85,7 @@ export const NotesPage = () => {
   const [activeNote, setActiveNote] = useState(null);
   const [search, setSearch] = useState('');
   const [menuId, setMenuId] = useState(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null); // 2-step delete confirmation
   const [newItemText, setNewItemText] = useState('');
   const newItemRef = useRef(null);
   const titleRef = useRef(null);
@@ -216,9 +217,22 @@ export const NotesPage = () => {
   const handleDeleteNote = (id) => {
     deleteNote(id);
     setMenuId(null);
+    setConfirmDeleteId(null);
     if (activeNote && activeNote.id === id) {
       setView('list');
       setActiveNote(null);
+    }
+  };
+
+  // First tap → arms confirmation; second tap → deletes
+  const handleDeletePress = (e, id) => {
+    e.stopPropagation();
+    if (confirmDeleteId === id) {
+      handleDeleteNote(id);
+    } else {
+      setConfirmDeleteId(id);
+      // Auto-dismiss confirmation after 3 seconds if not tapped again
+      setTimeout(() => setConfirmDeleteId(prev => prev === id ? null : prev), 3000);
     }
   };
 
@@ -585,9 +599,14 @@ export const NotesPage = () => {
             className={`w-11 h-11 rounded-xl border flex items-center justify-center transition-all active:scale-90 flex-shrink-0 ${activeNote.pinned ? 'bg-accent-blue/10 border-accent-blue/20 text-accent-blue' : 'bg-bg-card border-border-light text-text-muted hover:bg-bg-input'}`}>
             <Pin size={18} className={activeNote.pinned ? 'fill-current' : 'rotate-45'} />
           </button>
-          <button onClick={() => handleDeleteNote(activeNote.id)}
-            className="w-11 h-11 rounded-xl bg-red-500/10 hover:bg-red-500/20 flex items-center justify-center text-red-500 transition-all active:scale-90 flex-shrink-0">
+          <button onClick={(e) => handleDeletePress(e, activeNote.id)}
+            className={`h-11 rounded-xl flex items-center justify-center transition-all active:scale-90 flex-shrink-0 gap-2 px-3 ${
+              confirmDeleteId === activeNote.id
+                ? 'bg-red-500 text-white text-xs font-black'
+                : 'w-11 bg-red-500/10 hover:bg-red-500/20 text-red-500'
+            }`}>
             <Trash2 size={18} />
+            {confirmDeleteId === activeNote.id && <span>Confirm?</span>}
           </button>
         </header>
 
@@ -1001,14 +1020,14 @@ export const NotesPage = () => {
               </button>
               <div className="relative">
                 <button
-                  onClick={(e) => { e.stopPropagation(); setMenuId(menuId === note.id ? null : note.id); }}
+                  onClick={(e) => { e.stopPropagation(); setMenuId(menuId === note.id ? null : note.id); setConfirmDeleteId(null); }}
                   className="p-1.5 rounded-lg text-text-muted hover:bg-bg-input hover:text-text-main transition-colors"
                 >
                   <MoreVertical size={14} />
                 </button>
 
                 {menuId === note.id && (
-                  <div className="absolute bottom-full mb-1 right-0 w-40 bg-bg-input border border-border-med ring-1 ring-white/10 rounded-xl shadow-float z-50 p-1">
+                  <div className="absolute bottom-full mb-1 right-0 w-44 bg-bg-input border border-border-med ring-1 ring-white/10 rounded-xl shadow-float z-50 p-1">
                     <button
                       onClick={(e) => { e.stopPropagation(); handleTogglePin(note); setMenuId(null); }}
                       className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-text-main hover:bg-bg-card text-xs font-black transition-colors"
@@ -1016,10 +1035,15 @@ export const NotesPage = () => {
                       <Pin size={14} className="rotate-45" /> {note.pinned ? 'Unpin' : 'Pin'}
                     </button>
                     <button
-                      onClick={(e) => { e.stopPropagation(); handleDeleteNote(note.id); }}
-                      className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-red-500 hover:bg-red-500/10 text-xs font-black transition-colors"
+                      onClick={(e) => handleDeletePress(e, note.id)}
+                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-black transition-all ${
+                        confirmDeleteId === note.id
+                          ? 'bg-red-500 text-white rounded-lg'
+                          : 'text-red-500 hover:bg-red-500/10'
+                      }`}
                     >
-                      <Trash2 size={14} /> Delete
+                      <Trash2 size={14} />
+                      {confirmDeleteId === note.id ? 'Tap again to confirm' : 'Delete'}
                     </button>
                   </div>
                 )}
