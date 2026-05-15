@@ -22,7 +22,7 @@ import {
   getGoalScheduledDays
 } from '../utils/calculationUtils';
 import { XP_SOURCES, getLevelFromXP, evaluateBadges, getNewlyEarnedBadges } from '../utils/gamificationEngine';
-import { scheduleLocalNotification } from '../utils/notificationUtils';
+import { scheduleLocalNotification, scheduleReminder, cancelReminder } from '../utils/notificationUtils';
 import {
   analyzeUserBehavior,
   generateRecoveryStrategies,
@@ -117,6 +117,7 @@ export const AppProvider = ({ children }) => {
   useEffect(() => { goalsRef.current = goals; }, [goals]);
   useEffect(() => { memoriesRef.current = memories; }, [memories]);
   const habitsListeners = useRef({});
+  const scheduledRemindersRef = useRef({});
 
   // Story Celebration Modal state
   const [completedGoalForCelebration, setCompletedGoalForCelebration] = useState(null);
@@ -137,8 +138,56 @@ export const AppProvider = ({ children }) => {
       
       prevGoalsProgressRef.current[goal.id] = currentProgress;
     });
+  }, [goals, loading]);
+
+  // ── Notification Management: Syncing Reminders with Habit State ──
+  useEffect(() => {
+    if (loading || !goals) return;
+
+    const currentHabitIds = new Set();
     
-    // Clean up deleted goals from our ref
+    goals.forEach(goal => {
+      (goal.habits || []).forEach(habit => {
+        currentHabitIds.add(String(habit.id));
+        
+        const config = {
+          enabled: !!habit.reminderEnabled,
+          time: habit.reminderTime || '08:00',
+          days: JSON.stringify(habit.scheduleDays || [])
+        };
+
+        const lastConfigStr = scheduledRemindersRef.current[habit.id];
+        const currentConfigStr = JSON.stringify(config);
+        
+        if (lastConfigStr !== currentConfigStr) {
+          if (habit.reminderEnabled) {
+            scheduleReminder(
+              habit.id, 
+              `🔥 Habit: ${habit.title}`, 
+              `Goal: ${goal.title}`, 
+              habit.reminderTime || '08:00', 
+              habit.scheduleDays || []
+            );
+          } else {
+            cancelReminder(habit.id);
+          }
+          scheduledRemindersRef.current[habit.id] = currentConfigStr;
+        }
+      });
+    });
+    
+    // Cleanup orphaned reminders (deleted habits)
+    Object.keys(scheduledRemindersRef.current).forEach(hid => {
+      if (!currentHabitIds.has(String(hid))) {
+        cancelReminder(hid);
+        delete scheduledRemindersRef.current[hid];
+      }
+    });
+  }, [goals, loading]);
+
+  // Clean up deleted goals from progress ref
+  useEffect(() => {
+    if (loading || !goals) return;
     const currentGoalIds = new Set(goals.map(g => g.id));
     Object.keys(prevGoalsProgressRef.current).forEach(gId => {
       if (!currentGoalIds.has(gId)) {
@@ -499,6 +548,8 @@ export const AppProvider = ({ children }) => {
                   completedDates: hd.completed_dates || [],
                   missedDays: hd.missed_days ?? 0,
                   scheduleDays: hd.schedule_days || [],
+                  reminderEnabled: hd.reminder_enabled ?? false,
+                  reminderTime: hd.reminder_time || '08:00',
                   lastActiveDate: hd.last_active_date || null,
                   isRecovering: hd.is_recovering ?? false,
                   originalTarget: hd.original_target || null,
@@ -913,29 +964,63 @@ export const AppProvider = ({ children }) => {
     }
   }, [completedItems, totalItems, loading, user]);
 
-  // ── AI Analysis Effect ───────────────────────────────────
+  // ── AI Analysis Effect (Offloaded to Web Worker) ───────────────────────────────────
+  const [workerReady, setWorkerReady] = useState(false);
+  const aiWorkerRef = useRef(null);
+  const lastAiHashRef = useRef('');
+
   useEffect(() => {
-    if (loading) return;
+    // Initialize Web Worker for background AI processing
+    const worker = new Worker(new URL('../workers/aiWorker.js', import.meta.url), { type: 'module' });
+    aiWorkerRef.current = worker;
+    
+    worker.onmessage = (e) => {
+      if (e.data.type === 'SUCCESS') {
+        const { insights, strategies, suggestion } = e.data.payload;
+        setAiInsights(insights);
+        setRecoveryStrategies(strategies);
+        setSmartSuggestions(suggestion);
+      } else {
+        console.error('[AI Worker Error]', e.data.error);
+      }
+    };
+
+    setWorkerReady(true);
+
+    return () => {
+      worker.terminate();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (loading || !workerReady || !aiWorkerRef.current) return;
 
     const timer = setTimeout(() => {
-      const insights = analyzeUserBehavior(goals, tasks, taskLogs, focusTime);
-      const strategies = generateRecoveryStrategies(goals, tasks);
-      const suggestion = getSmartSuggestions(new Date(), tasks, accuracy);
-
-      // Dismissed IDs are date-stamped (e.g. 'peak_performance__2026-05-05')
-      // so the same insight-type can re-appear the next day with fresh data.
-      const todayKey = TODAY();
-      const dismissed = settings.dismissedInsights || [];
-      const filteredInsights = insights.filter(i => !dismissed.includes(`${i.id}__${todayKey}`));
-      const filteredStrategies = strategies.filter(s => !dismissed.includes(`${s.id}__${todayKey}`));
-
-      setAiInsights(filteredInsights);
-      setRecoveryStrategies(filteredStrategies);
-      setSmartSuggestions(suggestion);
-    }, 600); // 600ms debounce to prevent layouts bottlenecking on quick item interactions!
+      // Intelligent Caching: Create a lightweight hash to prevent redundant background recalculations
+      const activeGoals = goals.filter(g => !isGoalDoneToday(g)).length;
+      const doneTasks = tasks.filter(t => t.completed).length;
+      const dismissedCount = (settings.dismissedInsights || []).length;
+      const logCount = Object.keys(taskLogs).length;
+      
+      const currentHash = `${activeGoals}_${doneTasks}_${logCount}_${focusTime}_${accuracy}_${dismissedCount}`;
+      
+      if (lastAiHashRef.current !== currentHash) {
+        lastAiHashRef.current = currentHash;
+        // Offload heavy data processing to the background worker thread
+        aiWorkerRef.current.postMessage({
+          goals,
+          tasks,
+          taskLogs,
+          focusTime,
+          accuracy,
+          dismissedInsights: settings.dismissedInsights || [],
+          dateStr: TODAY()
+        });
+      }
+    }, 800); 
 
     return () => clearTimeout(timer);
-  }, [goals, tasks, taskLogs, focusTime, accuracy, settings.dismissedInsights, loading]);
+  }, [goals, tasks, taskLogs, focusTime, accuracy, settings.dismissedInsights, loading, workerReady]);
 
   const dismissInsight = (id) => {
     // Store with today's date so it auto-resets the next day
@@ -947,6 +1032,46 @@ export const AppProvider = ({ children }) => {
       dismissedInsights: [...(prev.dismissedInsights || []).slice(-29), stampedId]
     }));
   };
+
+  // ── Notification Reminder Synchronization ──────────────────────────────────────────
+  useEffect(() => {
+    if (loading) return;
+
+    const timer = setTimeout(async () => {
+      // 1. Sync Task Reminders
+      tasks.forEach(task => {
+        if (task.reminderEnabled && task.reminderTime) {
+          scheduleReminder(
+            task.id, 
+            task.title, 
+            `Daily Task: ${task.title}`, 
+            task.reminderTime
+          );
+        } else {
+          cancelReminder(task.id);
+        }
+      });
+
+      // 2. Sync Habit Reminders
+      goals.forEach(goal => {
+        (goal.habits || []).forEach(habit => {
+          if (habit.reminderEnabled && habit.reminderTime) {
+            scheduleReminder(
+              habit.id, 
+              habit.title, 
+              `Habit: ${habit.title}`, 
+              habit.reminderTime
+            );
+          } else {
+            cancelReminder(habit.id);
+          }
+        });
+      });
+    }, 2000);
+
+    return () => clearTimeout(timer);
+  }, [goals, tasks, loading]);
+
 
   const applyRecoveryPlan = (plan) => {
     if (plan.isHabit) {
@@ -1246,6 +1371,9 @@ export const AppProvider = ({ children }) => {
     } else {
       console.log(`%c[Diagnostic Log] ACTION COMPLETE: deleteGoal [goalId=${goalIdStr}] (No Logged-In User)`, 'color: #3b82f6; font-weight: bold;');
     }
+
+    // Cancel all habit reminders for this goal
+    habitIds.forEach(hId => cancelReminder(hId));
   };
 
   const addHabit = (goalId, habit) => {
@@ -1330,6 +1458,8 @@ export const AppProvider = ({ children }) => {
       db.deleteHabitDb(user.id, goalId, habitId).catch(err => console.error('[Firestore Sync] Habit delete failed:', err));
       db.upsertGoal(user.id, finalGoal).catch(err => console.error('[Firestore Sync] Goal upsert failed:', err));
     }
+
+    cancelReminder(habitId);
   };
 
   const logHabitTime = (goalId, habitId, minutes) => {
@@ -1445,6 +1575,33 @@ export const AppProvider = ({ children }) => {
       });
     } else {
       console.log(`%c[Diagnostic Log] ACTION COMPLETE: logHabitTime [goalId=${goalId}, habitId=${habitId}] (No Logged-In User)`, 'color: #3b82f6; font-weight: bold;');
+    }
+  };
+
+  const updateHabitReminder = (goalId, habitId, reminderEnabled, reminderTime) => {
+    const goal = goals.find(g => g.id === goalId);
+    if (!goal) return;
+
+    let habitToUpdate = null;
+    const updatedHabits = (goal.habits || []).map(h => {
+      if (h.id === habitId) {
+        habitToUpdate = {
+          ...h,
+          reminderEnabled,
+          reminderTime: reminderTime || h.reminderTime || '08:00',
+          lastActionTimestamp: new Date().toISOString()
+        };
+        return habitToUpdate;
+      }
+      return h;
+    });
+
+    const updatedGoal = { ...goal, habits: updatedHabits, lastActionTimestamp: new Date().toISOString() };
+    setGoals(prev => prev.map(g => g.id === goalId ? updatedGoal : g));
+
+    if (user && habitToUpdate) {
+      db.upsertHabit(user.id, goalId, habitToUpdate).catch(err => console.error('[Firestore Sync] Habit reminder update failed:', err));
+      db.upsertGoal(user.id, updatedGoal).catch(err => console.error('[Firestore Sync] Goal update failed:', err));
     }
   };
 
@@ -1735,6 +1892,8 @@ export const AppProvider = ({ children }) => {
         console.error('[Firestore Sync] Failed to delete task:', err);
       }
     }
+
+    cancelReminder(id);
   };
 
   const toggleTaskComplete = (taskId) => {
@@ -2232,7 +2391,7 @@ export const AppProvider = ({ children }) => {
 
   const goalsValue = {
     goals, addGoal, updateGoal, editGoalSystem, deleteGoal, extendGoalDeadline,
-    addHabit, deleteHabit, logHabitTime, toggleHabitCheck, updateHabitCount,
+    addHabit, deleteHabit, logHabitTime, toggleHabitCheck, updateHabitCount, updateHabitReminder,
     allHabits, completedGoalForCelebration, setCompletedGoalForCelebration,
     loading, syncError, retrySync: syncFromCloud, clearProfileData
   };
@@ -2271,7 +2430,7 @@ export const AppProvider = ({ children }) => {
 
   const value = {
     goals, addGoal, updateGoal, editGoalSystem, deleteGoal, extendGoalDeadline,
-    addHabit, deleteHabit, logHabitTime, toggleHabitCheck, updateHabitCount,
+    addHabit, deleteHabit, logHabitTime, toggleHabitCheck, updateHabitCount, updateHabitReminder,
     tasks, addTask, updateTask, deleteTask, logTaskTime, toggleTaskComplete, updateTaskCount,
     focusTime, focusHistory, addFocusTime, addFocusTimeToHabit,
     theme, toggleTheme,

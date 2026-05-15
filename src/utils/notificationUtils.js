@@ -147,7 +147,87 @@ export const cancelTimerNotification = async () => {
       await LocalNotifications.cancel({ notifications: [{ id: 9999 }] });
       console.log('[Notification] Background timer notification cancelled.');
     } catch (err) {
-      console.error('[Notification] Failed to cancel native notification:', err);
+      console.error('[Notification] Error cancelling background native notification:', err);
     }
   }
 };
+
+export const getNotificationId = (id) => {
+  if (typeof id === 'number') return id;
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) {
+    const char = id.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; 
+  }
+  return Math.abs(hash % 1000000);
+};
+
+export const scheduleReminder = async (id, title, body, timeStr, scheduleDays = []) => {
+  if (!Capacitor.isNativePlatform()) {
+    console.log(`[Notification] Reminder simulation: "${title}" at ${timeStr} (Days: ${scheduleDays.length ? scheduleDays.join(',') : 'Everyday'})`);
+    return;
+  }
+
+  try {
+    const permission = await LocalNotifications.checkPermissions();
+    if (permission.display !== 'granted') {
+      const result = await LocalNotifications.requestPermissions();
+      if (result.display !== 'granted') return;
+    }
+
+    const [hour, minute] = timeStr.split(':').map(Number);
+    const mainId = getNotificationId(id);
+    const dayMap = { 'Sun': 1, 'Mon': 2, 'Tue': 3, 'Wed': 4, 'Thu': 5, 'Fri': 6, 'Sat': 7 };
+    const ALL_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+    // 1. Cancel previous schedules for this habit
+    const idsToCancel = [mainId, ...ALL_DAYS.map(d => getNotificationId(`${id}-${d}`))];
+    await LocalNotifications.cancel({ notifications: idsToCancel.map(cid => ({ id: cid })) });
+
+    if (!scheduleDays || scheduleDays.length === 0) {
+      // 2a. Schedule Daily Reminder
+      await LocalNotifications.schedule({
+        notifications: [
+          {
+            title,
+            body: body || 'Time to complete your habit!',
+            id: mainId,
+            schedule: { on: { hour, minute }, repeats: true, allowWhileIdle: true },
+            extra: { type: 'reminder', originalId: id }
+          }
+        ]
+      });
+      console.log(`[Notification] Scheduled "${title}" daily at ${timeStr} [ID: ${mainId}]`);
+    } else {
+      // 2b. Schedule Weekday Reminders
+      const notifications = scheduleDays.map(day => ({
+        title,
+        body: body || 'Time to complete your habit!',
+        id: getNotificationId(`${id}-${day}`),
+        schedule: { on: { weekday: dayMap[day], hour, minute }, repeats: true, allowWhileIdle: true },
+        extra: { type: 'reminder', originalId: id, day }
+      }));
+      
+      await LocalNotifications.schedule({ notifications });
+      console.log(`[Notification] Scheduled "${title}" for ${scheduleDays.join(',')} at ${timeStr}`);
+    }
+  } catch (err) {
+    console.error('[Notification] Failed to schedule reminder:', err);
+  }
+};
+
+export const cancelReminder = async (id) => {
+  if (!Capacitor.isNativePlatform()) return;
+  try {
+    const mainId = getNotificationId(id);
+    const ALL_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const idsToCancel = [mainId, ...ALL_DAYS.map(d => getNotificationId(`${id}-${d}`))];
+    
+    await LocalNotifications.cancel({ notifications: idsToCancel.map(cid => ({ id: cid })) });
+    console.log(`[Notification] Cancelled all reminders for: ${id}`);
+  } catch (err) {
+    console.error('[Notification] Failed to cancel reminder:', err);
+  }
+};
+

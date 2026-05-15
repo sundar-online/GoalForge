@@ -127,12 +127,14 @@ const EditGoalSystemModal = ({ goal, onClose, onSave }) => {
       type: h.type || 'time',
       targetTime: h.targetTime ?? 15,
       targetCount: h.targetCount ?? 10,
-      scheduleDays: h.scheduleDays || []
+      scheduleDays: h.scheduleDays || [],
+      reminderEnabled: !!h.reminderEnabled,
+      reminderTime: h.reminderTime || '08:00'
     }))
   );
 
   const handleAddStagingHabit = () => {
-    setHabits(prev => [...prev, { id: 'staging_' + Date.now() + '_' + Math.random(), title: '', type: 'time', targetTime: 15, targetCount: 10, scheduleDays: [] }]);
+    setHabits(prev => [...prev, { id: 'staging_' + Date.now() + '_' + Math.random(), title: '', type: 'time', targetTime: 15, targetCount: 10, scheduleDays: [], reminderEnabled: false, reminderTime: '08:00' }]);
   };
 
   const handleRemoveStagingHabit = (id) => {
@@ -274,6 +276,21 @@ const EditGoalSystemModal = ({ goal, onClose, onSave }) => {
                      value={h.scheduleDays || []}
                      onChange={days => handleUpdateStagingHabit(h.id, { scheduleDays: days })}
                    />
+                   <div className="flex items-center justify-between gap-3 bg-bg-card rounded-xl px-4 py-2 border border-border-light/40">
+                      <div className="flex items-center gap-2">
+                         <Clock size={12} className="text-text-muted" />
+                         <span className="text-[10px] font-black text-text-muted uppercase tracking-widest">Reminder</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                         {h.reminderEnabled && (
+                            <input type="time" value={h.reminderTime} onChange={e => handleUpdateStagingHabit(h.id, { reminderTime: e.target.value })} className="bg-transparent border-none text-[11px] font-black text-accent-blue outline-none" />
+                         )}
+                         <button type="button" onClick={() => handleUpdateStagingHabit(h.id, { reminderEnabled: !h.reminderEnabled })}
+                           className={`w-9 h-5 rounded-full relative transition-colors ${h.reminderEnabled ? 'bg-accent-blue' : 'bg-bg-input-hover'}`}>
+                           <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${h.reminderEnabled ? 'left-4.5' : 'left-0.5'}`} />
+                         </button>
+                      </div>
+                   </div>
                 </div>
               ))}
             </div>
@@ -314,7 +331,7 @@ const LogTimeModal = ({ habit, goalId, onClose, logHabitTime }) => {
   );
 };
 
-const HabitRow = ({ habit, goalId, logHabitTime, deleteHabit, toggleHabitCheck, updateHabitCount }) => {
+const HabitRow = ({ habit, goalId, logHabitTime, deleteHabit, toggleHabitCheck, updateHabitCount, updateHabitReminder }) => {
   const [showLog, setShowLog] = useState(false);
   const isCheck = habit.type === 'check';
   const isCount = habit.type === 'count';
@@ -401,6 +418,37 @@ const HabitRow = ({ habit, goalId, logHabitTime, deleteHabit, toggleHabitCheck, 
             <div className={`h-full transition-all duration-700 ${done ? 'bg-emerald-500' : 'bg-accent-blue'}`} style={{ width: `${pct}%` }} />
           </div>
         )}
+
+        {/* Reminder Settings Row */}
+        <div className="flex items-center justify-between pt-2 border-t border-border-light/30 mt-1">
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 opacity-60">
+              <Clock size={10} className="text-text-muted" />
+              <span className="text-[9px] font-black text-text-muted uppercase tracking-wider">Reminder</span>
+            </div>
+            <button 
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                updateHabitReminder(goalId, habit.id, !habit.reminderEnabled, habit.reminderTime);
+              }}
+              className={`w-8 h-4 rounded-full relative transition-all duration-300 ${habit.reminderEnabled ? 'bg-accent-blue shadow-sm shadow-accent-blue/20' : 'bg-bg-input-hover border border-border-light'}`}
+            >
+              <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all duration-300 ${habit.reminderEnabled ? 'left-[18px]' : 'left-0.5'}`} />
+            </button>
+          </div>
+          {habit.reminderEnabled && (
+            <div className="flex items-center animate-in fade-in slide-in-from-right-2 duration-300">
+              <input 
+                type="time" 
+                value={habit.reminderTime || '08:00'} 
+                onClick={e => e.stopPropagation()}
+                onChange={e => updateHabitReminder(goalId, habit.id, true, e.target.value)}
+                className="bg-transparent border-none text-[10px] font-black text-accent-blue outline-none cursor-pointer hover:text-accent-blue-hover transition-colors"
+              />
+            </div>
+          )}
+        </div>
       </div>
       {showLog && !isCheck && !isCount && <LogTimeModal habit={habit} goalId={goalId} onClose={() => setShowLog(false)} logHabitTime={logHabitTime} />}
     </>
@@ -408,7 +456,7 @@ const HabitRow = ({ habit, goalId, logHabitTime, deleteHabit, toggleHabitCheck, 
 };
 
 export const GoalsPage = () => {
-  const { goals, addGoal, deleteGoal, addHabit, deleteHabit, logHabitTime, toggleHabitCheck, updateHabitCount, extendGoalDeadline, editGoalSystem, setCompletedGoalForCelebration } = useGoals();
+  const { goals, addGoal, deleteGoal, addHabit, deleteHabit, logHabitTime, toggleHabitCheck, updateHabitCount, updateHabitReminder, extendGoalDeadline, editGoalSystem, setCompletedGoalForCelebration } = useGoals();
   const [expandedGoalIds, setExpandedGoalIds] = useState([]);
   const [isMobile, setIsMobile] = useState(false);
   const [colsCount, setColsCount] = useState(1);
@@ -479,9 +527,9 @@ export const GoalsPage = () => {
     deadline: '', 
     mode: 'ANY', 
     minHabits: 1, 
-    habits: [{ id: Date.now(), title: '', type: 'time', targetTime: 15, targetCount: 10 }]
+    habits: [{ id: Date.now(), title: '', type: 'time', targetTime: 15, targetCount: 10, reminderEnabled: false, reminderTime: '08:00' }]
   });
-  const [newHabit, setNewHabit] = useState({ title: '', type: 'time', targetTime: 15, targetCount: 10, scheduleDays: [] });
+  const [newHabit, setNewHabit] = useState({ title: '', type: 'time', targetTime: 15, targetCount: 10, scheduleDays: [], reminderEnabled: false, reminderTime: '08:00' });
 
   const doneGoals = goals.filter(g => g.progress === 100).length;
   const activeGoals = goals.length - doneGoals;
@@ -497,7 +545,9 @@ export const GoalsPage = () => {
       ...h,
       targetTime: Number(h.targetTime ?? 15),
       targetCount: Number(h.targetCount ?? 10),
-      scheduleDays: h.scheduleDays || []
+      scheduleDays: h.scheduleDays || [],
+      reminderEnabled: !!h.reminderEnabled,
+      reminderTime: h.reminderTime || '08:00'
     }));
 
     addGoal({
@@ -512,7 +562,7 @@ export const GoalsPage = () => {
       deadline: '',
       mode: 'ANY',
       minHabits: 1,
-      habits: [{ id: Date.now(), title: '', type: 'time', targetTime: 15, targetCount: 10, scheduleDays: [] }]
+      habits: [{ id: Date.now(), title: '', type: 'time', targetTime: 15, targetCount: 10, scheduleDays: [], reminderEnabled: false, reminderTime: '08:00' }]
     });
     setShowAddGoal(false);
   };
@@ -527,7 +577,7 @@ export const GoalsPage = () => {
   const addStagingHabit = () => {
     setNewGoal(prev => ({
       ...prev,
-      habits: [...prev.habits, { id: Date.now(), title: '', type: 'time', targetTime: 15, targetCount: 10, scheduleDays: [] }]
+      habits: [...prev.habits, { id: Date.now(), title: '', type: 'time', targetTime: 15, targetCount: 10, scheduleDays: [], reminderEnabled: false, reminderTime: '08:00' }]
     }));
   };
 
@@ -550,9 +600,11 @@ export const GoalsPage = () => {
       type: newHabit.type,
       targetTime: Number(newHabit.targetTime),
       targetCount: Number(newHabit.targetCount),
-      scheduleDays: newHabit.scheduleDays || []
+      scheduleDays: newHabit.scheduleDays || [],
+      reminderEnabled: !!newHabit.reminderEnabled,
+      reminderTime: newHabit.reminderTime || '08:00'
     });
-    setNewHabit({ title: '', type: 'time', targetTime: 15, targetCount: 10, scheduleDays: [] });
+    setNewHabit({ title: '', type: 'time', targetTime: 15, targetCount: 10, scheduleDays: [], reminderEnabled: false, reminderTime: '08:00' });
     setShowAddHabit(null);
   };
 
@@ -691,6 +743,21 @@ export const GoalsPage = () => {
                      value={h.scheduleDays || []}
                      onChange={days => updateStagingHabit(h.id, { scheduleDays: days })}
                    />
+                   <div className="flex items-center justify-between gap-3 bg-bg-card rounded-xl px-4 py-2.5 border border-border-light/40">
+                      <div className="flex items-center gap-2">
+                         <Clock size={14} className="text-text-muted" />
+                         <span className="text-[10px] font-black text-text-muted uppercase tracking-widest">Daily Reminder</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                         {h.reminderEnabled && (
+                            <input type="time" value={h.reminderTime} onChange={e => updateStagingHabit(h.id, { reminderTime: e.target.value })} className="bg-transparent border-none text-xs font-black text-accent-blue outline-none" />
+                         )}
+                         <button type="button" onClick={() => updateStagingHabit(h.id, { reminderEnabled: !h.reminderEnabled })}
+                           className={`w-10 h-6 rounded-full relative transition-colors ${h.reminderEnabled ? 'bg-accent-blue' : 'bg-bg-input-hover'}`}>
+                           <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${h.reminderEnabled ? 'left-5' : 'left-1'}`} />
+                         </button>
+                      </div>
+                   </div>
                 </div>
               ))}
             </div>
@@ -863,7 +930,7 @@ export const GoalsPage = () => {
                                 if (aDone !== bDone) return aDone ? 1 : -1;
                                 return 0;
                               })
-                              .map(h => <HabitRow key={h.id} habit={h} goalId={goal.id} logHabitTime={logHabitTime} deleteHabit={deleteHabit} toggleHabitCheck={toggleHabitCheck} updateHabitCount={updateHabitCount} />)}
+                              .map(h => <HabitRow key={h.id} habit={h} goalId={goal.id} logHabitTime={logHabitTime} deleteHabit={deleteHabit} toggleHabitCheck={toggleHabitCheck} updateHabitCount={updateHabitCount} updateHabitReminder={updateHabitReminder} />)}
                           </div>
                           
                           {showAddHabit === goal.id ? (
@@ -889,6 +956,21 @@ export const GoalsPage = () => {
                                 value={newHabit.scheduleDays || []}
                                 onChange={days => setNewHabit(h => ({ ...h, scheduleDays: days }))}
                               />
+                              <div className="flex items-center justify-between gap-3 bg-bg-card rounded-xl px-4 py-3 border border-border-light/40">
+                                <div className="flex items-center gap-2">
+                                  <Clock size={14} className="text-text-muted" />
+                                  <span className="text-[10px] font-black text-text-muted uppercase tracking-widest">Daily Reminder</span>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                  {newHabit.reminderEnabled && (
+                                    <input type="time" value={newHabit.reminderTime} onChange={e => setNewHabit(h => ({ ...h, reminderTime: e.target.value }))} className="bg-transparent border-none text-sm font-black text-accent-blue outline-none" />
+                                  )}
+                                  <button type="button" onClick={() => setNewHabit(h => ({ ...h, reminderEnabled: !h.reminderEnabled }))}
+                                    className={`w-12 h-6 rounded-full relative transition-colors ${newHabit.reminderEnabled ? 'bg-accent-blue' : 'bg-bg-input-hover'}`}>
+                                    <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${newHabit.reminderEnabled ? 'left-7' : 'left-1'}`} />
+                                  </button>
+                                </div>
+                              </div>
                               <div className="flex gap-3 pt-2">
                                 <button type="submit" className="flex-1 py-3.5 rounded-xl bg-accent-blue text-white font-black text-sm shadow-md active:scale-95 transition-all">Add Daily Habit</button>
                                 <button type="button" onClick={() => setShowAddHabit(null)} className="px-6 py-3.5 rounded-xl bg-bg-input text-text-muted font-black text-sm hover:bg-bg-input/80 transition-colors">Cancel</button>

@@ -51,7 +51,9 @@ export const DailyTasks = () => {
     priority: 'Medium', 
     targetDate: TODAY(), 
     startDate: TODAY(), 
-    endDate: TODAY() 
+    endDate: TODAY(),
+    reminderEnabled: false,
+    reminderTime: '08:00'
   };
   const [newTask, setNewTask] = useState(defaultTask);
   const [isAdding, setIsAdding] = useState(false);
@@ -205,6 +207,34 @@ export const DailyTasks = () => {
                   <input type="number" required value={newTask.targetCount} onChange={e => setNewTask({ ...newTask, targetCount: e.target.value })} className="w-full bg-bg-input border-none rounded-xl p-4 text-sm font-bold text-text-main outline-none" />
                 </div>
               )}
+            </div>
+
+            {/* Reminder Section */}
+            <div className="flex items-center gap-4 p-5 bg-bg-input rounded-2xl border border-border-light/50 transition-all hover:border-accent-blue/20">
+              <div className="w-10 h-10 rounded-xl bg-accent-blue/10 flex items-center justify-center shrink-0">
+                <Clock size={18} className="text-accent-blue" />
+              </div>
+              <div className="flex-1">
+                <p className="text-[10px] font-black text-text-muted uppercase tracking-widest leading-none mb-1">Reminder Alarm</p>
+                <p className="text-xs font-bold text-text-main">Notify me at specific time</p>
+              </div>
+              <div className="flex items-center gap-4">
+                {newTask.reminderEnabled && (
+                  <input 
+                    type="time" 
+                    value={newTask.reminderTime} 
+                    onChange={e => setNewTask({...newTask, reminderTime: e.target.value})} 
+                    className="bg-white/5 dark:bg-black/20 border border-white/10 rounded-lg px-2 py-1 text-sm font-black text-accent-blue outline-none animate-in fade-in" 
+                  />
+                )}
+                <button 
+                  type="button" 
+                  onClick={() => setNewTask({...newTask, reminderEnabled: !newTask.reminderEnabled})}
+                  className={`w-12 h-6 rounded-full relative transition-all duration-300 ${newTask.reminderEnabled ? 'bg-accent-blue' : 'bg-bg-dark-elem/20 border border-white/10'}`}
+                >
+                  <div className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow-sm transition-all duration-300 ${newTask.reminderEnabled ? 'left-7' : 'left-1'}`} />
+                </button>
+              </div>
             </div>
             
             <button type="submit" className="w-full bg-accent-blue text-white rounded-2xl py-4 font-black text-base shadow-xl shadow-accent-blue/30 hover:opacity-90 active:scale-[0.98] transition-all">

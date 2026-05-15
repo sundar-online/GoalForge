@@ -19,9 +19,10 @@ const logAccuracy = (log) =>
 
 // ── Helper: Group logs by weekday ────────────────────────────────────────────
 const groupByWeekday = (logs) => {
+  if (!logs || !Array.isArray(logs)) return {};
   const byDay = {}; // { 'Monday': [accuracy, ...], ... }
   logs.forEach((log) => {
-    if (!log.date || log.total_tasks === 0) return;
+    if (!log || !log.date || log.total_tasks === 0) return;
     const day = getDayName(log.date);
     if (!byDay[day]) byDay[day] = [];
     byDay[day].push(logAccuracy(log));
@@ -36,7 +37,7 @@ export const analyzeUserBehavior = (goals, tasks, taskLogs, focusTime) => {
   const todayDayName = getTodayDayName();
 
   // Use last 21 days of logs for richer, trend-based analysis
-  const allLogs = Object.values(taskLogs)
+  const allLogs = Object.values(taskLogs || {})
     .filter((l) => l && l.date && l.date !== today) // Exclude today (in-progress)
     .sort((a, b) => (a.date > b.date ? 1 : -1))
     .slice(-21);
@@ -315,37 +316,82 @@ export const generateRecoveryStrategies = (goals, tasks) => {
 };
 
 // ── Smart Time-of-Day Suggestions ────────────────────────────────────────────
-export const getSmartSuggestions = (currentTime, tasks, progress) => {
-  const hour = new Date().getHours();
+export const getSmartSuggestions = (currentTime, tasks = [], progress = 0) => {
+  const hour = new Date(currentTime).getHours();
   const todayDayName = getTodayDayName();
+  const pendingTasksCount = (tasks || []).filter(t => !t.completed).length;
 
-  if (hour < 9 && progress < 5) {
+  // 1. Early Morning (Before 9 AM)
+  if (hour < 9) {
+    if (progress > 10) return {
+      title: '🚀 Explosive Start',
+      message: `You've already crossed ${Math.round(progress)}% of your day before 9 AM! This is elite performance territory. Keep this fire burning.`
+    };
     return {
       title: '🌅 Morning Intention',
-      message: `Happy ${todayDayName}! A small, quiet win right now will trigger a dopamine loop and build strong momentum for the rest of your day.`,
+      message: `Happy ${todayDayName}! A small, quiet win right now will trigger a dopamine loop and build strong momentum for the rest of your day.`
     };
   }
 
-  if (hour >= 9 && hour < 12 && progress < 30) {
-    return {
+  // 2. Prime Focus Hours (9 AM - 12 PM)
+  if (hour >= 9 && hour < 12) {
+    if (progress < 20) return {
       title: '⚡ High-Focus Window',
-      message: 'Your mind is fresh and active right now. Protect these hours from distraction and tackle your single hardest task.',
+      message: 'Your mind is fresh and active right now. Protect these hours from distraction and tackle your single hardest "Deep Work" task.'
     };
-  }
-
-  if (hour >= 14 && hour < 16 && progress < 60) {
     return {
-      title: '☕ Energy Recovery Hour',
-      message: 'Post-lunch slumps are natural. Step away for a quick screen-free stretch or walk, then return focused.',
+      title: '🔥 Mid-Morning Burn',
+      message: "You're in the zone. Don't stop to check emails—stay in the flow and clear your main priority list."
     };
   }
 
-  if (hour >= 20 && progress < 80) {
+  // 3. Post-Lunch Recovery (12 PM - 2 PM)
+  if (hour >= 12 && hour < 14) {
     return {
-      title: '🌙 Calm Evening Routine',
-      message: 'Wind down your mental loops. Focus on completing just one small element that will make tomorrow morning effortless.',
+      title: '🥗 Strategic Pause',
+      message: 'Natural energy dips occur after lunch. Use this hour for low-friction tasks like organization or quick replies before your afternoon push.'
     };
   }
 
-  return null;
+  // 4. Afternoon Peak (2 PM - 5 PM)
+  if (hour >= 14 && hour < 17) {
+    if (progress < 50) return {
+      title: '📈 Afternoon Re-Ignition',
+      message: 'The day is far from over. Break your remaining tasks into 15-minute sprints to rebuild your momentum for a strong finish.'
+    };
+    return {
+      title: '🔋 Sustained Energy',
+      message: "You've crossed the 50% mark! Finish one more meaningful task before 5 PM to guarantee a productive day's win."
+    };
+  }
+
+  // 5. Late Afternoon / Sunset (5 PM - 8 PM)
+  if (hour >= 17 && hour < 20) {
+    if (pendingTasksCount > 0) return {
+      title: '🎯 The Golden Hour',
+      message: `You still have ${pendingTasksCount} items pending. Pick the smallest one to finish now so you can enjoy your evening with true mental peace.`
+    };
+    return {
+      title: '✨ Daily Victory',
+      message: 'Main tasks cleared! This is the perfect time to review your wins and set one small intention for tomorrow.'
+    };
+  }
+
+  // 6. Night / Wind Down (After 8 PM)
+  if (hour >= 20) {
+    if (progress < 70 && pendingTasksCount > 0) return {
+      title: '💤 Strategic Surrender',
+      message: "It's late and energy is low. Don't force heavy work now. Reschedule pending items and focus on quality sleep—your brain's best performance tool."
+    };
+    return {
+      title: '🌙 Calm Reflection',
+      message: 'Wind down your mental loops. Focus on completing just one small element (like setting your clothes out) that will make tomorrow morning effortless.'
+    };
+  }
+
+  // Fallback: General encouragement
+  return {
+    title: '🧠 Neural Baseline',
+    message: 'Analyzing your performance patterns. Continue your routine to unlock deeper behavioral insights and recovery strategies.',
+  };
 };

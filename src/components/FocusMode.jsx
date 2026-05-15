@@ -2,13 +2,18 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGoals, useTasks, useFocus, useGamification } from '../context/AppContext';
 import { 
-  Play, Pause, RotateCcw, Target, Coffee, Zap, 
-  Volume2, VolumeX, CheckCircle, ChevronDown, Check, 
-  Flame, Trophy, Calendar, Sparkles, Award, Bell, Music, HelpCircle,
-  Clock, History
+  Play, Pause, RotateCcw, Target, Award, Zap, Shield, TrendingUp, 
+  ChevronRight, Volume2, VolumeX, Settings, X, Info, Flame, History, Clock,
+  Trophy, Calendar, Sparkles, Bell, Music, CircleHelp
 } from 'lucide-react';
 import { TODAY } from '../utils/dateUtils';
-import { scheduleTimerCompletionNotification, cancelTimerNotification } from '../utils/notificationUtils';
+import { 
+  scheduleTimerCompletionNotification, 
+  cancelTimerNotification,
+  scheduleLocalNotification, 
+  scheduleReminder, 
+  cancelReminder 
+} from '../utils/notificationUtils';
 
 // ── Audio Themes Synthesizer ──────────────────────────────────────────
 const playSynthesizedSound = (theme, volume = 0.5, isMuted = false) => {
@@ -60,11 +65,25 @@ const playSynthesizedSound = (theme, volume = 0.5, isMuted = false) => {
   }
 };
 
+// ── Haptic Pulse Utilities ─────────────────────────────────────────────
+const triggerHapticPulse = () => {
+  if (typeof window !== 'undefined' && window.navigator && window.navigator.vibrate) {
+    window.navigator.vibrate(10);
+  }
+};
+
+const triggerCompletionHaptics = () => {
+  if (typeof window !== 'undefined' && window.navigator && window.navigator.vibrate) {
+    window.navigator.vibrate([40, 60, 40, 60, 200]);
+  }
+};
+
 export const FocusMode = () => {
-  const { goals, addFocusTimeToHabit } = useGoals();
-  const { tasks } = useTasks();
-  const { focusTime } = useFocus();
+  const { goals = [] } = useGoals();
+  const { tasks = [] } = useTasks();
+  const { focusTime, addFocusTimeToHabit } = useFocus();
   const { awardFocusXP } = useGamification();
+  const todayStr = TODAY();
   
   // ── PERSISTENT TIMER STATE MANAGEMENT ─────────────────────────────────
   const [timerState, setTimerState] = useState(() => {
@@ -110,15 +129,20 @@ export const FocusMode = () => {
   const [showCelebration, setShowCelebration] = useState(false);
   const [celebrationDetails, setCelebrationDetails] = useState(null);
   const [sessionLogs, setSessionLogs] = useState(() => {
-    const saved = localStorage.getItem('gf_focus_completed_sessions');
-    return saved ? JSON.parse(saved) : [];
+    try {
+      const saved = localStorage.getItem('gf_focus_completed_sessions');
+      if (!saved) return [];
+      const parsed = JSON.parse(saved);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+      console.error('Focus logs parse error:', e);
+      return [];
+    }
   });
 
   const timerIntervalRef = useRef(null);
 
-  // Get Today's tasks
-  const todayStr = TODAY();
-  const todayTasks = tasks.filter(t => {
+  const todayTasks = (tasks || []).filter(t => {
     const type = t.type || 'daily';
     if (type === 'daily') return true;
     if (type === 'single') return t.targetDate === todayStr || t.date === todayStr;
@@ -127,22 +151,22 @@ export const FocusMode = () => {
   });
 
   const isDailyTaskMode = selectedGoalId === 'DAILY_TASK';
-  const selectedGoal = isDailyTaskMode ? null : goals.find(g => g.id === selectedGoalId);
+  const selectedGoal = isDailyTaskMode ? null : (goals || []).find(g => g.id === selectedGoalId);
   const activeList = isDailyTaskMode ? todayTasks : (selectedGoal?.habits || []);
-  const selectedItem = activeList.find(h => h.id === selectedHabitId);
+  const selectedItem = (activeList || []).find(h => h.id === selectedHabitId);
 
   // ── Synchronize selections dynamically if empty ────────────────────
   useEffect(() => {
-    if (!selectedGoalId) {
-      if (goals.length > 0) {
+    if (!selectedGoalId && (goals || todayTasks)) {
+      if (goals?.length > 0) {
         setSelectedGoalId(goals[0].id);
         localStorage.setItem('gf_focus_selectedGoalId', goals[0].id);
-      } else if (todayTasks.length > 0) {
+      } else if (todayTasks?.length > 0) {
         setSelectedGoalId('DAILY_TASK');
         localStorage.setItem('gf_focus_selectedGoalId', 'DAILY_TASK');
       }
     }
-  }, [goals, todayTasks]);
+  }, [goals, todayTasks, selectedGoalId]);
 
   useEffect(() => {
     if (selectedGoalId && activeList.length > 0 && !selectedHabitId) {
@@ -166,12 +190,12 @@ export const FocusMode = () => {
 
   // ── ANALYTICS: Calculate Streak and Daily Totals ─────────────────────
   const streakCount = useMemo(() => {
-    if (sessionLogs.length === 0) return 0;
-    const uniqueDates = Array.from(new Set(sessionLogs.map(s => s.date))).sort();
+    if (!sessionLogs || !Array.isArray(sessionLogs) || sessionLogs.length === 0) return 0;
+    
+    const uniqueDates = Array.from(new Set(sessionLogs.map(s => s.date))).sort().reverse();
     let currentStreak = 0;
     let checkDate = new Date();
     
-    // Check if there's focus today or yesterday to continue streak
     const formatDateStr = (d) => {
       const year = d.getFullYear();
       const month = String(d.getMonth() + 1).padStart(2, '0');
@@ -180,11 +204,13 @@ export const FocusMode = () => {
     };
 
     let checkStr = formatDateStr(checkDate);
+    // If today is not in logs, check if yesterday is (to allow continuing a streak today)
     if (!uniqueDates.includes(checkStr)) {
       checkDate.setDate(checkDate.getDate() - 1);
       checkStr = formatDateStr(checkDate);
     }
 
+    // Now count backwards as long as the dates are present
     while (uniqueDates.includes(checkStr)) {
       currentStreak++;
       checkDate.setDate(checkDate.getDate() - 1);
@@ -403,19 +429,7 @@ export const FocusMode = () => {
     setShowCelebration(true);
   };
 
-  // ── HAPTICS & ALERTS VIBRATION ─────────────────────────────────────
-  const triggerHapticPulse = () => {
-    if ('vibrate' in navigator) {
-      navigator.vibrate(60);
-    }
-  };
 
-  const triggerCompletionHaptics = () => {
-    if ('vibrate' in navigator) {
-      // Elegant futuristic heartbeat vibration pattern
-      navigator.vibrate([150, 80, 150, 80, 400]);
-    }
-  };
 
   // Calculate stats
   const totalSeconds = duration * 60;
@@ -423,7 +437,7 @@ export const FocusMode = () => {
     ? elapsedBeforePause + Math.floor((Date.now() - startTime) / 1000)
     : elapsedBeforePause;
   
-  const pct = Math.min(100, (elapsed / totalSeconds) * 100);
+  const pct = totalSeconds > 0 ? Math.min(100, (elapsed / totalSeconds) * 100) : 0;
   const R = 100; const SIZE = 240; const CX = 120; const CY = 120;
   const CIRC = 2 * Math.PI * R;
   const dashOffset = CIRC - (CIRC * pct) / 100;
@@ -432,7 +446,8 @@ export const FocusMode = () => {
   const isNearCompletion = timerState === 'running' && (time < 60 || pct >= 90);
 
   return (
-    <div className="w-full max-w-6xl mx-auto pb-12 px-4 lg:px-0">
+    <div className="w-full min-h-screen bg-slate-950 text-slate-100 -mt-8 pt-8 px-4 lg:px-0">
+      <div className="max-w-6xl mx-auto pb-12">
       {/* ── CELEBRATION MODAL OVERLAY ─────────────────────────────────── */}
       <AnimatePresence>
         {showCelebration && celebrationDetails && (
@@ -837,6 +852,7 @@ export const FocusMode = () => {
           )}
         </div>
       </div>
+    </div>
     </div>
   );
 };

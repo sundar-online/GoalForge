@@ -23,6 +23,21 @@ export const Dashboard = ({ setView }) => {
   const xpData = rawXpData || { totalXP: 0, earnedBadges: [], xpHistory: [] };
   const currentLevelInfo = rawLevelInfo || { level: 1, title: 'Recruit', progress: 0, xpForNext: 100, isMaxLevel: false };
 
+  const reminders = [
+    ...(todayTasks || []).filter(t => t.reminderEnabled && t.reminderTime).map(t => ({ 
+      id: t.id, 
+      title: t.title, 
+      time: t.reminderTime, 
+      type: 'Task' 
+    })),
+    ...(allHabits || []).filter(h => h.reminderEnabled && h.reminderTime).map(h => ({ 
+      id: h.id, 
+      title: h.title, 
+      time: h.reminderTime, 
+      type: 'Habit' 
+    }))
+  ].sort((a, b) => a.time.localeCompare(b.time));
+
   const { displayName, signOut, user } = useAuth();
   const [showSignOut, setShowSignOut] = useState(false);
 
@@ -231,6 +246,33 @@ export const Dashboard = ({ setView }) => {
               })}
             </div>
           )}
+
+          {/* Reminders Horizon */}
+          {reminders.length > 0 && (
+            <div className="space-y-4">
+              <div className="flex justify-between items-center px-1">
+                <p className="text-[10px] font-black text-text-muted uppercase tracking-[0.2em]">Next Alerts</p>
+                <span className="text-[10px] font-bold text-accent-blue bg-accent-blue/10 px-2 py-0.5 rounded-full">{reminders.length} Scheduled</span>
+              </div>
+              <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
+                {reminders.map((r, i) => (
+                  <div key={i} className="min-w-[160px] bg-bg-card rounded-2xl p-4 border border-border-light shadow-sm flex flex-col gap-2 transition-all hover:border-accent-blue/30 group">
+                    <div className="flex justify-between items-start">
+                      <div className="w-8 h-8 rounded-lg bg-bg-input flex items-center justify-center text-accent-blue group-hover:bg-accent-blue group-hover:text-white transition-all">
+                        <Clock size={14} />
+                      </div>
+                      <span className="text-[11px] font-black text-accent-blue">{r.time}</span>
+                    </div>
+                    <div className="mt-1">
+                      <p className="text-xs font-black text-text-main truncate">{r.title}</p>
+                      <p className="text-[9px] font-bold text-text-muted uppercase tracking-widest">{r.type}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
 
           {/* Accuracy + Focus Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
