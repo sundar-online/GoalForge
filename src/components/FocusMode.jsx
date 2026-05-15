@@ -3,8 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useGoals, useTasks, useFocus, useGamification } from '../context/AppContext';
 import { 
   Play, Pause, RotateCcw, Target, Award, Zap, Shield, TrendingUp, 
-  ChevronRight, Volume2, VolumeX, Settings, X, Info, Flame, History, Clock,
-  Trophy, Calendar, Sparkles, Bell, Music, CircleHelp
+  ChevronRight, ChevronDown, Volume2, VolumeX, Settings, X, Info, Flame, History, Clock,
+  Trophy, Calendar, Sparkles, Bell, Music, CircleHelp, CheckCircle2
 } from 'lucide-react';
 import { TODAY } from '../utils/dateUtils';
 import { 
@@ -775,7 +775,7 @@ export const FocusMode = () => {
               }`}
             >
               {time === 0 ? (
-                <CheckCircle size={36} className="text-white" strokeWidth={2.5} />
+                <CheckCircle2 size={36} className="text-white" strokeWidth={2.5} />
               ) : timerState === 'running' ? (
                 <Pause size={36} fill="white" className="text-white" />
               ) : (
