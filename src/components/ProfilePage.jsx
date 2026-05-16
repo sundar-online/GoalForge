@@ -3,7 +3,7 @@ import { useAppContext } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { BADGE_DEFINITIONS, LEVEL_THRESHOLDS, getLevelFromXP } from '../utils/gamificationEngine';
 import { Award, Zap, Target, Clock, Flame, TrendingUp, Star, Lock, ChevronRight, Bell, BellOff, BookOpen, Trash2, Sparkles, History } from 'lucide-react';
-import { requestNotificationPermission, checkNotificationPermission } from '../utils/notificationUtils';
+import {requestNotificationPermission, checkNotificationPermission } from '../utils/notificationUtils';
 
 export const ProfilePage = () => {
   const {
