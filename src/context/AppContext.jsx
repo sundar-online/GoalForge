@@ -21,7 +21,7 @@ import {
   calculateGoalConsecutiveMissedDays,
   getGoalScheduledDays
 } from '../utils/calculationUtils';
-import { XP_SOURCES, getLevelFromXP, evaluateBadges, getNewlyEarnedBadges } from '../utils/gamificationEngine';
+import { XP_SOURCES, getLevelFromXP, evaluateBadges, getNewlyEarnedBadges, getBadgeById } from '../utils/gamificationEngine';
 import { scheduleLocalNotification, scheduleReminder, cancelReminder } from '../utils/notificationUtils';
 import {
   analyzeUserBehavior,
@@ -59,6 +59,7 @@ const DEFAULT_XP_DATA = {
   totalCompletions: 0,
   lastXPDate: '',
   xpHistory: [],  // last 50 entries: { amount, reason, date }
+  notifiedBadges: [],
 };
 
 const safeParse = (key, fallback) => {
@@ -709,6 +710,7 @@ export const AppProvider = ({ children }) => {
             totalCompletions: x.total_completions || 0,
             lastXPDate: x.last_xp_date || '',
             xpHistory: x.xp_history || [],
+            notifiedBadges: x.notified_badges || [],
           });
         }
       }, (error) => {
@@ -2293,46 +2295,84 @@ export const AppProvider = ({ children }) => {
 
   const currentlyEarnedBadges = useMemo(() => evaluateBadges(badgeState), [badgeState]);
 
-  // Detect newly earned badges and persist them
-  const prevBadgesRef = useRef(xpData.earnedBadges || []);
+  // Sync earned badges with derived state and handle notifications
+  const initialLoadRef = useRef(true);
   useEffect(() => {
-    const prev = prevBadgesRef.current;
-    const newBadges = getNewlyEarnedBadges(prev, currentlyEarnedBadges);
+    if (loading) return;
 
-    if (newBadges.length > 0) {
-      // Add all new badges to the queue
-      badgeQueueRef.current = [...badgeQueueRef.current, ...newBadges];
-      
-      // If no badge is currently showing, show the first one
-      if (!badgeUnlockEvent) {
-        setBadgeUnlockEvent(badgeQueueRef.current.shift());
-      }
+    const savedBadges = xpData.earnedBadges || [];
+    const notifiedBadges = xpData.notifiedBadges || [];
 
-      setXpData(prevData => {
+    // 1. Detect badges in derived state that aren't in persisted state
+    const newlyDerivedBadges = currentlyEarnedBadges.filter(id => !savedBadges.includes(id));
+    
+    if (newlyDerivedBadges.length > 0) {
+      setXpData(prev => {
         const now = new Date().toISOString();
-        const newDates = { ...prevData.badgeUnlockDates };
-        newBadges.forEach(b => { newDates[b.id] = now; });
+        const newDates = { ...prev.badgeUnlockDates };
+        newlyDerivedBadges.forEach(id => { if (!newDates[id]) newDates[id] = now; });
+        
         return {
-          ...prevData,
-          earnedBadges: currentlyEarnedBadges,
-          badgeUnlockDates: newDates,
+          ...prev,
+          earnedBadges: [...new Set([...(prev.earnedBadges || []), ...newlyDerivedBadges])],
+          badgeUnlockDates: newDates
         };
       });
-
-      prevBadgesRef.current = currentlyEarnedBadges;
-    } else if (currentlyEarnedBadges.length !== prev.length) {
-      setXpData(prevData => ({ ...prevData, earnedBadges: currentlyEarnedBadges }));
-      prevBadgesRef.current = currentlyEarnedBadges;
     }
-  }, [currentlyEarnedBadges, badgeUnlockEvent]);
+
+    // 2. Migration/Initial State: If this is the first load and we have earned badges but no notifications recorded,
+    // mark existing badges as notified to prevent a popup explosion.
+    if (initialLoadRef.current) {
+      if (notifiedBadges.length === 0 && savedBadges.length > 0) {
+        setXpData(prev => ({ ...prev, notifiedBadges: prev.earnedBadges || [] }));
+      }
+      initialLoadRef.current = false;
+      return;
+    }
+
+    // 3. Queue notifications for badges that are earned but not yet notified
+    // A badge is "newly earned" for notification purposes if it's in earnedBadges but NOT in notifiedBadges
+    const pendingNotifications = savedBadges.filter(id => !notifiedBadges.includes(id));
+
+    if (pendingNotifications.length > 0) {
+      const addedToQueue = [];
+      pendingNotifications.forEach(badgeId => {
+        const badgeDef = getBadgeById(badgeId);
+        // Ensure it's not already in the local queue
+        if (badgeDef && !badgeQueueRef.current.find(b => b.id === badgeId)) {
+          badgeQueueRef.current.push(badgeDef);
+          addedToQueue.push(badgeId);
+        }
+      });
+
+      if (addedToQueue.length > 0 && !badgeUnlockEvent) {
+        setBadgeUnlockEvent(badgeQueueRef.current.shift());
+      }
+    }
+  }, [currentlyEarnedBadges, xpData.earnedBadges, xpData.notifiedBadges, loading, badgeUnlockEvent]);
 
   const dismissBadgeEvent = useCallback(() => {
+    const currentBadgeId = badgeUnlockEvent?.id;
+    
+    if (currentBadgeId) {
+      // Mark as notified persistently
+      setXpData(prev => {
+        const notified = prev.notifiedBadges || [];
+        if (notified.includes(currentBadgeId)) return prev;
+        return {
+          ...prev,
+          notifiedBadges: [...notified, currentBadgeId]
+        };
+      });
+    }
+
+    // Process next in queue
     if (badgeQueueRef.current.length > 0) {
       setBadgeUnlockEvent(badgeQueueRef.current.shift());
     } else {
       setBadgeUnlockEvent(null);
     }
-  }, []);
+  }, [badgeUnlockEvent]);
 
   // ── Gamification: Daily XP Checks (in daily reset) ─────
   // Perfect day check & streak milestone XP are awarded during daily reset.

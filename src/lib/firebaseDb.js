@@ -720,6 +720,7 @@ export async function fetchXpData(userId) {
       totalCompletions: data.total_completions || 0,
       lastXPDate: data.last_xp_date || '',
       xpHistory: data.xp_history || [],
+      notifiedBadges: data.notified_badges || [],
     };
   } catch (err) {
     log('fetchXpData', err);
@@ -738,6 +739,7 @@ export async function upsertXpData(userId, xpData) {
     total_completions: xpData.totalCompletions || 0,
     last_xp_date: xpData.lastXPDate || '',
     xp_history: (xpData.xpHistory || []).slice(0, 50),
+    notified_badges: xpData.notifiedBadges || [],
     updated_at: new Date().toISOString(),
   };
 

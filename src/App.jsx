@@ -131,7 +131,7 @@ function AppInner() {
 function GamificationOverlays() {
   const { 
     levelUpEvent, setLevelUpEvent, 
-    badgeUnlockEvent, setBadgeUnlockEvent,
+    badgeUnlockEvent, dismissBadgeEvent,
     completedGoalForCelebration, setCompletedGoalForCelebration 
   } = useAppContext();
   return (
@@ -146,7 +146,7 @@ function GamificationOverlays() {
       {badgeUnlockEvent && (
         <BadgeToast
           badge={badgeUnlockEvent}
-          onClose={() => setBadgeUnlockEvent(null)}
+          onClose={dismissBadgeEvent}
         />
       )}
       {completedGoalForCelebration && (
