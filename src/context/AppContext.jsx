@@ -267,13 +267,20 @@ export const AppProvider = ({ children }) => {
   }), [tasks, todayStr]);
 
   const allHabits = useMemo(() => (goals || []).flatMap(g => g.habits || []), [goals]);
-  const goalsDone = useMemo(() => (goals || []).filter(g => isGoalDoneToday(g)).length, [goals]);
-  const tasksDone = useMemo(() => (todayTasks || []).filter(t => isTaskDone(t)).length, [todayTasks]);
+  const todayGoals = useMemo(() => (goals || []).filter(g => {
+    const habits = g.habits || [];
+    if (habits.length === 0) return false;
+    return habits.some(isHabitScheduledToday);
+  }), [goals]);
 
-  const totalItems = (goals?.length || 0) + (todayTasks?.length || 0);
+  const goalsDone = useMemo(() => (todayGoals || []).filter(g => isGoalDoneToday(g)).length, [todayGoals]);
+  const tasksDone = useMemo(() => (todayTasks || []).filter(t => isTaskDone(t) && t.lastCompletedDate === todayStr).length, [todayTasks, todayStr]);
+
+  const totalItems = (todayGoals?.length || 0) + (todayTasks?.length || 0);
   const completedItems = (goalsDone || 0) + (tasksDone || 0);
 
   const accuracy = useMemo(() => {
+    if (completedItems === 0) return 0;
     return totalItems === 0 ? 100 : Math.round((completedItems / totalItems) * 100);
   }, [completedItems, totalItems]);
 
@@ -793,150 +800,161 @@ export const AppProvider = ({ children }) => {
 
   useEffect(() => {
     if (loading) return;
-    if (user && isInitialGoalsLoad.current) return;
+    if (!user) return;
 
     const todayStr = currentDate;
     const yesterdayStr = addDays(todayStr, -1);
-    const lastActive = settings.lastActiveDate || yesterdayStr;
 
-    if (lastActive === todayStr) return; // Already reset for today
+    // 1. Check if ANY reset needs to be performed
+    const hasSettingsNeed = settings.lastActiveDate !== todayStr;
+    const hasTaskNeed = tasks.some(t => 
+      (t.schedule_type || t.type) === 'daily' && t.lastActiveDate !== todayStr
+    );
+    const hasHabitNeed = goals.some(goal => 
+      (goal.habits || []).some(h => h.lastActiveDate !== todayStr)
+    );
 
-    // Update settings first to mark reset complete
-    setSettings(prev => ({ ...prev, focusTimeToday: 0, lastActiveDate: todayStr }));
+    if (!hasSettingsNeed && !hasTaskNeed && !hasHabitNeed) return; // Nothing to reset
 
-    // Reset goals using functional updater to avoid dependency issues
-    setGoals(prevGoals => {
-      return prevGoals.map(goal => {
-        const gLastActive = goal.lastActiveDate || lastActive;
-        const start = parseLocalDate(gLastActive);
-        const end = parseLocalDate(todayStr);
-        let daysDiff = 0;
-        if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
-          daysDiff = Math.floor((end - start) / (1000 * 60 * 60 * 24));
-        }
+    console.log('[Daily Reset] Reset sequence triggered todayStr:', todayStr, 'SettingsNeed:', hasSettingsNeed, 'TaskNeed:', hasTaskNeed, 'HabitNeed:', hasHabitNeed);
 
-        if (daysDiff <= 0) return goal;
-
-        const updatedHabits = (goal.habits || []).map(h => {
-          let updatedH = { ...h };
-          const wasDone = updatedH.completed ||
-                          (updatedH.type === 'time' && (updatedH.timeSpent ?? 0) >= (updatedH.targetTime ?? 15)) ||
-                          (updatedH.type === 'count' && (updatedH.currentCount ?? 0) >= (updatedH.targetCount ?? 10));
-
-          // Check if yesterday (gLastActive) was a scheduled day for this habit
-          const lastActiveDay = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][parseLocalDate(gLastActive).getDay()];
-          const wasScheduled = !h.scheduleDays || h.scheduleDays.length === 0 || h.scheduleDays.includes(lastActiveDay);
-
-          let updatedDates = h.completedDates ? [...h.completedDates] : [];
-          if (wasDone && wasScheduled && !updatedDates.includes(gLastActive)) {
-            updatedDates.push(gLastActive);
-          }
-
-          // Calculate new missed days and streak dynamically using the simulation engine
-          const newMissed = calculateConsecutiveMissedDays(updatedDates, h.scheduleDays);
-          const newStreak = calculateStreakFromHistory(updatedDates, h.scheduleDays, goal.completedDates, h.createdAt);
-
-          return {
-            ...h,
-            completedDates: updatedDates,
-            timeSpent: 0,
-            completed: false,
-            currentCount: 0,
-            streak: newStreak,
-            missedDays: newMissed,
-            lastActiveDate: todayStr,
-            lastActionTimestamp: new Date().toISOString()
-          };
-        });
-
-        // Recalculate goal completed dates, streak, and missed days dynamically from habits
-        const updatedGoalWithoutDates = { ...goal, habits: updatedHabits };
-        const updatedGoalDates = recalculateGoalCompletedDates(updatedGoalWithoutDates);
-        const goalSchedule = getGoalScheduledDays(updatedGoalWithoutDates);
-        const newGoalStreak = calculateGoalStreak(updatedGoalDates, goalSchedule);
-        const newGoalMissed = calculateGoalConsecutiveMissedDays(updatedGoalDates, goalSchedule);
-
-        const totalDays = Math.max(1, diffDays(goal.startDate || goal.createdAt || todayStr, goal.deadline || addDays(todayStr, 30)));
-        const progress = Math.min(100, Math.round(((updatedGoalDates || []).length / totalDays) * 100));
-
-        const finalGoal = {
-          ...goal,
-          habits: updatedHabits,
-          completedDates: updatedGoalDates,
-          missedDays: newGoalMissed,
-          streak: newGoalStreak,
-          progress,
-          lastActiveDate: todayStr,
-          lastActionTimestamp: new Date().toISOString()
-        };
-
-        // Write to DB asynchronously
-        if (user) {
-          db.upsertGoal(user.id, finalGoal);
-          updatedHabits.forEach(h => db.upsertHabit(user.id, goal.id, h));
-        }
-
-        return finalGoal;
-      });
-    });
-
-    // Reset daily tasks using functional updater
-    setTasks(prevTasks => {
-      return prevTasks.map(t => {
-        if ((t.schedule_type || t.type) === 'daily') {
-          const tLastActive = t.lastActiveDate || lastActive;
-          const start = parseLocalDate(tLastActive);
-          const end = parseLocalDate(todayStr);
-          let daysDiff = 0;
-          if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
-            daysDiff = Math.floor((end - start) / (1000 * 60 * 60 * 24));
-          }
-          if (daysDiff <= 0) return t;
-
-          let newMissed = t.missedDays || 0;
-          let newStreak = t.currentStreak || 0;
-
-          const isCompleted = t.completed ||
-            (t.completionType === 'count' && (t.currentCount || 0) >= (t.targetCount || 10)) ||
-            (t.completionType === 'time' && (t.timeSpent ?? 0) >= (t.targetTime ?? 30));
-
-          if (!isCompleted) {
-            newMissed += 1;
-          } else {
-            newMissed = 0;
-          }
-
-          if (daysDiff > 1) {
-            for (let i = 1; i < daysDiff; i++) {
-              newMissed += 1;
-              if (newMissed >= 3) { newStreak = 0; newMissed = 0; }
-            }
-          }
-          if (newMissed >= 3) { newStreak = 0; newMissed = 0; }
-
-          const finalTask = {
-            ...t,
-            timeSpent: 0,
-            currentCount: 0,
-            completed: false,
-            currentStreak: newStreak,
-            missedDays: newMissed,
-            lastActiveDate: todayStr,
-            lastActionTimestamp: new Date().toISOString()
-          };
-
-          if (user) db.upsertTask(user.id, finalTask);
-          return finalTask;
-        }
-        return t;
-      });
-    });
-
-    if (user) {
+    // 2. Perform settings reset if needed
+    if (hasSettingsNeed) {
+      setSettings(prev => ({ ...prev, focusTimeToday: 0, lastActiveDate: todayStr }));
       db.upsertUserSettings(user.id, { theme, focusTimeToday: 0, lastReset: todayStr });
     }
 
-  }, [loading, user, settings.lastActiveDate, currentDate]);
+    // 3. Perform goals/habits reset if needed
+    if (hasHabitNeed) {
+      setGoals(prevGoals => {
+        return prevGoals.map(goal => {
+          let goalNeedsUpdate = false;
+          const updatedHabits = (goal.habits || []).map(h => {
+            const hLastActive = h.lastActiveDate || settings.lastActiveDate || yesterdayStr;
+            if (hLastActive === todayStr) return h; // Already reset for today
+
+            goalNeedsUpdate = true;
+            let updatedH = { ...h };
+            const wasDone = updatedH.completed ||
+                            (updatedH.type === 'time' && (updatedH.timeSpent ?? 0) >= (updatedH.targetTime ?? 15)) ||
+                            (updatedH.type === 'count' && (updatedH.currentCount ?? 0) >= (updatedH.targetCount ?? 10));
+
+            // Check if yesterday (hLastActive) was a scheduled day for this habit
+            const lastActiveDay = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][parseLocalDate(hLastActive).getDay()];
+            const wasScheduled = !h.scheduleDays || h.scheduleDays.length === 0 || h.scheduleDays.includes(lastActiveDay);
+
+            let updatedDates = h.completedDates ? [...h.completedDates] : [];
+            if (wasDone && wasScheduled && !updatedDates.includes(hLastActive)) {
+              updatedDates.push(hLastActive);
+            }
+
+            // Calculate new missed days and streak dynamically using the simulation engine
+            const newMissed = calculateConsecutiveMissedDays(updatedDates, h.scheduleDays);
+            const newStreak = calculateStreakFromHistory(updatedDates, h.scheduleDays, goal.completedDates, h.createdAt);
+
+            const finalHabit = {
+              ...h,
+              completedDates: updatedDates,
+              timeSpent: 0,
+              completed: false,
+              currentCount: 0,
+              streak: newStreak,
+              missedDays: newMissed,
+              lastActiveDate: todayStr,
+              lastActionTimestamp: new Date().toISOString()
+            };
+
+            // Write habit reset to DB
+            db.upsertHabit(user.id, goal.id, finalHabit);
+            return finalHabit;
+          });
+
+          if (!goalNeedsUpdate) return goal;
+
+          // Recalculate goal completed dates, streak, and missed days dynamically from habits
+          const updatedGoalWithoutDates = { ...goal, habits: updatedHabits };
+          const updatedGoalDates = recalculateGoalCompletedDates(updatedGoalWithoutDates);
+          const goalSchedule = getGoalScheduledDays(updatedGoalWithoutDates);
+          const newGoalStreak = calculateGoalStreak(updatedGoalDates, goalSchedule);
+          const newGoalMissed = calculateGoalConsecutiveMissedDays(updatedGoalDates, goalSchedule);
+
+          const totalDays = Math.max(1, diffDays(goal.startDate || goal.createdAt || todayStr, goal.deadline || addDays(todayStr, 30)));
+          const progress = Math.min(100, Math.round(((updatedGoalDates || []).length / totalDays) * 100));
+
+          const finalGoal = {
+            ...goal,
+            habits: updatedHabits,
+            completedDates: updatedGoalDates,
+            missedDays: newGoalMissed,
+            streak: newGoalStreak,
+            progress,
+            lastActiveDate: todayStr,
+            lastActionTimestamp: new Date().toISOString()
+          };
+
+          // Write goal reset to DB
+          db.upsertGoal(user.id, finalGoal);
+          return finalGoal;
+        });
+      });
+    }
+
+    // 4. Perform daily tasks reset if needed
+    if (hasTaskNeed) {
+      setTasks(prevTasks => {
+        return prevTasks.map(t => {
+          if ((t.schedule_type || t.type) === 'daily') {
+            const tLastActive = t.lastActiveDate || settings.lastActiveDate || yesterdayStr;
+            if (tLastActive === todayStr) return t; // Already reset for today
+
+            const start = parseLocalDate(tLastActive);
+            const end = parseLocalDate(todayStr);
+            let daysDiff = 0;
+            if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+              daysDiff = Math.floor((end - start) / (1000 * 60 * 60 * 24));
+            }
+
+            let newMissed = t.missedDays || 0;
+            let newStreak = t.currentStreak || 0;
+
+            const isCompleted = t.completed ||
+              (t.completionType === 'count' && (t.currentCount || 0) >= (t.targetCount || 10)) ||
+              (t.completionType === 'time' && (t.timeSpent ?? 0) >= (t.targetTime ?? 30));
+
+            if (!isCompleted) {
+              newMissed += 1;
+            } else {
+              newMissed = 0;
+            }
+
+            if (daysDiff > 1) {
+              for (let i = 1; i < daysDiff; i++) {
+                newMissed += 1;
+                if (newMissed >= 3) { newStreak = 0; newMissed = 0; }
+              }
+            }
+            if (newMissed >= 3) { newStreak = 0; newMissed = 0; }
+
+            const finalTask = {
+              ...t,
+              timeSpent: 0,
+              currentCount: 0,
+              completed: false,
+              currentStreak: newStreak,
+              missedDays: newMissed,
+              lastActiveDate: todayStr,
+              lastActionTimestamp: new Date().toISOString()
+            };
+
+            db.upsertTask(user.id, finalTask);
+            return finalTask;
+          }
+          return t;
+        });
+      });
+    }
+
+  }, [loading, user, settings, goals, tasks, currentDate]);
 
   // ── Automatic Daily Summary Sync ─────────────────────────
   useEffect(() => {
@@ -1508,6 +1526,7 @@ export const AppProvider = ({ children }) => {
           streak: newStreak,
           lastCompletedDate: newLastCompleted,
           missedDays: newMissed,
+          lastActiveDate: today,
           lastActionTimestamp: new Date().toISOString()
         };
 
@@ -1667,6 +1686,7 @@ export const AppProvider = ({ children }) => {
         updatedH.streak = newStreak;
         updatedH.lastCompletedDate = newLastCompleted;
         updatedH.missedDays = newMissed;
+        updatedH.lastActiveDate = today;
         updatedH.lastActionTimestamp = new Date().toISOString();
 
         if (isDone && !wasCompleted) {
@@ -1780,6 +1800,7 @@ export const AppProvider = ({ children }) => {
           streak: newStreak,
           lastCompletedDate: newLastCompleted,
           missedDays: newMissed,
+          lastActiveDate: today,
           lastActionTimestamp: new Date().toISOString()
         };
 

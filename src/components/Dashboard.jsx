@@ -336,7 +336,7 @@ export const Dashboard = ({ setView }) => {
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6">
-              {goals.slice(0, 4).map(goal => {
+              {goals.filter(goal => (goal.progress || 0) < 100).slice(0, 4).map(goal => {
                 const habitsTotal = goal.habits.length;
                 const dailyProgress = calculateGoalDailyProgress(goal);
                 const achieved = dailyProgress === 100;
@@ -377,7 +377,7 @@ export const Dashboard = ({ setView }) => {
                   </div>
                 );
               })}
-              {goals.length === 0 && (
+              {goals.filter(goal => (goal.progress || 0) < 100).length === 0 && (
                 <div onClick={() => setView('goals')} className="col-span-full py-16 text-center border-2 border-dashed border-border-med rounded-[32px] cursor-pointer hover:bg-bg-input transition-colors space-y-3">
                   <div className="w-12 h-12 rounded-2xl bg-bg-input flex items-center justify-center mx-auto mb-2">
                     <Target className="text-text-muted" size={24} />

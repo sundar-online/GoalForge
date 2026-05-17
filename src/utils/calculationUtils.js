@@ -66,13 +66,21 @@ export const calculateAccuracy = (tasks, goals) => {
     return false;
   });
 
-  const goalsDone = goals.filter(isGoalDoneToday).length;
-  const tasksDone = todayTasks.filter(isTaskDone).length;
-  
-  const totalUnits = goals.length + todayTasks.length;
-  if (totalUnits === 0) return 100;
+  const todayGoals = goals.filter(g => {
+    const habits = g.habits || [];
+    if (habits.length === 0) return false;
+    return habits.some(isHabitScheduledToday);
+  });
+
+  const goalsDone = todayGoals.filter(isGoalDoneToday).length;
+  const tasksDone = todayTasks.filter(t => isTaskDone(t) && t.lastCompletedDate === todayDate).length;
   
   const completedUnits = goalsDone + tasksDone;
+  if (completedUnits === 0) return 0;
+
+  const totalUnits = todayGoals.length + todayTasks.length;
+  if (totalUnits === 0) return 100;
+  
   return Math.round((completedUnits / totalUnits) * 100);
 };
 
