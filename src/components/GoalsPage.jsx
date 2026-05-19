@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useGoals } from '../context/AppContext';
 import { Target, Plus, ChevronDown, ChevronUp, Trash2, Clock, Check, Layers, Calendar, History, Edit3, Maximize2, Minimize2 } from 'lucide-react';
-import { isGoalDoneToday, calculateGoalDailyProgress, isHabitScheduledToday } from '../utils/calculationUtils';
-import { addDays } from '../utils/dateUtils';
+import { isGoalDoneToday, calculateGoalDailyProgress, isHabitScheduledToday, calculateOverallProgress } from '../utils/calculationUtils';
+import { addDays, TODAY } from '../utils/dateUtils';
 import { DeleteConfirmationModal } from './DeleteConfirmationModal';
 
 // ── Day Picker ──────────────────────────────────────────────
@@ -461,6 +461,18 @@ const HabitRow = ({ habit, goalId, logHabitTime, deleteHabit, toggleHabitCheck, 
 
 export const GoalsPage = () => {
   const { goals, addGoal, deleteGoal, addHabit, deleteHabit, logHabitTime, toggleHabitCheck, updateHabitCount, updateHabitReminder, extendGoalDeadline, editGoalSystem, setCompletedGoalForCelebration } = useGoals();
+
+  const todayStr = TODAY();
+  const calculatedGoals = goals.map(g => {
+    const liveProgress = calculateOverallProgress(g);
+    const isFinished = liveProgress === 100 || (g.deadline && todayStr >= g.deadline);
+    return {
+      ...g,
+      progress: liveProgress,
+      isFinished
+    };
+  });
+
   const [expandedGoalIds, setExpandedGoalIds] = useState([]);
   const [isMobile, setIsMobile] = useState(false);
   const [colsCount, setColsCount] = useState(1);
@@ -514,7 +526,7 @@ export const GoalsPage = () => {
   };
 
   const handleExpandAll = () => {
-    setExpandedGoalIds(goals.map(g => g.id));
+    setExpandedGoalIds(calculatedGoals.map(g => g.id));
   };
 
   const handleCollapseAll = () => {
@@ -535,9 +547,9 @@ export const GoalsPage = () => {
   });
   const [newHabit, setNewHabit] = useState({ title: '', type: 'time', targetTime: 15, targetCount: 10, scheduleDays: [], reminderEnabled: false, reminderTime: '08:00' });
 
-  const doneGoals = goals.filter(g => g.progress === 100).length;
-  const activeGoals = goals.length - doneGoals;
-  const avgProgress = goals.length === 0 ? 0 : Math.round(goals.reduce((s, g) => s + (g.progress || 0), 0) / goals.length);
+  const doneGoals = calculatedGoals.filter(g => g.isFinished).length;
+  const activeGoals = calculatedGoals.filter(g => !g.isFinished).length;
+  const avgProgress = calculatedGoals.length === 0 ? 0 : Math.round(calculatedGoals.reduce((s, g) => s + (g.progress || 0), 0) / calculatedGoals.length);
 
   const submitGoal = (e) => {
     e.preventDefault();
@@ -774,7 +786,7 @@ export const GoalsPage = () => {
       )}
 
       {/* Power-User Overview View Controls */}
-      {goals.length > 0 && (
+      {calculatedGoals.length > 0 && (
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-bg-card border border-border-light rounded-[24px] px-6 py-4 shadow-sm gap-4 transition-all hover:border-border-med animate-in fade-in slide-in-from-top-2 duration-300">
           <div className="space-y-0.5">
             <div className="flex items-center gap-2">
@@ -812,7 +824,7 @@ export const GoalsPage = () => {
 
       {/* Goal Cards Masonry Grid / Accordion List */}
       {(() => {
-        const sortedGoals = [...goals].sort((a, b) => {
+        const sortedGoals = [...calculatedGoals].sort((a, b) => {
           const aDone = isGoalDoneToday(a);
           const bDone = isGoalDoneToday(b);
           if (aDone !== bDone) return aDone ? 1 : -1;
@@ -1012,7 +1024,7 @@ export const GoalsPage = () => {
         message="Are you sure you want to delete this Goal? This action cannot be undone and will permanently remove all related progress, habits, recovery suggestions, and streak metrics."
       />
       
-      {goals.length === 0 && !showAddGoal && (
+      {calculatedGoals.length === 0 && !showAddGoal && (
         <div className="flex flex-col items-center justify-center text-text-muted/50 py-10 pb-24">
           <div className="w-20 h-20 rounded-full bg-bg-input flex items-center justify-center mb-5">
             <Target size={40} strokeWidth={1.5} />

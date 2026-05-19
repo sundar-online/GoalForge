@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { calculateGoalDailyProgress, isHabitDoneToday } from '../utils/calculationUtils';
+import { calculateGoalDailyProgress, isHabitDoneToday, calculateOverallProgress } from '../utils/calculationUtils';
+import { TODAY } from '../utils/dateUtils';
 import { BADGE_DEFINITIONS } from '../utils/gamificationEngine';
 import { useAuth } from '../context/AuthContext';
 import { AlertTriangle, AlertCircle, TrendingUp, TrendingDown, CheckCircle2, Clock, Zap, LogOut, Moon, Sun, Sparkles, Trophy, ChevronRight, Target, Award, CalendarDays } from 'lucide-react';
@@ -336,56 +337,74 @@ export const Dashboard = ({ setView }) => {
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6">
-              {goals.filter(goal => (goal.progress || 0) < 100).slice(0, 4).map(goal => {
-                const habitsTotal = goal.habits.length;
-                const dailyProgress = calculateGoalDailyProgress(goal);
-                const achieved = dailyProgress === 100;
-                const habitsDone = goal.habits.filter(isHabitDoneToday).length;
-                const targetReq = goal.mode === 'ANY' ? 1 : (goal.mode === 'CUSTOM' ? (goal.minHabits || 1) : habitsTotal);
-                const habitAccuracy = Math.min(100, Math.round((habitsDone / (targetReq || 1)) * 100));
-                const ruleLabel = goal.mode === 'ANY' ? 'Any Rule' : goal.mode === 'CUSTOM' ? `Min ${goal.minHabits} Rule` : 'All Habits Rule';
+              {(() => {
+                const todayStr = TODAY();
+                const activeGoalsList = (goals || [])
+                  .map(g => {
+                    const liveProgress = calculateOverallProgress(g);
+                    const isFinished = liveProgress === 100 || (g.deadline && todayStr >= g.deadline);
+                    return {
+                      ...g,
+                      progress: liveProgress,
+                      isFinished
+                    };
+                  })
+                  .filter(goal => !goal.isFinished);
 
-                return (
-                  <div key={goal.id} className={`bg-bg-card rounded-[28px] p-6 shadow-sm border-2 transition-all hover:shadow-md ${achieved ? 'border-emerald-500/30' : 'border-border-light hover:border-accent-blue/30'}`}>
-                    <div className="flex justify-between items-start mb-5">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <p className="font-black text-lg text-text-main tracking-tight truncate max-w-[140px]">{goal.title}</p>
-                          {achieved && <span className="bg-emerald-100 text-emerald-700 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest">Done</span>}
+                if (activeGoalsList.length === 0) {
+                  return (
+                    <div onClick={() => setView('goals')} className="col-span-full py-16 text-center border-2 border-dashed border-border-med rounded-[32px] cursor-pointer hover:bg-bg-input transition-colors space-y-3">
+                      <div className="w-12 h-12 rounded-2xl bg-bg-input flex items-center justify-center mx-auto mb-2">
+                        <Target className="text-text-muted" size={24} />
+                      </div>
+                      <p className="font-black text-text-main">No systems defined</p>
+                      <p className="text-sm text-text-muted font-bold">Forge your first goal to start tracking.</p>
+                    </div>
+                  );
+                }
+
+                return activeGoalsList.slice(0, 4).map(goal => {
+                  const habitsTotal = goal.habits.length;
+                  const dailyProgress = calculateGoalDailyProgress(goal);
+                  const achieved = dailyProgress === 100;
+                  const habitsDone = goal.habits.filter(isHabitDoneToday).length;
+                  const targetReq = goal.mode === 'ANY' ? 1 : (goal.mode === 'CUSTOM' ? (goal.minHabits || 1) : habitsTotal);
+                  const habitAccuracy = Math.min(100, Math.round((habitsDone / (targetReq || 1)) * 100));
+                  const ruleLabel = goal.mode === 'ANY' ? 'Any Rule' : goal.mode === 'CUSTOM' ? `Min ${goal.minHabits} Rule` : 'All Habits Rule';
+
+                  return (
+                    <div key={goal.id} className={`bg-bg-card rounded-[28px] p-6 shadow-sm border-2 transition-all hover:shadow-md ${achieved ? 'border-emerald-500/30' : 'border-border-light hover:border-accent-blue/30'}`}>
+                      <div className="flex justify-between items-start mb-5">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <p className="font-black text-lg text-text-main tracking-tight truncate max-w-[140px]">{goal.title}</p>
+                            {achieved && <span className="bg-emerald-100 text-emerald-700 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest">Done</span>}
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            <span className="text-[9px] font-bold text-text-muted bg-bg-input px-2 py-0.5 rounded-md uppercase tracking-widest">{ruleLabel}</span>
+                          </div>
                         </div>
-                        <div className="flex flex-wrap gap-2">
-                          <span className="text-[9px] font-bold text-text-muted bg-bg-input px-2 py-0.5 rounded-md uppercase tracking-widest">{ruleLabel}</span>
+                        <div className="text-right">
+                          <span className={`text-2xl font-black leading-none tracking-tighter ${achieved ? 'text-emerald-500' : 'text-accent-blue'}`}>{habitAccuracy}%</span>
+                          <p className="text-[8px] font-black text-text-muted uppercase tracking-widest mt-0.5">Grit Score</p>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <span className={`text-2xl font-black leading-none tracking-tighter ${achieved ? 'text-emerald-500' : 'text-accent-blue'}`}>{habitAccuracy}%</span>
-                        <p className="text-[8px] font-black text-text-muted uppercase tracking-widest mt-0.5">Grit Score</p>
+
+                      <div className="h-2 bg-bg-input rounded-full overflow-hidden mb-4">
+                        <div 
+                          className={`h-full rounded-full transition-all duration-700 ${achieved ? 'bg-emerald-500' : 'bg-accent-blue'}`}
+                          style={{ width: `${achieved ? 100 : dailyProgress}%` }}
+                        />
+                      </div>
+                      
+                      <div className="flex justify-between items-center pt-4 border-t border-border-light">
+                        <span className="text-[9px] font-black text-text-muted uppercase tracking-widest">Mastery</span>
+                        <span className="text-sm font-black text-text-main tracking-tighter">{goal.progress || 0}%</span>
                       </div>
                     </div>
-
-                    <div className="h-2 bg-bg-input rounded-full overflow-hidden mb-4">
-                      <div 
-                        className={`h-full rounded-full transition-all duration-700 ${achieved ? 'bg-emerald-500' : 'bg-accent-blue'}`}
-                        style={{ width: `${achieved ? 100 : dailyProgress}%` }}
-                      />
-                    </div>
-                    
-                    <div className="flex justify-between items-center pt-4 border-t border-border-light">
-                      <span className="text-[9px] font-black text-text-muted uppercase tracking-widest">Mastery</span>
-                      <span className="text-sm font-black text-text-main tracking-tighter">{goal.progress || 0}%</span>
-                    </div>
-                  </div>
-                );
-              })}
-              {goals.filter(goal => (goal.progress || 0) < 100).length === 0 && (
-                <div onClick={() => setView('goals')} className="col-span-full py-16 text-center border-2 border-dashed border-border-med rounded-[32px] cursor-pointer hover:bg-bg-input transition-colors space-y-3">
-                  <div className="w-12 h-12 rounded-2xl bg-bg-input flex items-center justify-center mx-auto mb-2">
-                    <Target className="text-text-muted" size={24} />
-                  </div>
-                  <p className="font-black text-text-main">No systems defined</p>
-                  <p className="text-sm text-text-muted font-bold">Forge your first goal to start tracking.</p>
-                </div>
-              )}
+                  );
+                });
+              })()}
             </div>
           </section>
         </div>

@@ -94,6 +94,8 @@ export const FocusMode = () => {
     return parseInt(localStorage.getItem('gf_focus_duration') || '25', 10);
   });
   
+  const [customInputVal, setCustomInputVal] = useState(String(duration));
+  
   const [startTime, setStartTime] = useState(() => {
     const saved = localStorage.getItem('gf_focus_startTime');
     return saved ? parseInt(saved, 10) : null;
@@ -378,6 +380,25 @@ export const FocusMode = () => {
     localStorage.setItem('gf_focus_duration', String(mins));
   };
 
+  useEffect(() => {
+    setCustomInputVal(String(duration));
+  }, [duration]);
+
+  const handleCustomDurationChange = (e) => {
+    const valStr = e.target.value.replace(/[^0-9]/g, '');
+    setCustomInputVal(valStr);
+    if (valStr !== '') {
+      const parsed = parseInt(valStr, 10);
+      if (parsed > 0 && parsed <= 1440) {
+        changeDuration(parsed);
+      }
+    }
+  };
+
+  const handleCustomDurationBlur = () => {
+    setCustomInputVal(String(duration));
+  };
+
   // ── COMPLETION LOGIC ────────────────────────────────────────────────
   const handleTimerCompletion = (minsCompleted, completedInBackground = false) => {
     // 1. Reset timer state locally
@@ -446,7 +467,7 @@ export const FocusMode = () => {
   const isNearCompletion = timerState === 'running' && (time < 60 || pct >= 90);
 
   return (
-    <div className="w-full min-h-screen bg-slate-950 text-slate-100 -mt-8 pt-8 px-4 lg:px-0">
+    <div className="w-full min-h-screen bg-transparent text-slate-100 -mt-8 pt-8 px-4 lg:px-0">
       <div className="max-w-6xl mx-auto pb-12">
       {/* ── CELEBRATION MODAL OVERLAY ─────────────────────────────────── */}
       <AnimatePresence>
@@ -608,7 +629,7 @@ export const FocusMode = () => {
               <Clock size={12} className="text-accent-blue" /> Duration Preset
             </span>
             <div className="flex gap-1 bg-bg-input p-1 rounded-2xl border border-border-med shadow-xs">
-              {[10, 15, 25, 45, 60].map(m => (
+              {[5, 10, 30, 45, 90].map(m => (
                 <button 
                   key={m} 
                   onClick={() => changeDuration(m)} 
@@ -618,6 +639,26 @@ export const FocusMode = () => {
                   {m}m
                 </button>
               ))}
+            </div>
+
+            <div className="space-y-2 pt-1">
+              <span className="text-[10px] font-black text-text-muted uppercase tracking-widest flex items-center gap-1.5">
+                Custom Duration
+              </span>
+              <div className="relative flex items-center">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={customInputVal}
+                  onChange={handleCustomDurationChange}
+                  onBlur={handleCustomDurationBlur}
+                  disabled={timerState !== 'idle'}
+                  placeholder="Enter minutes..."
+                  className="w-full bg-bg-input border border-border-med rounded-2xl pl-4 pr-12 py-3 text-sm font-bold text-text-main shadow-xs outline-hidden focus:border-accent-blue transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                />
+                <span className="absolute right-4 text-xs font-bold text-text-muted pointer-events-none">min</span>
+              </div>
             </div>
           </div>
 

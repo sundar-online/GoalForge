@@ -425,4 +425,19 @@ export const calculateGoalStreak = (completedDates, scheduleDays = []) => {
   return streak;
 };
 
+/**
+ * Calculates the overall long-term progress (Mastery) of a goal from its start date to its deadline.
+ */
+export const calculateOverallProgress = (g) => {
+  if (!g) return 0;
+  let startStr = g.startDate || g.createdAt || TODAY();
+  if (startStr.includes('T')) startStr = startStr.split('T')[0];
+  let endStr = g.deadline || addDays(startStr, 30);
+  if (endStr.includes('T')) endStr = endStr.split('T')[0];
+
+  const totalDays = diffDays(startStr, endStr);
+  const completedDays = (g.completedDates || []).length;
+  return Math.min(100, Math.round((completedDays / totalDays) * 100));
+};
+
 

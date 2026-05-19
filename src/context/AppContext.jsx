@@ -19,7 +19,8 @@ import {
   recalculateGoalCompletedDates,
   calculateConsecutiveMissedDays,
   calculateGoalConsecutiveMissedDays,
-  getGoalScheduledDays
+  getGoalScheduledDays,
+  calculateOverallProgress
 } from '../utils/calculationUtils';
 import { XP_SOURCES, getLevelFromXP, evaluateBadges, getNewlyEarnedBadges, getBadgeById } from '../utils/gamificationEngine';
 import { scheduleLocalNotification, scheduleReminder, cancelReminder } from '../utils/notificationUtils';
@@ -96,12 +97,35 @@ export const AppProvider = ({ children }) => {
     localStorage.setItem('gf_deleted_goal_ids', JSON.stringify(deletedGoalIds));
   }, [deletedGoalIds]);
 
-  // Initial local state with deleted goals filtered out
+  // Track deleted habit IDs locally and persistently to ensure instant sync/offline support
+  const [deletedHabitIds, setDeletedHabitIds] = useState(() => {
+    try {
+      const saved = localStorage.getItem('gf_deleted_habit_ids');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const deletedHabitIdsRef = useRef(deletedHabitIds);
+  useEffect(() => {
+    deletedHabitIdsRef.current = deletedHabitIds;
+    localStorage.setItem('gf_deleted_habit_ids', JSON.stringify(deletedHabitIds));
+  }, [deletedHabitIds]);
+
+  // Initial local state with deleted goals and habits filtered out
   const [goals, setGoals] = useState(() => {
     const rawGoals = safeParse(STORAGE_KEYS.GOALS, []);
     const saved = localStorage.getItem('gf_deleted_goal_ids');
     const parsedDeletedIds = saved ? JSON.parse(saved) : [];
-    return rawGoals.filter(g => g && g.id && !parsedDeletedIds.includes(String(g.id)) && !g.deleted && !g.isDeleted);
+    const savedHabits = localStorage.getItem('gf_deleted_habit_ids');
+    const parsedDeletedHabitIds = savedHabits ? JSON.parse(savedHabits) : [];
+    return rawGoals
+      .filter(g => g && g.id && !parsedDeletedIds.includes(String(g.id)) && !g.deleted && !g.isDeleted)
+      .map(g => ({
+        ...g,
+        habits: (g.habits || []).filter(h => h && h.id && !parsedDeletedHabitIds.includes(String(h.id)))
+      }));
   });
   const [tasks, setTasks] = useState(() => safeParse(STORAGE_KEYS.TASKS, []));
   const [taskLogs, setTaskLogs] = useState(() => safeParse(STORAGE_KEYS.LOGS, {}));
@@ -540,6 +564,9 @@ export const AppProvider = ({ children }) => {
             const habitsQuery = query(collection(fireDb, 'users', user.id, 'goals', goal.id, 'habits'));
             const unsubHabit = onSnapshot(habitsQuery, { includeMetadataChanges: true }, (habitsSnapshot) => {
                const habitsList = habitsSnapshot.docs.map(hDoc => {
+                if (deletedHabitIdsRef.current.includes(String(hDoc.id))) {
+                  return null;
+                }
                 const hd = hDoc.data();
                 db.updateCache(`users/${user.id}/goals/${goal.id}/habits/${hDoc.id}`, hd);
                 return {
@@ -565,7 +592,7 @@ export const AppProvider = ({ children }) => {
                   updated_at: hd.updated_at || null,
                   syncPending: hDoc.metadata.hasPendingWrites,
                 };
-              });
+              }).filter(Boolean);
 
               // Merge these habits instantly into their goal's state
               setGoals(prev => prev.map(g => {
@@ -584,10 +611,13 @@ export const AppProvider = ({ children }) => {
 
                   for (const lh of localHabits) {
                     const lId = String(lh.id);
+                    if (deletedHabitIdsRef.current.includes(lId)) {
+                      continue;
+                    }
                     const sh = snapMap.get(lId);
 
                     if (!sh) {
-                      if (lh.syncPending || !lh.lastActionTimestamp) {
+                      if (lh.syncPending) {
                         merged.push(lh);
                         processedIds.add(lId);
                       }
@@ -878,19 +908,16 @@ export const AppProvider = ({ children }) => {
           const newGoalStreak = calculateGoalStreak(updatedGoalDates, goalSchedule);
           const newGoalMissed = calculateGoalConsecutiveMissedDays(updatedGoalDates, goalSchedule);
 
-          const totalDays = Math.max(1, diffDays(goal.startDate || goal.createdAt || todayStr, goal.deadline || addDays(todayStr, 30)));
-          const progress = Math.min(100, Math.round(((updatedGoalDates || []).length / totalDays) * 100));
-
           const finalGoal = {
             ...goal,
             habits: updatedHabits,
             completedDates: updatedGoalDates,
             missedDays: newGoalMissed,
             streak: newGoalStreak,
-            progress,
             lastActiveDate: todayStr,
             lastActionTimestamp: new Date().toISOString()
           };
+          finalGoal.progress = calculateOverallProgress(finalGoal);
 
           // Write goal reset to DB
           db.upsertGoal(user.id, finalGoal);
@@ -1212,6 +1239,15 @@ export const AppProvider = ({ children }) => {
     const finalHabitIds = new Set(finalHabits.map(h => String(h.id)));
     const deletedHabits = (targetGoal.habits || []).filter(h => !finalHabitIds.has(String(h.id)));
 
+    if (deletedHabits.length > 0) {
+      const deletedIds = deletedHabits.map(dh => String(dh.id));
+      deletedHabitIdsRef.current = [...new Set([...deletedHabitIdsRef.current, ...deletedIds])];
+      setDeletedHabitIds(prev => [...new Set([...prev, ...deletedIds])]);
+      for (const dh of deletedHabits) {
+        cancelReminder(dh.id);
+      }
+    }
+
     if (user) {
       for (const dh of deletedHabits) {
         await db.deleteHabitDb(user.id, goalId, dh.id);
@@ -1237,7 +1273,8 @@ export const AppProvider = ({ children }) => {
           missedDays: 0,
           lastActiveDate: TODAY(),
           createdAt: hCreatedAt,
-          lastActionTimestamp: new Date().toISOString()
+          lastActionTimestamp: new Date().toISOString(),
+          syncPending: true
         };
       } else {
         // Preserving tracker details but modifying target config
@@ -1275,7 +1312,8 @@ export const AppProvider = ({ children }) => {
           completed,
           streak: newStreak,
           missedDays: newMissed,
-          lastActionTimestamp: new Date().toISOString()
+          lastActionTimestamp: new Date().toISOString(),
+          syncPending: true
         };
       }
     });
@@ -1327,6 +1365,7 @@ export const AppProvider = ({ children }) => {
     
     const extension = { old_date: goal.deadline, new_date: newDeadline, extended_on: TODAY() };
     const updated = { ...goal, deadline: newDeadline, extensions: [...(goal.extensions || []), extension] };
+    updated.progress = calculateOverallProgress(updated);
     
     setGoals(prev => prev.map(g => g.id === id ? updated : g));
     
@@ -1417,7 +1456,8 @@ export const AppProvider = ({ children }) => {
       missedDays: 0,
       lastActiveDate: TODAY(),
       createdAt: hCreatedAt,
-      lastActionTimestamp: new Date().toISOString()
+      lastActionTimestamp: new Date().toISOString(),
+      syncPending: true
     };
     
     const updatedHabits = [...(targetGoal.habits || []), newH];
@@ -1451,6 +1491,10 @@ export const AppProvider = ({ children }) => {
   const deleteHabit = (goalId, habitId) => {
     const goal = goals.find(g => g.id === goalId);
     if (!goal) return;
+
+    // Track deleted habit ID locally and persistently to shield UI
+    deletedHabitIdsRef.current = [...new Set([...deletedHabitIdsRef.current, String(habitId)])];
+    setDeletedHabitIds(prev => [...new Set([...prev, String(habitId)])]);
 
     const updatedHabits = (goal.habits || []).filter(h => h.id !== habitId);
     const updatedGoal = { ...goal, habits: updatedHabits };
@@ -1626,11 +1670,7 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  const calculateOverallProgress = (g) => {
-    const totalDays = diffDays(g.startDate || g.createdAt || TODAY(), g.deadline || addDays(TODAY(), 30));
-    const currentDays = (g.daysCompleted || 0) + (isGoalDoneToday(g) ? 1 : 0);
-    return Math.min(100, Math.round((currentDays / (totalDays || 1)) * 100));
-  };
+
 
   const toggleHabitCheck = (goalId, habitId) => {
     console.log(`%c[Diagnostic Log] ACTION START: toggleHabitCheck [goalId=${goalId}, habitId=${habitId}]`, 'color: #3b82f6; font-weight: bold;');
@@ -2257,6 +2297,10 @@ export const AppProvider = ({ children }) => {
       // Clear deleted goal IDs locally
       setDeletedGoalIds([]);
       localStorage.removeItem('gf_deleted_goal_ids');
+
+      // Clear deleted habit IDs locally
+      setDeletedHabitIds([]);
+      localStorage.removeItem('gf_deleted_habit_ids');
 
       // 2. Reset LocalStorage keys
       localStorage.setItem(STORAGE_KEYS.GOALS, JSON.stringify([]));
