@@ -359,7 +359,11 @@ const HabitRow = ({ habit, goalId, logHabitTime, deleteHabit, toggleHabitCheck, 
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-xs sm:text-sm font-black text-text-muted truncate">{habit.title}</p>
-          <p className="text-[8px] sm:text-[10px] font-bold text-text-muted uppercase tracking-widest leading-none mt-0.5">Rest Day · {habit.scheduleDays?.join(', ')}</p>
+          <div className="flex flex-wrap items-center gap-1 sm:gap-2 mt-0.5">
+            <span className="text-[8px] sm:text-[10px] font-bold text-text-muted uppercase tracking-widest leading-none">Rest Day</span>
+            {habit.streak > 0 && <span className="text-[8px] sm:text-[9px] font-black text-orange-500 bg-orange-500/10 px-1 py-0.5 rounded leading-none">🔥 {habit.streak}d</span>}
+            {hasSchedule && <span className="text-[8px] sm:text-[9px] font-bold text-accent-blue/70 bg-accent-blue/10 px-1 py-0.5 rounded leading-none hidden min-[400px]:inline-block">{habit.scheduleDays.join('·')}</span>}
+          </div>
         </div>
       </div>
     );
