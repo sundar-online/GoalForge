@@ -1,14 +1,235 @@
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { calculateGoalDailyProgress, isHabitDoneToday, calculateOverallProgress } from '../utils/calculationUtils';
+import { calculateGoalDailyProgress, isHabitDoneToday, calculateOverallProgress, isGoalDoneToday } from '../utils/calculationUtils';
 import { TODAY } from '../utils/dateUtils';
 import { BADGE_DEFINITIONS } from '../utils/gamificationEngine';
 import { useAuth } from '../context/AuthContext';
-import { AlertTriangle, AlertCircle, TrendingUp, TrendingDown, CheckCircle2, Clock, Zap, LogOut, Moon, Sun, Sparkles, Trophy, ChevronRight, Target, Award, CalendarDays } from 'lucide-react';
+import { AlertTriangle, AlertCircle, TrendingUp, TrendingDown, CheckCircle2, Clock, Zap, LogOut, Moon, Sun, Sparkles, Trophy, ChevronRight, Target, Award, CalendarDays, Brain, Plus, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { WeeklyHeatmap } from './WeeklyHeatmap';
 import { WeeklyReportCard } from './WeeklyReportCard';
 import { SkeletonLoader } from './SkeletonLoader';
 import AIInsights from './AIInsights';
+
+const QuickThoughtsWidget = () => {
+  const {
+    quickThoughts,
+    addQuickThought,
+    updateQuickThought,
+    deleteQuickThought
+  } = useAppContext();
+
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [newText, setNewText] = useState('');
+  const [selectedEmoji, setSelectedEmoji] = useState('💡');
+  const [editingId, setEditingId] = useState(null);
+  const [editText, setEditText] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+
+  const emojiOptions = ['💡', '😌', '⚡', '😰', '📝'];
+
+  const handleAdd = async (e) => {
+    e.preventDefault();
+    if (!newText.trim()) return;
+    setIsSaving(true);
+    await addQuickThought(newText.trim(), selectedEmoji);
+    setNewText('');
+    setIsSaving(false);
+  };
+
+  const handleStartEdit = (thought) => {
+    setEditingId(thought.id);
+    setEditText(thought.content);
+  };
+
+  const handleSaveEdit = async (id, originalEmoji) => {
+    if (!editText.trim()) {
+      await deleteQuickThought(id);
+    } else {
+      await updateQuickThought(id, editText.trim(), originalEmoji);
+    }
+    setEditingId(null);
+  };
+
+  const handleEmojiChange = async (thought, newEmoji) => {
+    await updateQuickThought(thought.id, thought.content, newEmoji);
+  };
+
+  const latestThought = quickThoughts[0];
+  const count = quickThoughts.length;
+
+  return (
+    <div className="bg-bg-card rounded-[32px] border border-border-light shadow-sm overflow-hidden transition-all duration-300">
+      {/* Header / Collapsed Bar */}
+      <div 
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="p-5 flex items-center justify-between cursor-pointer hover:bg-bg-input/30 transition-colors"
+      >
+        <div className="flex items-center gap-3 min-w-0 flex-1">
+          <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center text-purple-400 shrink-0 border border-purple-500/20">
+            <Brain size={18} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-black text-text-main tracking-tight leading-none">Quick Thoughts</h3>
+              <span className="bg-bg-input px-1.5 py-0.5 rounded-full text-[9px] font-black text-text-muted">
+                {count}/5
+              </span>
+            </div>
+            {/* Show latest note preview when collapsed */}
+            {!isExpanded && (
+              <p className="text-xs text-text-muted mt-1 truncate max-w-[200px]">
+                {latestThought ? (
+                  <>
+                    <span className="mr-1">{latestThought.emoji}</span>
+                    {latestThought.content}
+                  </>
+                ) : (
+                  "Capture a spark before it fades..."
+                )}
+              </p>
+            )}
+          </div>
+        </div>
+        <button className="text-text-muted hover:text-text-main p-1 transition-colors">
+          {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+        </button>
+      </div>
+
+      {/* Expanded Thoughts Content */}
+      <AnimatePresence initial={false}>
+        {isExpanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.25, ease: 'easeInOut' }}
+            className="border-t border-border-light overflow-hidden"
+          >
+            <div className="p-5 space-y-4">
+              {/* Note List */}
+              <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+                {quickThoughts.length === 0 ? (
+                  <p className="text-xs text-text-muted py-2 text-center italic">
+                    No thoughts saved yet. Write one below!
+                  </p>
+                ) : (
+                  quickThoughts.map((thought) => (
+                    <div 
+                      key={thought.id}
+                      className="group flex items-center justify-between gap-3 p-3 rounded-2xl bg-bg-input/40 border border-border-light/50 hover:border-border-light transition-all duration-200"
+                    >
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        {/* Emoji Trigger/Dropdown */}
+                        <div className="relative shrink-0 select-none">
+                          <span className="text-base cursor-pointer p-1 rounded-md hover:bg-bg-input transition-colors">
+                            {thought.emoji}
+                          </span>
+                          {/* Mini Emoji Selector Overlay on Hover/Focus */}
+                          <div className="absolute left-0 bottom-full mb-1 hidden group-hover:flex items-center gap-1 bg-bg-card border border-border-light p-1 rounded-xl shadow-lg z-20">
+                            {emojiOptions.map(e => (
+                              <button
+                                key={e}
+                                type="button"
+                                onClick={(eEvent) => {
+                                  eEvent.stopPropagation();
+                                  handleEmojiChange(thought, e);
+                                }}
+                                className={`text-sm p-1 rounded-lg hover:bg-bg-input transition-colors ${thought.emoji === e ? 'bg-bg-input' : ''}`}
+                              >
+                                {e}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Text / Input */}
+                        {editingId === thought.id ? (
+                          <input
+                            type="text"
+                            value={editText}
+                            onChange={(e) => setEditText(e.target.value)}
+                            onBlur={() => handleSaveEdit(thought.id, thought.emoji)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleSaveEdit(thought.id, thought.emoji)}
+                            className="bg-transparent border-b border-accent-blue text-xs text-text-main w-full focus:outline-none py-0.5"
+                            autoFocus
+                            maxLength={100}
+                          />
+                        ) : (
+                          <span 
+                            onClick={() => handleStartEdit(thought)}
+                            className="text-xs text-text-main truncate flex-1 cursor-text select-text"
+                          >
+                            {thought.content}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Delete Action */}
+                      <button 
+                        onClick={() => deleteQuickThought(thought.id)}
+                        className="text-text-muted hover:text-red-500 opacity-0 group-hover:opacity-100 p-1 rounded-lg hover:bg-red-500/10 transition-all shrink-0"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Add Entry Form (Only if < 5) */}
+              {count < 5 ? (
+                <form onSubmit={handleAdd} className="space-y-3 pt-2 border-t border-border-light/60">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs text-text-muted font-black uppercase tracking-wider">New Thought</span>
+                    <div className="flex gap-1 bg-bg-input/60 p-0.5 rounded-xl border border-border-light/50">
+                      {emojiOptions.map((emoji) => (
+                        <button
+                          key={emoji}
+                          type="button"
+                          onClick={() => setSelectedEmoji(emoji)}
+                          className={`text-sm w-7 h-7 rounded-lg flex items-center justify-center transition-all ${
+                            selectedEmoji === emoji 
+                              ? 'bg-bg-card text-text-main shadow-sm' 
+                              : 'text-text-muted hover:text-text-main'
+                          }`}
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="relative flex items-center bg-bg-input/50 border border-border-light rounded-2xl p-1.5 focus-within:border-accent-blue/50 transition-colors">
+                    <input
+                      type="text"
+                      placeholder="Capture a spark... (max 100 chars)"
+                      value={newText}
+                      onChange={(e) => setNewText(e.target.value)}
+                      className="bg-transparent text-xs text-text-main flex-1 focus:outline-none pl-2.5 pr-8 py-2"
+                      maxLength={100}
+                    />
+                    <button
+                      type="submit"
+                      disabled={!newText.trim() || isSaving}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-xl bg-accent-blue hover:bg-accent-blue/90 disabled:opacity-55 disabled:cursor-not-allowed flex items-center justify-center text-white transition-all active:scale-95 shadow-md shadow-accent-blue/20"
+                    >
+                      <Plus size={16} />
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <div className="text-[10px] text-text-muted text-center font-bold py-1.5 bg-bg-input/30 rounded-xl border border-border-light/40">
+                  ⚠️ List is full (5/5). Delete one to add a new spark.
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
 
 export const Dashboard = ({ setView }) => {
   const {
@@ -222,6 +443,11 @@ export const Dashboard = ({ setView }) => {
             </div>
           </section>
 
+          {/* Quick Thoughts Widget - Mobile Only */}
+          <div className="block lg:hidden">
+            <QuickThoughtsWidget />
+          </div>
+
           {/* AI Insights & Recovery */}
           <AIInsights />
 
@@ -327,7 +553,7 @@ export const Dashboard = ({ setView }) => {
           </div>
 
           {/* Goal Progress List */}
-          <section className="space-y-5">
+          <section className="hidden md:block space-y-5">
             <div className="flex justify-between items-end px-2">
               <div className="space-y-1">
                 <h3 className="text-[10px] font-black text-text-muted uppercase tracking-[0.15em]">Active Goals</h3>
@@ -342,14 +568,16 @@ export const Dashboard = ({ setView }) => {
                 const activeGoalsList = (goals || [])
                   .map(g => {
                     const liveProgress = calculateOverallProgress(g);
-                    const isFinished = liveProgress === 100 || (g.deadline && todayStr >= g.deadline);
+                    const isFinished = liveProgress >= 100 || (g.deadline && todayStr >= g.deadline);
+                    const isDoneToday = isGoalDoneToday(g);
                     return {
                       ...g,
                       progress: liveProgress,
-                      isFinished
+                      isFinished,
+                      isDoneToday
                     };
                   })
-                  .filter(goal => !goal.isFinished);
+                  .filter(goal => !goal.isFinished && !goal.isDoneToday);
 
                 if (activeGoalsList.length === 0) {
                   return (
@@ -412,6 +640,11 @@ export const Dashboard = ({ setView }) => {
         {/* Right Column / Sidebar Dashboard Content */}
         <div className="lg:col-span-4 flex flex-col gap-6 lg:gap-8">
           
+          {/* Quick Thoughts Widget - Desktop Only */}
+          <div className="hidden lg:block">
+            <QuickThoughtsWidget />
+          </div>
+
           {/* Weekly Performance Widget */}
           <WeeklyReportCard report={weeklyReport} />
 

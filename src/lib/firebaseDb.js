@@ -291,7 +291,7 @@ export async function fetchGoals(userId) {
     for (const goalDoc of snap.docs) {
       const g = goalDoc.data();
       if (g.deleted || g.isDeleted) continue;
-      
+
       const goalPathKey = `users/${userId}/goals/${goalDoc.id}`;
       writeCache.set(goalPathKey, cleanPayload(g)); // Cache primed value
 
@@ -301,7 +301,7 @@ export async function fetchGoals(userId) {
         const hd = h.data();
         const habitPathKey = `users/${userId}/goals/${goalDoc.id}/habits/${h.id}`;
         writeCache.set(habitPathKey, cleanPayload(hd)); // Cache primed value
-        
+
         return {
           id: h.id,
           title: hd.title,
@@ -612,7 +612,7 @@ export async function fetchUserSettings(userId) {
     if (snap.empty) return null;
     const prefDoc = snap.docs.find(d => d.id === 'preferences');
     if (!prefDoc) return null;
-    
+
     const data = prefDoc.data();
     const pathKey = `users/${userId}/settings/preferences`;
     writeCache.set(pathKey, cleanPayload(data)); // Prime value in cache
@@ -695,6 +695,54 @@ export async function deleteNoteDb(userId, noteId) {
     debugLog(`Write SUCCESS: deleteNoteDb [id=${noteId}]`);
   } catch (err) {
     errorLog(`Write FAILURE: deleteNoteDb [id=${noteId}]`, err);
+  }
+}
+
+// ── Quick Thoughts ──────────────────────────────────────
+export async function fetchQuickThoughts(userId) {
+  try {
+    const q = query(userCol(userId, 'quick_thoughts'), orderBy('updated_at', 'desc'));
+    const snap = await getDocs(q);
+    return snap.docs.map(d => {
+      const data = d.data();
+      const pathKey = `users/${userId}/quick_thoughts/${d.id}`;
+      writeCache.set(pathKey, cleanPayload(data));
+
+      return {
+        id: d.id,
+        content: data.content || '',
+        emoji: data.emoji || '',
+        created_at: data.created_at,
+        updated_at: data.updated_at,
+      };
+    });
+  } catch (err) {
+    log('fetchQuickThoughts', err);
+    return null;
+  }
+}
+
+export async function upsertQuickThought(userId, thought) {
+  const payload = {
+    content: thought.content || '',
+    emoji: thought.emoji || '',
+    created_at: thought.created_at || new Date().toISOString(),
+    updated_at: thought.updated_at || new Date().toISOString(),
+  };
+
+  const pathKey = `users/${userId}/quick_thoughts/${thought.id}`;
+  const docRef = userDoc(userId, 'quick_thoughts', thought.id);
+  return smartWrite(docRef, payload, pathKey, false, 1000);
+}
+
+export async function deleteQuickThoughtDb(userId, id) {
+  try {
+    debugLog(`Write START: deleteQuickThoughtDb [id=${id}]`);
+    invalidateCache(`users/${userId}/quick_thoughts/${id}`);
+    await deleteDoc(userDoc(userId, 'quick_thoughts', id));
+    debugLog(`Write SUCCESS: deleteQuickThoughtDb [id=${id}]`);
+  } catch (err) {
+    errorLog(`Write FAILURE: deleteQuickThoughtDb [id=${id}]`, err);
   }
 }
 
@@ -838,6 +886,13 @@ export async function clearUserDataDb(userId) {
       batch.delete(m.ref);
     });
 
+    // 6. Delete all quick thoughts
+    const quickThoughtsSnap = await getDocs(userCol(userId, 'quick_thoughts'));
+    quickThoughtsSnap.docs.forEach(q => {
+      invalidateCache(`users/${userId}/quick_thoughts/${q.id}`);
+      batch.delete(q.ref);
+    });
+
     // Commit deletions
     await batch.commit();
 
@@ -935,7 +990,7 @@ export async function retryAsyncOperation(fn, retries = 3, delay = 2000) {
 
 // ── Connection Safety: Reconnect Trigger Observer ────────
 export function enableNetworkReconnectSync(onReconnectCallback) {
-  if (typeof window === 'undefined') return () => {};
+  if (typeof window === 'undefined') return () => { };
 
   const handleOnline = () => {
     console.log('%c[Network Observer] Device is back ONLINE! Triggering automatic database sync retry.', 'color: #22c55e; font-weight: bold;');

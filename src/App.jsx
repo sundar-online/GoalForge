@@ -105,13 +105,13 @@ function AppInner() {
   const renderView = () => {
     switch (currentView) {
       case 'dashboard': return <Dashboard setView={setCurrentView} />;
-      case 'goals':     return <GoalsPage />;
-      case 'tasks':     return <DailyTasks />;
-      case 'notes':     return <NotesPage />;
-      case 'focus':     return <FocusMode />;
-      case 'weeklyplan':return <WeeklyPlan />;
-      case 'profile':   return <ProfilePage />;
-      default:          return <Dashboard setView={setCurrentView} />;
+      case 'goals': return <GoalsPage />;
+      case 'tasks': return <DailyTasks />;
+      case 'notes': return <NotesPage />;
+      case 'focus': return <FocusMode />;
+      case 'weeklyplan': return <WeeklyPlan />;
+      case 'profile': return <ProfilePage />;
+      default: return <Dashboard setView={setCurrentView} />;
     }
   };
 
@@ -129,10 +129,10 @@ function AppInner() {
 
 /** Renders level-up and badge modals, reading from context. */
 function GamificationOverlays() {
-  const { 
-    levelUpEvent, setLevelUpEvent, 
+  const {
+    levelUpEvent, setLevelUpEvent,
     badgeUnlockEvent, dismissBadgeEvent,
-    completedGoalForCelebration, setCompletedGoalForCelebration 
+    completedGoalForCelebration, setCompletedGoalForCelebration
   } = useAppContext();
   return (
     <>

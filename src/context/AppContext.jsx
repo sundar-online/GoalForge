@@ -47,7 +47,8 @@ const STORAGE_KEYS = {
   SETTINGS: 'goalforge_settings',
   NOTES: 'goalforge_notes',
   XP: 'goalforge_xp',
-  MEMORIES: 'goalforge_memories'
+  MEMORIES: 'goalforge_memories',
+  QUICK_THOUGHTS: 'goalforge_quick_thoughts'
 };
 
 const DEFAULT_XP_DATA = {
@@ -131,16 +132,19 @@ export const AppProvider = ({ children }) => {
   const [taskLogs, setTaskLogs] = useState(() => safeParse(STORAGE_KEYS.LOGS, {}));
   const [notes, setNotes] = useState(() => safeParse(STORAGE_KEYS.NOTES, []));
   const [memories, setMemories] = useState(() => safeParse(STORAGE_KEYS.MEMORIES, []));
+  const [quickThoughts, setQuickThoughts] = useState(() => safeParse(STORAGE_KEYS.QUICK_THOUGHTS, []));
 
   const tasksRef = useRef([]);
   const notesRef = useRef([]);
   const goalsRef = useRef([]);
   const memoriesRef = useRef([]);
+  const quickThoughtsRef = useRef([]);
 
   useEffect(() => { tasksRef.current = tasks; }, [tasks]);
   useEffect(() => { notesRef.current = notes; }, [notes]);
   useEffect(() => { goalsRef.current = goals; }, [goals]);
   useEffect(() => { memoriesRef.current = memories; }, [memories]);
+  useEffect(() => { quickThoughtsRef.current = quickThoughts; }, [quickThoughts]);
   const habitsListeners = useRef({});
   const scheduledRemindersRef = useRef({});
 
@@ -154,13 +158,13 @@ export const AppProvider = ({ children }) => {
     goals.forEach(goal => {
       const prevProgress = prevGoalsProgressRef.current[goal.id];
       const currentProgress = goal.progress || 0;
-      
+
       // If progress newly transitions to 100%
       if (currentProgress === 100 && prevProgress !== undefined && prevProgress < 100) {
         // Trigger completion celebration modal!
         setCompletedGoalForCelebration(goal);
       }
-      
+
       prevGoalsProgressRef.current[goal.id] = currentProgress;
     });
   }, [goals, loading]);
@@ -170,11 +174,11 @@ export const AppProvider = ({ children }) => {
     if (loading || !goals) return;
 
     const currentHabitIds = new Set();
-    
+
     goals.forEach(goal => {
       (goal.habits || []).forEach(habit => {
         currentHabitIds.add(String(habit.id));
-        
+
         const config = {
           enabled: !!habit.reminderEnabled,
           time: habit.reminderTime || '08:00',
@@ -183,14 +187,14 @@ export const AppProvider = ({ children }) => {
 
         const lastConfigStr = scheduledRemindersRef.current[habit.id];
         const currentConfigStr = JSON.stringify(config);
-        
+
         if (lastConfigStr !== currentConfigStr) {
           if (habit.reminderEnabled) {
             scheduleReminder(
-              habit.id, 
-              `🔥 Habit: ${habit.title}`, 
-              `Goal: ${goal.title}`, 
-              habit.reminderTime || '08:00', 
+              habit.id,
+              `🔥 Habit: ${habit.title}`,
+              `Goal: ${goal.title}`,
+              habit.reminderTime || '08:00',
               habit.scheduleDays || []
             );
           } else {
@@ -200,7 +204,7 @@ export const AppProvider = ({ children }) => {
         }
       });
     });
-    
+
     // Cleanup orphaned reminders (deleted habits)
     Object.keys(scheduledRemindersRef.current).forEach(hid => {
       if (!currentHabitIds.has(String(hid))) {
@@ -339,6 +343,7 @@ export const AppProvider = ({ children }) => {
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify(taskLogs)); }, [taskLogs]);
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.NOTES, JSON.stringify(notes)); }, [notes]);
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.XP, JSON.stringify(xpData)); }, [xpData]);
+  useEffect(() => { localStorage.setItem(STORAGE_KEYS.QUICK_THOUGHTS, JSON.stringify(quickThoughts)); }, [quickThoughts]);
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
     document.documentElement.setAttribute('data-theme', settings.theme || 'dark');
@@ -348,6 +353,7 @@ export const AppProvider = ({ children }) => {
   const isInitialTasksLoad = useRef(true);
   const isInitialNotesLoad = useRef(true);
   const isInitialGoalsLoad = useRef(true);
+  const isInitialQuickThoughtsLoad = useRef(true);
 
   // Expose syncFromCloud as connection verification & trigger
   const syncFromCloud = async () => {
@@ -369,7 +375,7 @@ export const AppProvider = ({ children }) => {
   // Reconnect listener to sync automatic retries when network transitions back to online
   useEffect(() => {
     if (!user) return;
-    
+
     // Automatically verify connection on user change or login
     syncFromCloud();
 
@@ -490,6 +496,40 @@ export const AppProvider = ({ children }) => {
       });
       unsubscribes.push(unsubNotes);
 
+      // X. Subscribe to Quick Thoughts Collection
+      const qtQuery = query(collection(fireDb, 'users', user.id, 'quick_thoughts'), orderBy('updated_at', 'desc'));
+      const unsubQt = onSnapshot(qtQuery, { includeMetadataChanges: true }, (snapshot) => {
+        const updatedQt = snapshot.docs.map(doc => {
+          const data = doc.data();
+          db.updateCache(`users/${user.id}/quick_thoughts/${doc.id}`, data);
+          return {
+            id: doc.id,
+            content: data.content || '',
+            emoji: data.emoji || '',
+            created_at: data.created_at,
+            updated_at: data.updated_at,
+            syncPending: doc.metadata.hasPendingWrites,
+          };
+        });
+
+        if (!isInitialQuickThoughtsLoad.current) {
+          const prevIds = new Set(quickThoughtsRef.current.map(q => q.id));
+          const newlySynced = updatedQt.filter(q => !prevIds.has(q.id));
+          if (newlySynced.length > 0) {
+            scheduleLocalNotification("💭 Thoughts Updated", {
+              body: "Your quick thoughts have been updated on another device.",
+            });
+          }
+        } else {
+          isInitialQuickThoughtsLoad.current = false;
+        }
+
+        setQuickThoughts(updatedQt);
+      }, (error) => {
+        console.error('[Realtime Sync] Error in Quick Thoughts subscription:', error);
+      });
+      unsubscribes.push(unsubQt);
+
       // 3. Subscribe to Goals with Reactive Habits Listener
       const goalsQuery = query(collection(fireDb, 'users', user.id, 'goals'), orderBy('created_at', 'desc'));
       const unsubGoals = onSnapshot(goalsQuery, { includeMetadataChanges: true }, (snapshot) => {
@@ -563,7 +603,7 @@ export const AppProvider = ({ children }) => {
           if (!habitsListeners.current[goal.id]) {
             const habitsQuery = query(collection(fireDb, 'users', user.id, 'goals', goal.id, 'habits'));
             const unsubHabit = onSnapshot(habitsQuery, { includeMetadataChanges: true }, (habitsSnapshot) => {
-               const habitsList = habitsSnapshot.docs.map(hDoc => {
+              const habitsList = habitsSnapshot.docs.map(hDoc => {
                 if (deletedHabitIdsRef.current.includes(String(hDoc.id))) {
                   return null;
                 }
@@ -807,7 +847,7 @@ export const AppProvider = ({ children }) => {
       const dateObj = new Date();
       const hours = dateObj.getHours();
       const mins = dateObj.getMinutes();
-      
+
       // Trigger evening reminder at 8:00 PM if accuracy is < 100 and haven't pushed today
       if (hours === 20 && mins === 0 && accuracy < 100) {
         if (settings.lastPushDate !== now) {
@@ -837,10 +877,10 @@ export const AppProvider = ({ children }) => {
 
     // 1. Check if ANY reset needs to be performed
     const hasSettingsNeed = settings.lastActiveDate !== todayStr;
-    const hasTaskNeed = tasks.some(t => 
+    const hasTaskNeed = tasks.some(t =>
       (t.schedule_type || t.type) === 'daily' && t.lastActiveDate !== todayStr
     );
-    const hasHabitNeed = goals.some(goal => 
+    const hasHabitNeed = goals.some(goal =>
       (goal.habits || []).some(h => h.lastActiveDate !== todayStr)
     );
 
@@ -866,11 +906,11 @@ export const AppProvider = ({ children }) => {
             goalNeedsUpdate = true;
             let updatedH = { ...h };
             const wasDone = updatedH.completed ||
-                            (updatedH.type === 'time' && (updatedH.timeSpent ?? 0) >= (updatedH.targetTime ?? 15)) ||
-                            (updatedH.type === 'count' && (updatedH.currentCount ?? 0) >= (updatedH.targetCount ?? 10));
+              (updatedH.type === 'time' && (updatedH.timeSpent ?? 0) >= (updatedH.targetTime ?? 15)) ||
+              (updatedH.type === 'count' && (updatedH.currentCount ?? 0) >= (updatedH.targetCount ?? 10));
 
             // Check if yesterday (hLastActive) was a scheduled day for this habit
-            const lastActiveDay = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][parseLocalDate(hLastActive).getDay()];
+            const lastActiveDay = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][parseLocalDate(hLastActive).getDay()];
             const wasScheduled = !h.scheduleDays || h.scheduleDays.length === 0 || h.scheduleDays.includes(lastActiveDay);
 
             let updatedDates = h.completedDates ? [...h.completedDates] : [];
@@ -996,11 +1036,11 @@ export const AppProvider = ({ children }) => {
     };
 
     const last = lastSavedSummaryRef.current;
-    const isSame = last && 
-                   last.date === summary.date &&
-                   last.total_tasks === summary.total_tasks && 
-                   last.completed_tasks === summary.completed_tasks && 
-                   last.time_spent === summary.time_spent;
+    const isSame = last &&
+      last.date === summary.date &&
+      last.total_tasks === summary.total_tasks &&
+      last.completed_tasks === summary.completed_tasks &&
+      last.time_spent === summary.time_spent;
 
     if (!isSame) {
       lastSavedSummaryRef.current = summary;
@@ -1020,7 +1060,7 @@ export const AppProvider = ({ children }) => {
     // Initialize Web Worker for background AI processing
     const worker = new Worker(new URL('../workers/aiWorker.js', import.meta.url), { type: 'module' });
     aiWorkerRef.current = worker;
-    
+
     worker.onmessage = (e) => {
       if (e.data.type === 'SUCCESS') {
         const { insights, strategies, suggestion } = e.data.payload;
@@ -1048,9 +1088,9 @@ export const AppProvider = ({ children }) => {
       const doneTasks = tasks.filter(t => t.completed).length;
       const dismissedCount = (settings.dismissedInsights || []).length;
       const logCount = Object.keys(taskLogs).length;
-      
+
       const currentHash = `${activeGoals}_${doneTasks}_${logCount}_${focusTime}_${accuracy}_${dismissedCount}`;
-      
+
       if (lastAiHashRef.current !== currentHash) {
         lastAiHashRef.current = currentHash;
         // Offload heavy data processing to the background worker thread
@@ -1064,7 +1104,7 @@ export const AppProvider = ({ children }) => {
           dateStr: TODAY()
         });
       }
-    }, 800); 
+    }, 800);
 
     return () => clearTimeout(timer);
   }, [goals, tasks, taskLogs, focusTime, accuracy, settings.dismissedInsights, loading, workerReady]);
@@ -1089,9 +1129,9 @@ export const AppProvider = ({ children }) => {
       tasks.forEach(task => {
         if (task.reminderEnabled && task.reminderTime) {
           scheduleReminder(
-            task.id, 
-            task.title, 
-            `Daily Task: ${task.title}`, 
+            task.id,
+            task.title,
+            `Daily Task: ${task.title}`,
             task.reminderTime
           );
         } else {
@@ -1104,9 +1144,9 @@ export const AppProvider = ({ children }) => {
         (goal.habits || []).forEach(habit => {
           if (habit.reminderEnabled && habit.reminderTime) {
             scheduleReminder(
-              habit.id, 
-              habit.title, 
-              `Habit: ${habit.title}`, 
+              habit.id,
+              habit.title,
+              `Habit: ${habit.title}`,
               habit.reminderTime
             );
           } else {
@@ -1195,7 +1235,7 @@ export const AppProvider = ({ children }) => {
       try {
         // Ensure Goal document is fully created and goalId is available first
         await db.upsertGoal(user.id, newG);
-        
+
         // Immediately create pending habits using the new goalId
         const habitPromises = initialHabits.map(h => db.upsertHabit(user.id, goalId, h));
         await Promise.all(habitPromises);
@@ -1362,13 +1402,13 @@ export const AppProvider = ({ children }) => {
   const extendGoalDeadline = (id, newDeadline) => {
     const goal = goals.find(g => g.id === id);
     if (!goal) return;
-    
+
     const extension = { old_date: goal.deadline, new_date: newDeadline, extended_on: TODAY() };
     const updated = { ...goal, deadline: newDeadline, extensions: [...(goal.extensions || []), extension] };
     updated.progress = calculateOverallProgress(updated);
-    
+
     setGoals(prev => prev.map(g => g.id === id ? updated : g));
-    
+
     if (user) {
       db.upsertGoal(user.id, updated).catch(err => console.error('[Firestore Sync] Extend deadline failed:', err));
     }
@@ -1377,7 +1417,7 @@ export const AppProvider = ({ children }) => {
   const deleteGoal = id => {
     const goalIdStr = String(id);
     console.log(`%c[Diagnostic Log] ACTION START: deleteGoal [goalId=${goalIdStr}]`, 'color: #3b82f6; font-weight: bold;');
-    
+
     // 1. Clean up active habits sub-collection real-time snapshot listener
     if (habitsListeners.current[goalIdStr]) {
       habitsListeners.current[goalIdStr]();
@@ -1387,7 +1427,7 @@ export const AppProvider = ({ children }) => {
     // 2. Clear any lingering recovery state, dismissed insights, or weekly intention cache
     const targetGoal = goals.find(g => String(g.id) === goalIdStr);
     const habitIds = targetGoal ? (targetGoal.habits || []).map(h => String(h.id)) : [];
-    
+
     setSettings(prev => {
       const updatedIntentions = { ...prev.weeklyIntentions };
       delete updatedIntentions[goalIdStr];
@@ -1459,7 +1499,7 @@ export const AppProvider = ({ children }) => {
       lastActionTimestamp: new Date().toISOString(),
       syncPending: true
     };
-    
+
     const updatedHabits = [...(targetGoal.habits || []), newH];
     const updatedGoal = { ...targetGoal, habits: updatedHabits };
 
@@ -1471,12 +1511,12 @@ export const AppProvider = ({ children }) => {
     const newGoalLastCompleted = sortedGoalDates.length > 0 ? sortedGoalDates[0] : null;
 
     const finalGoal = {
-        ...updatedGoal,
-        completedDates: updatedGoalDates,
-        streak: newGoalStreak,
-        missedDays: newGoalMissed,
-        lastCompletedDate: newGoalLastCompleted,
-        lastActionTimestamp: new Date().toISOString()
+      ...updatedGoal,
+      completedDates: updatedGoalDates,
+      streak: newGoalStreak,
+      missedDays: newGoalMissed,
+      lastCompletedDate: newGoalLastCompleted,
+      lastActionTimestamp: new Date().toISOString()
     };
     finalGoal.progress = calculateOverallProgress(finalGoal);
 
@@ -1507,12 +1547,12 @@ export const AppProvider = ({ children }) => {
     const newGoalLastCompleted = sortedGoalDates.length > 0 ? sortedGoalDates[0] : null;
 
     const finalGoal = {
-        ...updatedGoal,
-        completedDates: updatedGoalDates,
-        streak: newGoalStreak,
-        missedDays: newGoalMissed,
-        lastCompletedDate: newGoalLastCompleted,
-        lastActionTimestamp: new Date().toISOString()
+      ...updatedGoal,
+      completedDates: updatedGoalDates,
+      streak: newGoalStreak,
+      missedDays: newGoalMissed,
+      lastCompletedDate: newGoalLastCompleted,
+      lastActionTimestamp: new Date().toISOString()
     };
     finalGoal.progress = calculateOverallProgress(finalGoal);
 
@@ -1618,7 +1658,7 @@ export const AppProvider = ({ children }) => {
 
     if (user) {
       console.log(`%c[Diagnostic Log] BEFORE FIRESTORE WRITE: logHabitTime [goalId=${goalId}, habitId=${habitId}]`, 'color: #eab308; font-weight: bold;');
-      
+
       const p1 = db.upsertHabit(user.id, goalId, habitToUpdate)
         .then(() => {
           console.log(`%c[Diagnostic Log] WRITE SUCCESS: logHabitTime [upsertHabit]`, 'color: #22c55e; font-weight: bold;');
@@ -1771,7 +1811,7 @@ export const AppProvider = ({ children }) => {
 
     if (user) {
       console.log(`%c[Diagnostic Log] BEFORE FIRESTORE WRITE: toggleHabitCheck [goalId=${goalId}, habitId=${habitId}]`, 'color: #eab308; font-weight: bold;');
-      
+
       const p1 = db.upsertHabit(user.id, goalId, habitToUpdate)
         .then(() => {
           console.log(`%c[Diagnostic Log] WRITE SUCCESS: toggleHabitCheck [upsertHabit]`, 'color: #22c55e; font-weight: bold;');
@@ -1886,7 +1926,7 @@ export const AppProvider = ({ children }) => {
 
     if (user) {
       console.log(`%c[Diagnostic Log] BEFORE FIRESTORE WRITE: updateHabitCount [goalId=${goalId}, habitId=${habitId}]`, 'color: #eab308; font-weight: bold;');
-      
+
       const p1 = db.upsertHabit(user.id, goalId, habitToUpdate)
         .then(() => {
           console.log(`%c[Diagnostic Log] WRITE SUCCESS: updateHabitCount [upsertHabit]`, 'color: #22c55e; font-weight: bold;');
@@ -2234,7 +2274,7 @@ export const AppProvider = ({ children }) => {
       id: memory.id || Date.now().toString(),
       createdAt: memory.createdAt || new Date().toISOString()
     };
-    
+
     // Save locally
     setMemories(prev => {
       const updated = [newM, ...prev.filter(m => m.id !== newM.id)];
@@ -2268,6 +2308,81 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+  const addQuickThought = async (content, emoji) => {
+    const newQt = {
+      id: Date.now().toString(),
+      content,
+      emoji: emoji || '',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+
+    // If adding this exceeds 5 thoughts, prune the oldest from DB
+    if (user && quickThoughtsRef.current.length >= 5) {
+      const sorted = [...quickThoughtsRef.current].sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+      // keep only the top 4, so the new one fits as the 5th
+      const excess = sorted.slice(4);
+      for (const item of excess) {
+        try {
+          await db.deleteQuickThoughtDb(user.id, item.id);
+        } catch (e) {
+          console.error('[Firestore Sync] Failed to prune quick thought:', e);
+        }
+      }
+    }
+
+    setQuickThoughts(prev => {
+      const updated = [newQt, ...prev.filter(q => q.id !== newQt.id)].slice(0, 5);
+      localStorage.setItem(STORAGE_KEYS.QUICK_THOUGHTS, JSON.stringify(updated));
+      return updated;
+    });
+
+    if (user) {
+      try {
+        await db.upsertQuickThought(user.id, newQt);
+      } catch (err) {
+        console.error('[Firestore Sync] Failed to add quick thought:', err);
+      }
+    }
+    return newQt;
+  };
+
+  const updateQuickThought = async (id, content, emoji) => {
+    const qt = quickThoughts.find(item => item.id === id);
+    if (!qt) return;
+    const updated = { ...qt, content, emoji, updated_at: new Date().toISOString() };
+
+    setQuickThoughts(prev => {
+      const updatedList = prev.map(item => item.id === id ? updated : item);
+      localStorage.setItem(STORAGE_KEYS.QUICK_THOUGHTS, JSON.stringify(updatedList));
+      return updatedList;
+    });
+
+    if (user) {
+      try {
+        await db.upsertQuickThought(user.id, updated);
+      } catch (err) {
+        console.error('[Firestore Sync] Failed to update quick thought:', err);
+      }
+    }
+  };
+
+  const deleteQuickThought = async id => {
+    setQuickThoughts(prev => {
+      const updatedList = prev.filter(item => item.id !== id);
+      localStorage.setItem(STORAGE_KEYS.QUICK_THOUGHTS, JSON.stringify(updatedList));
+      return updatedList;
+    });
+
+    if (user) {
+      try {
+        await db.deleteQuickThoughtDb(user.id, id);
+      } catch (err) {
+        console.error('[Firestore Sync] Failed to delete quick thought:', err);
+      }
+    }
+  };
+
   const clearProfileData = async () => {
     console.log('%c[Diagnostic Log] ACTION START: clearProfileData', 'color: #3b82f6; font-weight: bold;');
     if (!user) {
@@ -2280,6 +2395,7 @@ export const AppProvider = ({ children }) => {
       setTasks([]);
       setTaskLogs({});
       setMemories([]);
+      setQuickThoughts([]);
       setAiInsights([]);
       setRecoveryStrategies([]);
       setSmartSuggestions(null);
@@ -2307,6 +2423,7 @@ export const AppProvider = ({ children }) => {
       localStorage.setItem(STORAGE_KEYS.TASKS, JSON.stringify([]));
       localStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify({}));
       localStorage.setItem(STORAGE_KEYS.MEMORIES, JSON.stringify([]));
+      localStorage.setItem(STORAGE_KEYS.QUICK_THOUGHTS, JSON.stringify([]));
       localStorage.setItem(STORAGE_KEYS.XP, JSON.stringify(DEFAULT_XP_DATA));
       localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify({
         theme: settings.theme || 'dark',
@@ -2370,13 +2487,13 @@ export const AppProvider = ({ children }) => {
 
     // 1. Detect badges in derived state that aren't in persisted state
     const newlyDerivedBadges = currentlyEarnedBadges.filter(id => !savedBadges.includes(id));
-    
+
     if (newlyDerivedBadges.length > 0) {
       setXpData(prev => {
         const now = new Date().toISOString();
         const newDates = { ...prev.badgeUnlockDates };
         newlyDerivedBadges.forEach(id => { if (!newDates[id]) newDates[id] = now; });
-        
+
         return {
           ...prev,
           earnedBadges: [...new Set([...(prev.earnedBadges || []), ...newlyDerivedBadges])],
@@ -2418,7 +2535,7 @@ export const AppProvider = ({ children }) => {
 
   const dismissBadgeEvent = useCallback(() => {
     const currentBadgeId = badgeUnlockEvent?.id;
-    
+
     if (currentBadgeId) {
       // Mark as notified persistently
       setXpData(prev => {
@@ -2522,6 +2639,7 @@ export const AppProvider = ({ children }) => {
   const notesValue = {
     notes, addNote, updateNote, deleteNote,
     memories, addMemory, deleteMemory,
+    quickThoughts, addQuickThought, updateQuickThought, deleteQuickThought,
     loading, syncError, retrySync: syncFromCloud, clearProfileData
   };
 
@@ -2557,6 +2675,8 @@ export const AppProvider = ({ children }) => {
     saveWeeklyIntention,
     // Memories & Completed Celebration Modal
     memories, addMemory, deleteMemory,
+    // Quick Thoughts
+    quickThoughts, addQuickThought, updateQuickThought, deleteQuickThought,
     completedGoalForCelebration, setCompletedGoalForCelebration,
     clearProfileData
   };
