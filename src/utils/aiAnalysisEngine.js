@@ -221,6 +221,18 @@ export const analyzeUserBehavior = (goals, tasks, taskLogs, focusTime) => {
   return insights;
 };
 
+// Helper to check if item is completed today
+const isItemDoneToday = (item) => {
+  if (item.isHabit) {
+    const today = TODAY();
+    if (item.lastCompletedDate !== today) return false;
+    if (item.type === 'check') return item.completed;
+    if (item.type === 'count') return (item.currentCount ?? 0) >= (item.targetCount ?? 10);
+    return (item.timeSpent ?? 0) >= (item.targetTime ?? 15);
+  }
+  return item.completed;
+};
+
 // ── Recovery Strategies (With Smart Grouping & Prioritization) ───────────────
 export const generateRecoveryStrategies = (goals, tasks) => {
   const strategies = [];
@@ -234,8 +246,12 @@ export const generateRecoveryStrategies = (goals, tasks) => {
     ...tasks.filter((t) => t.type === 'daily').map((t) => ({ ...t, isHabit: false, streak: t.currentStreak || 0 })),
   ];
 
-  // Identify items that have missed exactly 2 days (Streak Emergency state)
-  const criticalItems = allItems.filter((item) => (item.missedDays || 0) === 2);
+  // Identify items that have missed exactly 2 days, are not done today, and are not already in recovery mode
+  const criticalItems = allItems.filter((item) => 
+    (item.missedDays || 0) === 2 && 
+    !isItemDoneToday(item) && 
+    !item.isRecovering
+  );
 
   if (criticalItems.length === 0) {
     return strategies;

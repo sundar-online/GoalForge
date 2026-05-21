@@ -934,6 +934,14 @@ export const AppProvider = ({ children }) => {
               lastActionTimestamp: new Date().toISOString()
             };
 
+            // Restore original target if habit was in recovery mode
+            if (h.isRecovering && h.originalTarget !== undefined) {
+              const targetKey = h.type === 'count' ? 'targetCount' : 'targetTime';
+              finalHabit[targetKey] = h.originalTarget;
+              finalHabit.isRecovering = false;
+              delete finalHabit.originalTarget;
+            }
+
             // Write habit reset to DB
             db.upsertHabit(user.id, goal.id, finalHabit);
             return finalHabit;
@@ -1013,6 +1021,14 @@ export const AppProvider = ({ children }) => {
               lastActionTimestamp: new Date().toISOString()
             };
 
+            // Restore original target if task was in recovery mode
+            if (t.isRecovering && t.originalTarget !== undefined) {
+              const targetKey = t.completionType === 'count' ? 'targetCount' : 'targetTime';
+              finalTask[targetKey] = t.originalTarget;
+              finalTask.isRecovering = false;
+              delete finalTask.originalTarget;
+            }
+
             db.upsertTask(user.id, finalTask);
             return finalTask;
           }
@@ -1084,12 +1100,12 @@ export const AppProvider = ({ children }) => {
 
     const timer = setTimeout(() => {
       // Intelligent Caching: Create a lightweight hash to prevent redundant background recalculations
-      const activeGoals = goals.filter(g => !isGoalDoneToday(g)).length;
-      const doneTasks = tasks.filter(t => t.completed).length;
+      const goalsHash = goals.map(g => `${g.id}_${(g.habits || []).map(h => `${h.id}_${h.isRecovering}_${(h.completedDates || []).length}_${h.missedDays}_${h.targetCount || h.targetTime}_${h.lastCompletedDate}`).join(',')}`).join('|');
+      const tasksHash = tasks.map(t => `${t.id}_${t.completed}_${t.isRecovering}_${t.currentCount || t.targetCount}`).join('|');
       const dismissedCount = (settings.dismissedInsights || []).length;
       const logCount = Object.keys(taskLogs).length;
 
-      const currentHash = `${activeGoals}_${doneTasks}_${logCount}_${focusTime}_${accuracy}_${dismissedCount}`;
+      const currentHash = `${goalsHash}_${tasksHash}_${logCount}_${focusTime}_${accuracy}_${dismissedCount}`;
 
       if (lastAiHashRef.current !== currentHash) {
         lastAiHashRef.current = currentHash;
@@ -1160,8 +1176,21 @@ export const AppProvider = ({ children }) => {
   }, [goals, tasks, loading]);
 
 
-  const applyRecoveryPlan = (plan) => {
+  const applyRecoveryPlan = (plan, strategyId) => {
     if (plan.isHabit) {
+      let alreadyRecovering = false;
+      const targetGoal = goals.find(g => g.id === plan.parentId);
+      if (targetGoal) {
+        const targetHabit = (targetGoal.habits || []).find(h => h.id === plan.itemId);
+        if (targetHabit && targetHabit.isRecovering) {
+          alreadyRecovering = true;
+        }
+      }
+      if (alreadyRecovering) {
+        if (strategyId) dismissInsight(strategyId);
+        return;
+      }
+
       setGoals(prev => prev.map(g => {
         if (g.id === plan.parentId) {
           const updatedHabits = g.habits.map(h => {
@@ -1182,6 +1211,16 @@ export const AppProvider = ({ children }) => {
         return g;
       }));
     } else {
+      let alreadyRecovering = false;
+      const targetTask = tasks.find(t => t.id === plan.itemId);
+      if (targetTask && targetTask.isRecovering) {
+        alreadyRecovering = true;
+      }
+      if (alreadyRecovering) {
+        if (strategyId) dismissInsight(strategyId);
+        return;
+      }
+
       setTasks(prev => prev.map(t => {
         if (t.id === plan.itemId) {
           const updatedT = {
@@ -1197,7 +1236,7 @@ export const AppProvider = ({ children }) => {
       }));
     }
     // Dismiss the recovery insight after applying
-    dismissInsight(`recovery_${plan.itemId}`);
+    dismissInsight(strategyId || `recovery_${plan.itemId}`);
     awardXP(10, 'Recovery plan activated');
   };
 

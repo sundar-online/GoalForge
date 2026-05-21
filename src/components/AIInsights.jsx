@@ -137,14 +137,12 @@ const AIInsights = () => {
                   <X size={14} />
                 </button>
               </div>
-              
               <p className={`text-xs leading-relaxed mb-4 ${messageColor}`}>
                 {strategy.message}
               </p>
-
               {strategy.recoveryPlan && (
                 <button 
-                  onClick={() => applyRecoveryPlan(strategy.recoveryPlan)}
+                  onClick={() => applyRecoveryPlan(strategy.recoveryPlan, strategy.id)}
                   className="w-full py-3 rounded-xl bg-black/5 hover:bg-black/10 dark:bg-white/5 dark:hover:bg-white/10 border border-black/5 dark:border-white/10 hover:border-black/15 dark:hover:border-white/25 text-[11px] font-black uppercase tracking-wider text-text-main flex items-center justify-center gap-2 transition-all active:scale-[0.98] shadow-sm"
                 >
                   {strategy.actionLabel}
