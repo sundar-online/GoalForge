@@ -78,16 +78,16 @@ const QuickThoughtsWidget = () => {
             </div>
             {/* Show latest note preview when collapsed */}
             {!isExpanded && (
-              <p className="text-xs text-text-muted mt-1 truncate max-w-[200px]">
+              <div className="flex items-center gap-1.5 text-xs text-text-muted mt-1 min-w-0">
                 {latestThought ? (
                   <>
-                    <span className="mr-1">{latestThought.emoji}</span>
-                    {latestThought.content}
+                    <span className="shrink-0">{latestThought.emoji}</span>
+                    <span className="truncate flex-1 min-w-0">{latestThought.content}</span>
                   </>
                 ) : (
-                  "Capture a spark before it fades..."
+                  <span className="truncate flex-1 min-w-0">Capture a spark before it fades...</span>
                 )}
-              </p>
+              </div>
             )}
           </div>
         </div>
@@ -108,25 +108,25 @@ const QuickThoughtsWidget = () => {
           >
             <div className="p-5 space-y-4">
               {/* Note List */}
-              <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+              <div className="space-y-3 max-h-[220px] overflow-y-auto pt-5 pb-3 px-1.5">
                 {quickThoughts.length === 0 ? (
                   <p className="text-xs text-text-muted py-2 text-center italic">
                     No thoughts saved yet. Write one below!
                   </p>
                 ) : (
-                  quickThoughts.map((thought) => (
+                  quickThoughts.map((thought, index) => (
                     <div 
                       key={thought.id}
                       className="group flex items-center justify-between gap-3 p-3 rounded-2xl bg-bg-input/40 border border-border-light/50 hover:border-border-light transition-all duration-200"
                     >
                       <div className="flex items-center gap-2 flex-1 min-w-0">
                         {/* Emoji Trigger/Dropdown */}
-                        <div className="relative shrink-0 select-none">
-                          <span className="text-base cursor-pointer p-1 rounded-md hover:bg-bg-input transition-colors">
+                        <div className="relative shrink-0 select-none group/emoji">
+                          <span className="text-base cursor-pointer p-1 rounded-md hover:bg-bg-input transition-colors flex items-center justify-center select-none">
                             {thought.emoji}
                           </span>
                           {/* Mini Emoji Selector Overlay on Hover/Focus */}
-                          <div className="absolute left-0 bottom-full mb-1 hidden group-hover:flex items-center gap-1 bg-bg-card border border-border-light p-1 rounded-xl shadow-lg z-20">
+                          <div className="absolute left-full ml-1.5 top-1/2 -translate-y-1/2 hidden group-hover/emoji:flex items-center gap-1 bg-bg-card border border-border-light p-1 rounded-xl shadow-lg z-50">
                             {emojiOptions.map(e => (
                               <button
                                 key={e}
@@ -158,7 +158,7 @@ const QuickThoughtsWidget = () => {
                         ) : (
                           <span 
                             onClick={() => handleStartEdit(thought)}
-                            className="text-xs text-text-main truncate flex-1 cursor-text select-text"
+                            className="text-xs text-text-main truncate flex-1 cursor-text select-text py-0.5 leading-normal"
                           >
                             {thought.content}
                           </span>
@@ -168,7 +168,7 @@ const QuickThoughtsWidget = () => {
                       {/* Delete Action */}
                       <button 
                         onClick={() => deleteQuickThought(thought.id)}
-                        className="text-text-muted hover:text-red-500 opacity-0 group-hover:opacity-100 p-1 rounded-lg hover:bg-red-500/10 transition-all shrink-0"
+                        className="text-text-muted hover:text-red-500 opacity-0 group-hover:opacity-100 p-1 rounded-lg hover:bg-red-500/10 transition-all shrink-0 flex items-center justify-center"
                       >
                         <Trash2 size={14} />
                       </button>

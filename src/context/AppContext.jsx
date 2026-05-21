@@ -919,7 +919,7 @@ export const AppProvider = ({ children }) => {
             }
 
             // Calculate new missed days and streak dynamically using the simulation engine
-            const newMissed = calculateConsecutiveMissedDays(updatedDates, h.scheduleDays);
+            const newMissed = calculateConsecutiveMissedDays(updatedDates, h.scheduleDays, h.createdAt);
             const newStreak = calculateStreakFromHistory(updatedDates, h.scheduleDays, goal.completedDates, h.createdAt);
 
             const finalHabit = {
@@ -954,7 +954,7 @@ export const AppProvider = ({ children }) => {
           const updatedGoalDates = recalculateGoalCompletedDates(updatedGoalWithoutDates);
           const goalSchedule = getGoalScheduledDays(updatedGoalWithoutDates);
           const newGoalStreak = calculateGoalStreak(updatedGoalDates, goalSchedule);
-          const newGoalMissed = calculateGoalConsecutiveMissedDays(updatedGoalDates, goalSchedule);
+          const newGoalMissed = calculateGoalConsecutiveMissedDays(updatedGoalDates, goalSchedule, goal.startDate || goal.createdAt);
 
           const finalGoal = {
             ...goal,
@@ -1377,7 +1377,7 @@ export const AppProvider = ({ children }) => {
         }
 
         const newStreak = calculateStreakFromHistory(completedDates, h.scheduleDays || [], targetGoal.completedDates || [], existing.createdAt);
-        const newMissed = calculateConsecutiveMissedDays(completedDates, h.scheduleDays || []);
+        const newMissed = calculateConsecutiveMissedDays(completedDates, h.scheduleDays || [], existing.createdAt);
 
         return {
           ...existing,
@@ -1408,7 +1408,7 @@ export const AppProvider = ({ children }) => {
     const updatedGoalDates = recalculateGoalCompletedDates(updatedGoal);
     const goalSchedule = getGoalScheduledDays(updatedGoal);
     const newGoalStreak = calculateGoalStreak(updatedGoalDates, goalSchedule);
-    const newGoalMissed = calculateGoalConsecutiveMissedDays(updatedGoalDates, goalSchedule);
+    const newGoalMissed = calculateGoalConsecutiveMissedDays(updatedGoalDates, goalSchedule, targetGoal.startDate || targetGoal.createdAt);
     const sortedGoalDates = [...updatedGoalDates].sort((a, b) => b.localeCompare(a));
     const newGoalLastCompleted = sortedGoalDates.length > 0 ? sortedGoalDates[0] : null;
 
@@ -1545,7 +1545,7 @@ export const AppProvider = ({ children }) => {
     const updatedGoalDates = recalculateGoalCompletedDates(updatedGoal);
     const goalSchedule = getGoalScheduledDays(updatedGoal);
     const newGoalStreak = calculateGoalStreak(updatedGoalDates, goalSchedule);
-    const newGoalMissed = calculateGoalConsecutiveMissedDays(updatedGoalDates, goalSchedule);
+    const newGoalMissed = calculateGoalConsecutiveMissedDays(updatedGoalDates, goalSchedule, targetGoal.startDate || targetGoal.createdAt);
     const sortedGoalDates = [...updatedGoalDates].sort((a, b) => b.localeCompare(a));
     const newGoalLastCompleted = sortedGoalDates.length > 0 ? sortedGoalDates[0] : null;
 
@@ -1581,7 +1581,7 @@ export const AppProvider = ({ children }) => {
     const updatedGoalDates = recalculateGoalCompletedDates(updatedGoal);
     const goalSchedule = getGoalScheduledDays(updatedGoal);
     const newGoalStreak = calculateGoalStreak(updatedGoalDates, goalSchedule);
-    const newGoalMissed = calculateGoalConsecutiveMissedDays(updatedGoalDates, goalSchedule);
+    const newGoalMissed = calculateGoalConsecutiveMissedDays(updatedGoalDates, goalSchedule, goal.startDate || goal.createdAt);
     const sortedGoalDates = [...updatedGoalDates].sort((a, b) => b.localeCompare(a));
     const newGoalLastCompleted = sortedGoalDates.length > 0 ? sortedGoalDates[0] : null;
 
@@ -1637,7 +1637,7 @@ export const AppProvider = ({ children }) => {
         }
 
         const newStreak = calculateStreakFromHistory(updatedDates, h.scheduleDays || [], goal.completedDates || [], h.createdAt);
-        const newMissed = calculateConsecutiveMissedDays(updatedDates, h.scheduleDays || []);
+        const newMissed = calculateConsecutiveMissedDays(updatedDates, h.scheduleDays || [], h.createdAt);
         const sortedDates = [...updatedDates].sort((a, b) => b.localeCompare(a));
         const newLastCompleted = sortedDates.length > 0 ? sortedDates[0] : null;
 
@@ -1676,7 +1676,7 @@ export const AppProvider = ({ children }) => {
     const updatedGoalDates = recalculateGoalCompletedDates(updatedGoalWithoutDates);
     const goalSchedule = getGoalScheduledDays(updatedGoalWithoutDates);
     const newGoalStreak = calculateGoalStreak(updatedGoalDates, goalSchedule);
-    const newGoalMissed = calculateGoalConsecutiveMissedDays(updatedGoalDates, goalSchedule);
+    const newGoalMissed = calculateGoalConsecutiveMissedDays(updatedGoalDates, goalSchedule, goal.startDate || goal.createdAt);
     const sortedGoalDates = [...updatedGoalDates].sort((a, b) => b.localeCompare(a));
     const newGoalLastCompleted = sortedGoalDates.length > 0 ? sortedGoalDates[0] : null;
 
@@ -1797,7 +1797,7 @@ export const AppProvider = ({ children }) => {
         }
 
         const newStreak = calculateStreakFromHistory(updatedDates, h.scheduleDays || [], goal.completedDates || [], h.createdAt);
-        const newMissed = calculateConsecutiveMissedDays(updatedDates, h.scheduleDays || []);
+        const newMissed = calculateConsecutiveMissedDays(updatedDates, h.scheduleDays || [], h.createdAt);
         const sortedDates = [...updatedDates].sort((a, b) => b.localeCompare(a));
         const newLastCompleted = sortedDates.length > 0 ? sortedDates[0] : null;
 
@@ -1829,7 +1829,7 @@ export const AppProvider = ({ children }) => {
     const updatedGoalDates = recalculateGoalCompletedDates(updatedGoalWithoutDates);
     const goalSchedule = getGoalScheduledDays(updatedGoalWithoutDates);
     const newGoalStreak = calculateGoalStreak(updatedGoalDates, goalSchedule);
-    const newGoalMissed = calculateGoalConsecutiveMissedDays(updatedGoalDates, goalSchedule);
+    const newGoalMissed = calculateGoalConsecutiveMissedDays(updatedGoalDates, goalSchedule, goal.startDate || goal.createdAt);
     const sortedGoalDates = [...updatedGoalDates].sort((a, b) => b.localeCompare(a));
     const newGoalLastCompleted = sortedGoalDates.length > 0 ? sortedGoalDates[0] : null;
 
@@ -1907,7 +1907,7 @@ export const AppProvider = ({ children }) => {
         }
 
         const newStreak = calculateStreakFromHistory(updatedDates, h.scheduleDays || [], goal.completedDates || [], h.createdAt);
-        const newMissed = calculateConsecutiveMissedDays(updatedDates, h.scheduleDays || []);
+        const newMissed = calculateConsecutiveMissedDays(updatedDates, h.scheduleDays || [], h.createdAt);
         const sortedDates = [...updatedDates].sort((a, b) => b.localeCompare(a));
         const newLastCompleted = sortedDates.length > 0 ? sortedDates[0] : null;
 
@@ -1944,7 +1944,7 @@ export const AppProvider = ({ children }) => {
     const updatedGoalDates = recalculateGoalCompletedDates(updatedGoalWithoutDates);
     const goalSchedule = getGoalScheduledDays(updatedGoalWithoutDates);
     const newGoalStreak = calculateGoalStreak(updatedGoalDates, goalSchedule);
-    const newGoalMissed = calculateGoalConsecutiveMissedDays(updatedGoalDates, goalSchedule);
+    const newGoalMissed = calculateGoalConsecutiveMissedDays(updatedGoalDates, goalSchedule, goal.startDate || goal.createdAt);
     const sortedGoalDates = [...updatedGoalDates].sort((a, b) => b.localeCompare(a));
     const newGoalLastCompleted = sortedGoalDates.length > 0 ? sortedGoalDates[0] : null;
 

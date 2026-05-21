@@ -246,6 +246,15 @@ export const calculateStreakFromHistory = (completedDates, scheduleDays = [], pa
 };
 
 /**
+ * Helper to normalize any createdAt / created_at date field to YYYY-MM-DD
+ */
+const normalizeDateStr = (dateVal, fallbackDateStr) => {
+  if (!dateVal) return fallbackDateStr;
+  const str = String(dateVal);
+  return str.includes('T') ? str.split('T')[0] : str;
+};
+
+/**
  * Derives the exact list of completed dates for a Goal based on its habits' histories.
  */
 export const recalculateGoalCompletedDates = (goal) => {
@@ -263,7 +272,7 @@ export const recalculateGoalCompletedDates = (goal) => {
   if (allCompletedDates.length > 0) {
     const earliestHabitDate = [...allCompletedDates].sort()[0];
     if (earliestHabitDate < startStr) {
-      startStr = earliestHabitDate;
+      startStr =earliestHabitDate;
     }
   }
 
@@ -275,7 +284,17 @@ export const recalculateGoalCompletedDates = (goal) => {
 
   const completedDates = [];
   for (const dateStr of datesToTest) {
-    const scheduledHabits = habits.filter(h => {
+    // Only evaluate habits that were active (created) on or before dateStr
+    const activeHabits = habits.filter(h => {
+      const createdDateStr = normalizeDateStr(h.createdAt || h.created_at, startStr);
+      return dateStr >= createdDateStr;
+    });
+
+    if (activeHabits.length === 0) {
+      continue;
+    }
+
+    const scheduledHabits = activeHabits.filter(h => {
       if (!h.scheduleDays || h.scheduleDays.length === 0) return true;
       const dateObj = parseLocalDate(dateStr);
       const dayName = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dateObj.getDay()];
@@ -311,15 +330,19 @@ export const recalculateGoalCompletedDates = (goal) => {
 /**
  * Calculates the exact consecutive missed days for a habit.
  */
-export const calculateConsecutiveMissedDays = (completedDates, scheduleDays = []) => {
+export const calculateConsecutiveMissedDays = (completedDates, scheduleDays = [], createdAt = null) => {
   if (!completedDates || completedDates.length === 0) return 0;
   const completedSet = new Set(completedDates);
   const todayStr = TODAY();
+  const createdStr = createdAt ? (createdAt.includes('T') ? createdAt.split('T')[0] : createdAt) : null;
 
   let missed = 0;
   let checkDate = addDays(todayStr, -1);
   
   for (let i = 1; i <= 30; i++) {
+    if (createdStr && checkDate < createdStr) {
+      break; // stop evaluating before habit creation date
+    }
     const isCompleted = completedSet.has(checkDate);
     const dateObj = parseLocalDate(checkDate);
     const dayName = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dateObj.getDay()];
@@ -341,15 +364,19 @@ export const calculateConsecutiveMissedDays = (completedDates, scheduleDays = []
 /**
  * Calculates the consecutive missed days for a goal.
  */
-export const calculateGoalConsecutiveMissedDays = (goalCompletedDates, scheduleDays = []) => {
+export const calculateGoalConsecutiveMissedDays = (goalCompletedDates, scheduleDays = [], goalCreatedAt = null) => {
   if (!goalCompletedDates || goalCompletedDates.length === 0) return 0;
   const completedSet = new Set(goalCompletedDates);
   const todayStr = TODAY();
+  const createdStr = goalCreatedAt ? (goalCreatedAt.includes('T') ? goalCreatedAt.split('T')[0] : goalCreatedAt) : null;
 
   let missed = 0;
   let checkDate = addDays(todayStr, -1);
   
   for (let i = 1; i <= 30; i++) {
+    if (createdStr && checkDate < createdStr) {
+      break; // stop evaluating before goal creation date
+    }
     const isCompleted = completedSet.has(checkDate);
     const dateObj = parseLocalDate(checkDate);
     const dayName = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dateObj.getDay()];
@@ -364,7 +391,7 @@ export const calculateGoalConsecutiveMissedDays = (goalCompletedDates, scheduleD
     }
     checkDate = addDays(checkDate, -1);
   }
-  
+
   return missed;
 };
 
