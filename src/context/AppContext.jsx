@@ -328,8 +328,8 @@ export const AppProvider = ({ children }) => {
   const weeklyReport = useMemo(() => calculateWeeklyReport(taskLogs), [taskLogs]);
 
   const smartAlerts = useMemo(() =>
-    getSmartAlerts(accuracy, goals, tasks, weeklyReport),
-    [accuracy, goals, tasks, weeklyReport]
+    getSmartAlerts(accuracy, goals, tasks, weeklyReport, settings.dismissedInsights || []),
+    [accuracy, goals, tasks, weeklyReport, settings.dismissedInsights]
   );
 
   const alerts = useMemo(() => {
@@ -1618,14 +1618,29 @@ export const AppProvider = ({ children }) => {
 
     const updatedHabits = (goal.habits || []).map(h => {
       if (h.id === habitId) {
-        const newTime = Math.max(0, (h.timeSpent || 0) + minutes);
-        const wasCompleted = h.completed;
-        const target = h.targetTime ?? 15;
+        let updatedH = { ...h };
+        if (h.lastActiveDate !== today) {
+          updatedH.completed = false;
+          updatedH.currentCount = 0;
+          updatedH.timeSpent = 0;
+          if (h.isRecovering && h.originalTarget !== undefined) {
+            updatedH.targetTime = h.originalTarget;
+            updatedH.isRecovering = false;
+            delete updatedH.originalTarget;
+          }
+        }
+
+        const newTime = Math.max(0, (updatedH.timeSpent || 0) + minutes);
+        const wasCompleted = updatedH.completed;
+        const target = updatedH.targetTime ?? 15;
         const isDone = newTime >= target;
 
-        let updatedDates = h.completedDates ? [...h.completedDates] : [];
-        if (h.lastCompletedDate && !updatedDates.includes(h.lastCompletedDate)) {
-          updatedDates.push(h.lastCompletedDate);
+        updatedH.timeSpent = newTime;
+        updatedH.completed = isDone;
+
+        let updatedDates = updatedH.completedDates ? [...updatedH.completedDates] : [];
+        if (updatedH.lastCompletedDate && !updatedDates.includes(updatedH.lastCompletedDate)) {
+          updatedDates.push(updatedH.lastCompletedDate);
         }
 
         if (isDone) {
@@ -1636,29 +1651,24 @@ export const AppProvider = ({ children }) => {
           updatedDates = updatedDates.filter(d => d !== today);
         }
 
-        const newStreak = calculateStreakFromHistory(updatedDates, h.scheduleDays || [], goal.completedDates || [], h.createdAt);
-        const newMissed = calculateConsecutiveMissedDays(updatedDates, h.scheduleDays || [], h.createdAt);
+        const newStreak = calculateStreakFromHistory(updatedDates, updatedH.scheduleDays || [], goal.completedDates || [], updatedH.createdAt);
+        const newMissed = calculateConsecutiveMissedDays(updatedDates, updatedH.scheduleDays || [], updatedH.createdAt);
         const sortedDates = [...updatedDates].sort((a, b) => b.localeCompare(a));
         const newLastCompleted = sortedDates.length > 0 ? sortedDates[0] : null;
 
-        let updatedH = {
-          ...h,
-          timeSpent: newTime,
-          completed: isDone,
-          completedDates: updatedDates,
-          streak: newStreak,
-          lastCompletedDate: newLastCompleted,
-          missedDays: newMissed,
-          lastActiveDate: today,
-          lastActionTimestamp: new Date().toISOString()
-        };
+        updatedH.completedDates = updatedDates;
+        updatedH.streak = newStreak;
+        updatedH.lastCompletedDate = newLastCompleted;
+        updatedH.missedDays = newMissed;
+        updatedH.lastActiveDate = today;
+        updatedH.lastActionTimestamp = new Date().toISOString();
 
         if (isDone && !wasCompleted) {
           // XP: Habit completed via time
           awardXP(XP_SOURCES.HABIT_COMPLETE, `Completed: ${h.title}`);
           incrementCompletions();
           // Comeback detection
-          if ((h.missedDays || 0) >= 2) recordComeback();
+          if ((updatedH.missedDays || 0) >= 2) recordComeback();
         }
 
         habitToUpdate = updatedH;
@@ -1765,27 +1775,39 @@ export const AppProvider = ({ children }) => {
     const updatedHabits = (goal.habits || []).map(h => {
       if (h.id === habitId) {
         let updatedH = { ...h };
-        let isDone = false;
-        let wasCompleted = h.completed;
+        if (h.lastActiveDate !== today) {
+          updatedH.completed = false;
+          updatedH.currentCount = 0;
+          updatedH.timeSpent = 0;
+          if (h.isRecovering && h.originalTarget !== undefined) {
+            const targetKey = h.type === 'count' ? 'targetCount' : 'targetTime';
+            updatedH[targetKey] = h.originalTarget;
+            updatedH.isRecovering = false;
+            delete updatedH.originalTarget;
+          }
+        }
 
-        if (h.type === 'check') {
-          updatedH.completed = !h.completed;
+        let isDone = false;
+        let wasCompleted = updatedH.completed;
+
+        if (updatedH.type === 'check') {
+          updatedH.completed = !updatedH.completed;
           isDone = updatedH.completed;
-        } else if (h.type === 'count') {
-          const target = h.targetCount || 10;
-          updatedH.currentCount = (h.currentCount >= target) ? 0 : target;
+        } else if (updatedH.type === 'count') {
+          const target = updatedH.targetCount || 10;
+          updatedH.currentCount = (updatedH.currentCount >= target) ? 0 : target;
           updatedH.completed = updatedH.currentCount >= target;
           isDone = updatedH.completed;
         } else {
-          const target = h.targetTime ?? 15;
-          updatedH.timeSpent = (h.timeSpent >= target) ? 0 : target;
+          const target = updatedH.targetTime ?? 15;
+          updatedH.timeSpent = (updatedH.timeSpent >= target) ? 0 : target;
           updatedH.completed = updatedH.timeSpent >= target;
           isDone = updatedH.completed;
         }
 
-        let updatedDates = h.completedDates ? [...h.completedDates] : [];
-        if (h.lastCompletedDate && !updatedDates.includes(h.lastCompletedDate)) {
-          updatedDates.push(h.lastCompletedDate);
+        let updatedDates = updatedH.completedDates ? [...updatedH.completedDates] : [];
+        if (updatedH.lastCompletedDate && !updatedDates.includes(updatedH.lastCompletedDate)) {
+          updatedDates.push(updatedH.lastCompletedDate);
         }
 
         if (isDone) {
@@ -1796,8 +1818,8 @@ export const AppProvider = ({ children }) => {
           updatedDates = updatedDates.filter(d => d !== today);
         }
 
-        const newStreak = calculateStreakFromHistory(updatedDates, h.scheduleDays || [], goal.completedDates || [], h.createdAt);
-        const newMissed = calculateConsecutiveMissedDays(updatedDates, h.scheduleDays || [], h.createdAt);
+        const newStreak = calculateStreakFromHistory(updatedDates, updatedH.scheduleDays || [], goal.completedDates || [], updatedH.createdAt);
+        const newMissed = calculateConsecutiveMissedDays(updatedDates, updatedH.scheduleDays || [], updatedH.createdAt);
         const sortedDates = [...updatedDates].sort((a, b) => b.localeCompare(a));
         const newLastCompleted = sortedDates.length > 0 ? sortedDates[0] : null;
 
@@ -1811,7 +1833,7 @@ export const AppProvider = ({ children }) => {
         if (isDone && !wasCompleted) {
           awardXP(XP_SOURCES.HABIT_COMPLETE, `Completed: ${h.title}`);
           incrementCompletions();
-          if ((h.missedDays || 0) >= 2) recordComeback();
+          if ((updatedH.missedDays || 0) >= 2) recordComeback();
         }
 
         habitToUpdate = updatedH;
@@ -1888,14 +1910,29 @@ export const AppProvider = ({ children }) => {
 
     const updatedHabits = (goal.habits || []).map(h => {
       if (h.id === habitId) {
-        const newCount = Math.max(0, (h.currentCount || 0) + delta);
-        const wasCompleted = h.completed;
-        const target = h.targetCount || 10;
+        let updatedH = { ...h };
+        if (h.lastActiveDate !== today) {
+          updatedH.completed = false;
+          updatedH.currentCount = 0;
+          updatedH.timeSpent = 0;
+          if (h.isRecovering && h.originalTarget !== undefined) {
+            updatedH.targetCount = h.originalTarget;
+            updatedH.isRecovering = false;
+            delete updatedH.originalTarget;
+          }
+        }
+
+        const newCount = Math.max(0, (updatedH.currentCount || 0) + delta);
+        const wasCompleted = updatedH.completed;
+        const target = updatedH.targetCount || 10;
         const isDone = newCount >= target;
 
-        let updatedDates = h.completedDates ? [...h.completedDates] : [];
-        if (h.lastCompletedDate && !updatedDates.includes(h.lastCompletedDate)) {
-          updatedDates.push(h.lastCompletedDate);
+        updatedH.currentCount = newCount;
+        updatedH.completed = isDone;
+
+        let updatedDates = updatedH.completedDates ? [...updatedH.completedDates] : [];
+        if (updatedH.lastCompletedDate && !updatedDates.includes(updatedH.lastCompletedDate)) {
+          updatedDates.push(updatedH.lastCompletedDate);
         }
 
         if (isDone) {
@@ -1906,27 +1943,22 @@ export const AppProvider = ({ children }) => {
           updatedDates = updatedDates.filter(d => d !== today);
         }
 
-        const newStreak = calculateStreakFromHistory(updatedDates, h.scheduleDays || [], goal.completedDates || [], h.createdAt);
-        const newMissed = calculateConsecutiveMissedDays(updatedDates, h.scheduleDays || [], h.createdAt);
+        const newStreak = calculateStreakFromHistory(updatedDates, updatedH.scheduleDays || [], goal.completedDates || [], updatedH.createdAt);
+        const newMissed = calculateConsecutiveMissedDays(updatedDates, updatedH.scheduleDays || [], updatedH.createdAt);
         const sortedDates = [...updatedDates].sort((a, b) => b.localeCompare(a));
         const newLastCompleted = sortedDates.length > 0 ? sortedDates[0] : null;
 
-        let updatedH = {
-          ...h,
-          currentCount: newCount,
-          completed: isDone,
-          completedDates: updatedDates,
-          streak: newStreak,
-          lastCompletedDate: newLastCompleted,
-          missedDays: newMissed,
-          lastActiveDate: today,
-          lastActionTimestamp: new Date().toISOString()
-        };
+        updatedH.completedDates = updatedDates;
+        updatedH.streak = newStreak;
+        updatedH.lastCompletedDate = newLastCompleted;
+        updatedH.missedDays = newMissed;
+        updatedH.lastActiveDate = today;
+        updatedH.lastActionTimestamp = new Date().toISOString();
 
         if (isDone && !wasCompleted) {
           awardXP(XP_SOURCES.HABIT_COMPLETE, `Completed: ${h.title}`);
           incrementCompletions();
-          if ((h.missedDays || 0) >= 2) recordComeback();
+          if ((updatedH.missedDays || 0) >= 2) recordComeback();
         }
 
         habitToUpdate = updatedH;
@@ -2047,30 +2079,43 @@ export const AppProvider = ({ children }) => {
     }
 
     const today = TODAY();
-    let isDone = false;
-    let wasCompleted = t.completed;
+    const isDaily = (t.schedule_type || t.type) === 'daily';
     let updated = { ...t };
-    const cType = t.completionType || t.type || 'check';
+
+    if (isDaily && t.lastActiveDate !== today) {
+      updated.completed = false;
+      updated.currentCount = 0;
+      updated.timeSpent = 0;
+      if (t.isRecovering && t.originalTarget !== undefined) {
+        const targetKey = t.completionType === 'count' ? 'targetCount' : 'targetTime';
+        updated[targetKey] = t.originalTarget;
+        updated.isRecovering = false;
+        delete updated.originalTarget;
+      }
+    }
+
+    let isDone = false;
+    let wasCompleted = updated.completed;
+    const cType = updated.completionType || updated.type || 'check';
 
     if (cType === 'check') {
-      updated.completed = !t.completed;
+      updated.completed = !updated.completed;
       isDone = updated.completed;
     } else if (cType === 'count') {
-      const target = t.targetCount || 10;
-      updated.currentCount = (t.currentCount >= target) ? 0 : target;
+      const target = updated.targetCount || 10;
+      updated.currentCount = (updated.currentCount >= target) ? 0 : target;
       updated.completed = updated.currentCount >= target;
       isDone = updated.completed;
     } else {
-      const target = t.targetTime ?? 30;
-      updated.timeSpent = (t.timeSpent >= target) ? 0 : target;
+      const target = updated.targetTime ?? 30;
+      updated.timeSpent = (updated.timeSpent >= target) ? 0 : target;
       updated.completed = updated.timeSpent >= target;
       isDone = updated.completed;
     }
 
-    const isDaily = (t.schedule_type || t.type) === 'daily';
-    let updatedDates = t.completedDates ? [...t.completedDates] : [];
-    if (t.lastCompletedDate && !updatedDates.includes(t.lastCompletedDate)) {
-      updatedDates.push(t.lastCompletedDate);
+    let updatedDates = updated.completedDates ? [...updated.completedDates] : [];
+    if (updated.lastCompletedDate && !updatedDates.includes(updated.lastCompletedDate)) {
+      updatedDates.push(updated.lastCompletedDate);
     }
 
     if (isDone) {
@@ -2088,6 +2133,7 @@ export const AppProvider = ({ children }) => {
     updated.completedDates = updatedDates;
     updated.currentStreak = newStreak;
     updated.lastCompletedDate = newLastCompleted;
+    updated.lastActiveDate = today;
     if (isDone) {
       updated.missedDays = 0;
     }
@@ -2122,17 +2168,31 @@ export const AppProvider = ({ children }) => {
     }
 
     const today = TODAY();
-    const newCount = Math.max(0, (t.currentCount || 0) + delta);
-    const wasCompleted = t.completed;
-    const target = t.targetCount || 10;
-    const isDone = newCount >= target;
-
-    let updated = { ...t, currentCount: newCount, completed: isDone };
+    let updated = { ...t };
     const isDaily = (t.schedule_type || t.type) === 'daily';
 
-    let updatedDates = t.completedDates ? [...t.completedDates] : [];
-    if (t.lastCompletedDate && !updatedDates.includes(t.lastCompletedDate)) {
-      updatedDates.push(t.lastCompletedDate);
+    if (isDaily && t.lastActiveDate !== today) {
+      updated.completed = false;
+      updated.currentCount = 0;
+      updated.timeSpent = 0;
+      if (t.isRecovering && t.originalTarget !== undefined) {
+        updated.targetCount = t.originalTarget;
+        updated.isRecovering = false;
+        delete updated.originalTarget;
+      }
+    }
+
+    const newCount = Math.max(0, (updated.currentCount || 0) + delta);
+    const wasCompleted = updated.completed;
+    const target = updated.targetCount || 10;
+    const isDone = newCount >= target;
+
+    updated.currentCount = newCount;
+    updated.completed = isDone;
+
+    let updatedDates = updated.completedDates ? [...updated.completedDates] : [];
+    if (updated.lastCompletedDate && !updatedDates.includes(updated.lastCompletedDate)) {
+      updatedDates.push(updated.lastCompletedDate);
     }
 
     if (isDone) {
@@ -2150,6 +2210,7 @@ export const AppProvider = ({ children }) => {
     updated.completedDates = updatedDates;
     updated.currentStreak = newStreak;
     updated.lastCompletedDate = newLastCompleted;
+    updated.lastActiveDate = today;
     if (isDone) {
       updated.missedDays = 0;
     }
@@ -2183,17 +2244,31 @@ export const AppProvider = ({ children }) => {
     }
 
     const today = TODAY();
-    const newTime = Math.max(0, (t.timeSpent || 0) + mins);
-    const wasCompleted = t.completed;
-    const target = t.targetTime ?? 15;
-    const isDone = newTime >= target;
-
-    let updated = { ...t, timeSpent: newTime, completed: isDone };
+    let updated = { ...t };
     const isDaily = (t.schedule_type || t.type) === 'daily';
 
-    let updatedDates = t.completedDates ? [...t.completedDates] : [];
-    if (t.lastCompletedDate && !updatedDates.includes(t.lastCompletedDate)) {
-      updatedDates.push(t.lastCompletedDate);
+    if (isDaily && t.lastActiveDate !== today) {
+      updated.completed = false;
+      updated.currentCount = 0;
+      updated.timeSpent = 0;
+      if (t.isRecovering && t.originalTarget !== undefined) {
+        updated.targetTime = t.originalTarget;
+        updated.isRecovering = false;
+        delete updated.originalTarget;
+      }
+    }
+
+    const newTime = Math.max(0, (updated.timeSpent || 0) + mins);
+    const wasCompleted = updated.completed;
+    const target = updated.targetTime ?? 15;
+    const isDone = newTime >= target;
+
+    updated.timeSpent = newTime;
+    updated.completed = isDone;
+
+    let updatedDates = updated.completedDates ? [...updated.completedDates] : [];
+    if (updated.lastCompletedDate && !updatedDates.includes(updated.lastCompletedDate)) {
+      updatedDates.push(updated.lastCompletedDate);
     }
 
     if (isDone) {
@@ -2211,6 +2286,7 @@ export const AppProvider = ({ children }) => {
     updated.completedDates = updatedDates;
     updated.currentStreak = newStreak;
     updated.lastCompletedDate = newLastCompleted;
+    updated.lastActiveDate = today;
     if (isDone) {
       updated.missedDays = 0;
     }

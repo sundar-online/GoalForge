@@ -246,9 +246,10 @@ export const generateRecoveryStrategies = (goals, tasks) => {
     ...tasks.filter((t) => t.type === 'daily').map((t) => ({ ...t, isHabit: false, streak: t.currentStreak || 0 })),
   ];
 
-  // Identify items that have missed exactly 2 days, are not done today, and are not already in recovery mode
+  // Identify items that have missed 2 or more days, have an active streak, are not done today, and are not already in recovery mode
   const criticalItems = allItems.filter((item) => 
-    (item.missedDays || 0) === 2 && 
+    (item.missedDays || 0) >= 2 && 
+    (item.streak || 0) > 0 &&
     !isItemDoneToday(item) && 
     !item.isRecovering
   );
@@ -298,7 +299,7 @@ export const generateRecoveryStrategies = (goals, tasks) => {
       type: 'recovery',
       priority: 'high',
       title: '🆘 Streak Emergency!',
-      message: `"${item.title}" is on a 2-day miss window. To protect your streak, use our "Micro-Habit Plan" to complete just 30% of the target today.`,
+      message: `"${item.title}" is on a ${item.missedDays}-day miss window. To protect your streak, use our "Micro-Habit Plan" to complete just 30% of the target today.`,
       icon: '🆘',
       actionLabel: 'Accept Recovery Plan',
       recoveryPlan: {

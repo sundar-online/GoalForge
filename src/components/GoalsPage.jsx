@@ -339,13 +339,29 @@ const HabitRow = ({ habit, goalId, logHabitTime, deleteHabit, toggleHabitCheck, 
   const scheduledToday = isHabitScheduledToday(habit);
   const hasSchedule = habit.scheduleDays && habit.scheduleDays.length > 0;
 
-  let done = false;
-  if (isCheck) done = habit.completed;
-  else if (isCount) done = (habit.currentCount || 0) >= (habit.targetCount || 10);
-  else done = (habit.timeSpent || 0) >= (habit.targetTime || 15);
+  const todayStr = TODAY();
+  const hasBeenActiveToday = habit.lastActiveDate === todayStr;
 
-  const target = isCount ? habit.targetCount : (habit.targetTime || 15);
-  const current = isCount ? habit.currentCount : (habit.timeSpent || 0);
+  let done = false;
+  let target = 0;
+  let current = 0;
+
+  if (hasBeenActiveToday) {
+    if (isCheck) done = habit.completed;
+    else if (isCount) done = (habit.currentCount || 0) >= (habit.targetCount || 10);
+    else done = (habit.timeSpent || 0) >= (habit.targetTime || 15);
+    target = isCount ? habit.targetCount : (habit.targetTime || 15);
+    current = isCount ? habit.currentCount : (habit.timeSpent || 0);
+  } else {
+    done = false;
+    current = 0;
+    if (habit.isRecovering && habit.originalTarget !== undefined) {
+      target = habit.originalTarget;
+    } else {
+      target = isCount ? (habit.targetCount || 10) : (habit.targetTime || 15);
+    }
+  }
+
   const pct = Math.min(100, Math.round((current / (target || 1)) * 100));
 
   const Icon = isCheck ? Check : (isCount ? Layers : Clock);
@@ -941,8 +957,16 @@ export const GoalsPage = () => {
                           <div className="flex flex-col gap-2 sm:gap-2.5">
                             {goal.habits
                               .sort((a, b) => {
-                                const aDone = a.type === 'check' ? a.completed : (a.type === 'count' ? (a.currentCount >= (a.targetCount ?? 10)) : (a.timeSpent >= (a.targetTime ?? 15)));
-                                const bDone = b.type === 'check' ? b.completed : (b.type === 'count' ? (b.currentCount >= (b.targetCount ?? 10)) : (b.timeSpent >= (b.targetTime ?? 15)));
+                                const todayStr = TODAY();
+                                const isHabitDoneVisual = (h) => {
+                                  const hasBeenActiveToday = h.lastActiveDate === todayStr;
+                                  if (!hasBeenActiveToday) return false;
+                                  if (h.type === 'check') return h.completed;
+                                  if (h.type === 'count') return (h.currentCount || 0) >= (h.targetCount ?? 10);
+                                  return (h.timeSpent || 0) >= (h.targetTime ?? 15);
+                                };
+                                const aDone = isHabitDoneVisual(a);
+                                const bDone = isHabitDoneVisual(b);
                                 if (aDone !== bDone) return aDone ? 1 : -1;
                                 return 0;
                               })

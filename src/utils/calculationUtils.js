@@ -158,13 +158,48 @@ export const calculateWeeklyReport = (taskLogs) => {
   };
 };
 
-export const getSmartAlerts = (accuracy, goals = [], tasks = [], weeklyReport = {}) => {
+export const getSmartAlerts = (accuracy, goals = [], tasks = [], weeklyReport = {}, dismissedInsights = []) => {
   const alerts = [];
   try {
     // 1. Streak Alert
-    const streakAboutToBreak = goals.some(g => (g?.missedDays || 0) === 2) || 
-                               tasks.some(t => (t?.type === 'daily' || t?.schedule_type === 'daily') && (t?.missedDays || 0) === 2);
-    if (streakAboutToBreak) alerts.push({ type: 'warning', message: "⚠ You may break your streak today" });
+    const hasHabitRisk = goals.some(g => 
+      (g.habits || []).some(h => {
+        const isAtRisk = (h.missedDays || 0) >= 2 && (h.streak || 0) > 0 && !isHabitDoneToday(h) && !h.isRecovering;
+        if (!isAtRisk) return false;
+        // Check if dismissed
+        const isDismissed = dismissedInsights.some(d => 
+          d.startsWith(`recovery_${h.id}__`) || d.startsWith(`recovery_grouped_${h.id}__`)
+        );
+        return !isDismissed;
+      })
+    );
+
+    const hasTaskRisk = tasks.some(t => {
+      const isAtRisk = (t.type === 'daily' || t.schedule_type === 'daily') && 
+                       (t.missedDays || 0) >= 2 && 
+                       (t.currentStreak || 0) > 0 && 
+                       !isTaskDone(t) && 
+                       !t.isRecovering;
+      if (!isAtRisk) return false;
+      const isDismissed = dismissedInsights.some(d => 
+        d.startsWith(`recovery_${t.id}__`) || d.startsWith(`recovery_grouped_${t.id}__`)
+      );
+      return !isDismissed;
+    });
+
+    const hasGoalRisk = goals.some(g => {
+      const isAtRisk = (g.missedDays || 0) >= 2 && (g.streak || 0) > 0 && !isGoalDoneToday(g) && !g.isRecovering;
+      if (!isAtRisk) return false;
+      const isDismissed = dismissedInsights.some(d => 
+        d.startsWith(`recovery_${g.id}__`) || d.startsWith(`recovery_grouped_${g.id}__`)
+      );
+      return !isDismissed;
+    });
+
+    const streakAboutToBreak = hasHabitRisk || hasTaskRisk || hasGoalRisk;
+    if (streakAboutToBreak) {
+      alerts.push({ type: 'warning', message: "⚠ Your streak is at risk" });
+    }
 
     // 2. Low Productivity Alert
     if (accuracy < 50) alerts.push({ type: 'danger', message: "📉 Low productivity detected" });
@@ -189,16 +224,6 @@ export const calculateStreakFromHistory = (completedDates, scheduleDays = [], pa
 
   const completedSet = new Set(completedDates);
   const todayStr = TODAY();
-
-  // Area 3: Inherit goal completion history before habit creation date safely
-  if (habitCreatedAt && parentGoalCompletedDates && parentGoalCompletedDates.length > 0) {
-    const habitCreatedDateStr = habitCreatedAt.split('T')[0];
-    parentGoalCompletedDates.forEach(date => {
-      if (date < habitCreatedDateStr) {
-        completedSet.add(date);
-      }
-    });
-  }
 
   if (completedSet.size === 0) return 0;
 

@@ -281,14 +281,28 @@ export const DailyTasks = () => {
         <AnimatePresence initial={false}>
           {/* Active / Uncompleted Tasks */}
           {activeTasks.map(task => {
+            const todayStr = TODAY();
+            const isDaily = (task.schedule_type || task.type) === 'daily';
+            const hasBeenActiveToday = task.lastActiveDate === todayStr;
             const tDone = false;
             const cType = task.completionType || task.type || 'check';
             const isTime = cType === 'time';
             const isCount = cType === 'count';
             const isCheck = cType === 'check';
 
-            const target = isCount ? (task.targetCount ?? 10) : (task.targetTime ?? 30);
-            const current = isCount ? (task.currentCount || 0) : (task.timeSpent || 0);
+            let target = 0;
+            let current = 0;
+            if (isDaily && !hasBeenActiveToday) {
+              current = 0;
+              if (task.isRecovering && task.originalTarget !== undefined) {
+                target = task.originalTarget;
+              } else {
+                target = isCount ? (task.targetCount ?? 10) : (task.targetTime ?? 30);
+              }
+            } else {
+              target = isCount ? (task.targetCount ?? 10) : (task.targetTime ?? 30);
+              current = isCount ? (task.currentCount || 0) : (task.timeSpent || 0);
+            }
             const pct = isCheck ? 0 : Math.min(100, Math.round((current / (target || 1)) * 100));
             const sType = task.type || 'daily';
 
@@ -345,14 +359,28 @@ export const DailyTasks = () => {
 
           {/* Completed / Done Tasks (Lazy Loaded / Windowed) */}
           {visibleCompletedTasks.map(task => {
+            const todayStr = TODAY();
+            const isDaily = (task.schedule_type || task.type) === 'daily';
+            const hasBeenActiveToday = task.lastActiveDate === todayStr;
             const tDone = true;
             const cType = task.completionType || task.type || 'check';
             const isTime = cType === 'time';
             const isCount = cType === 'count';
             const isCheck = cType === 'check';
 
-            const target = isCount ? (task.targetCount ?? 10) : (task.targetTime ?? 30);
-            const current = isCount ? (task.currentCount || 0) : (task.timeSpent || 0);
+            let target = 0;
+            let current = 0;
+            if (isDaily && !hasBeenActiveToday) {
+              current = 0;
+              if (task.isRecovering && task.originalTarget !== undefined) {
+                target = task.originalTarget;
+              } else {
+                target = isCount ? (task.targetCount ?? 10) : (task.targetTime ?? 30);
+              }
+            } else {
+              target = isCount ? (task.targetCount ?? 10) : (task.targetTime ?? 30);
+              current = isCount ? (task.currentCount || 0) : (task.timeSpent || 0);
+            }
             const pct = isCheck ? 0 : Math.min(100, Math.round((current / (target || 1)) * 100));
             const sType = task.type || 'daily';
 
