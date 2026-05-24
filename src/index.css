@@ -282,4 +282,59 @@ body {
   scale: none !important;
 }
 
+/* --- Responsive Safe Area Layout Classes --- */
+.safe-content-container {
+  padding-left: 0.75rem; /* px-3 */
+  padding-right: 0.75rem;
+  padding-top: calc(1rem + env(safe-area-inset-top));
+  padding-bottom: calc(11rem + env(safe-area-inset-bottom));
+}
+
+@media (min-width: 640px) {
+  .safe-content-container {
+    padding-left: 1.5rem; /* px-6 */
+    padding-right: 1.5rem;
+    padding-top: 1.5rem;
+    padding-bottom: 11rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .safe-content-container {
+    padding-left: 2.5rem; /* px-10 */
+    padding-right: 2.5rem;
+    padding-top: 2.5rem;
+    padding-bottom: 2.5rem;
+  }
+}
+
+.safe-bottom-nav {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  width: calc(100% - 32px);
+  max-width: 28rem; /* max-w-md */
+  bottom: calc(1.5rem + env(safe-area-inset-bottom));
+}
+
+.safe-notes-fab {
+  position: fixed;
+  right: 1.5rem; /* right-6 */
+  bottom: calc(6rem + env(safe-area-inset-bottom));
+  z-index: 50;
+}
+@media (min-width: 768px) {
+  .safe-notes-fab {
+    right: 2rem;
+    bottom: 6rem;
+  }
+}
+@media (min-width: 1024px) {
+  .safe-notes-fab {
+    right: 3rem;
+    bottom: 6rem;
+  }
+}
+
 

@@ -721,7 +721,7 @@ export const FocusMode = () => {
         </div>
 
         {/* ── MIDDLE COLUMN: FOCUS VISUAL CENTERPIECE ── */}
-        <div className="lg:col-span-4 flex flex-col items-center justify-center text-center space-y-5 bg-bg-card border border-border-light rounded-[40px] p-6 sm:p-8 shadow-xl order-1 lg:order-2">
+        <div className="lg:col-span-4 flex flex-col items-center justify-center text-center space-y-5 bg-bg-card border border-border-light rounded-[40px] p-4 sm:p-8 shadow-xl order-1 lg:order-2">
           {/* Header */}
           <div className="space-y-1 w-full">
             <span className="inline-block bg-accent-blue/10 text-accent-blue text-[10px] font-black uppercase tracking-widest px-4 py-1.5 rounded-full shadow-xs">
@@ -843,22 +843,22 @@ export const FocusMode = () => {
         {/* ── RIGHT COLUMN: ANALYTICS & LOGS ── */}
         <div className="lg:col-span-4 space-y-5 order-3 lg:order-3 lg:sticky lg:top-6">
           {/* Stats ledger */}
-          <div className="grid grid-cols-3 gap-3 w-full">
-            <div className="bg-bg-card border border-border-light rounded-2xl p-4 text-center shadow-xs flex flex-col items-center justify-center min-h-[90px]">
-              <Flame size={18} className="text-amber-500 fill-current mb-1" />
-              <p className="text-[8px] font-black text-text-muted uppercase tracking-wider mb-0.5">Focus Streak</p>
-              <p className="text-sm sm:text-base font-black text-text-main leading-none mt-1">{streakCount} Days</p>
+          <div className="grid grid-cols-3 gap-1.5 sm:gap-3 w-full">
+            <div className="bg-bg-card border border-border-light rounded-2xl p-2 sm:p-4 text-center shadow-xs flex flex-col items-center justify-center min-h-[80px] sm:min-h-[90px] min-w-0">
+              <Flame size={16} className="text-amber-500 fill-current mb-0.5 sm:mb-1" />
+              <p className="text-[7px] sm:text-[8px] font-black text-text-muted uppercase tracking-wider mb-0.5 truncate max-w-full">Focus Streak</p>
+              <p className="text-xs sm:text-base font-black text-text-main leading-none mt-0.5 sm:mt-1 truncate">{streakCount}d</p>
             </div>
-            <div className="bg-bg-card border border-border-light rounded-2xl p-4 text-center shadow-xs flex flex-col items-center justify-center min-h-[90px]">
-              <Trophy size={18} className="text-yellow-500 mb-1" />
-              <p className="text-[8px] font-black text-text-muted uppercase tracking-wider mb-0.5">Yield Today</p>
-              <p className="text-sm sm:text-base font-black text-text-main leading-none mt-1">{todayCompletedCount} Blocks</p>
+            <div className="bg-bg-card border border-border-light rounded-2xl p-2 sm:p-4 text-center shadow-xs flex flex-col items-center justify-center min-h-[80px] sm:min-h-[90px] min-w-0">
+              <Trophy size={16} className="text-yellow-500 mb-0.5 sm:mb-1" />
+              <p className="text-[7px] sm:text-[8px] font-black text-text-muted uppercase tracking-wider mb-0.5 truncate max-w-full">Yield Today</p>
+              <p className="text-xs sm:text-base font-black text-text-main leading-none mt-0.5 sm:mt-1 truncate">{todayCompletedCount} Blks</p>
             </div>
-            <div className="bg-accent-blue rounded-2xl p-4 text-center shadow-lg shadow-accent-blue/15 flex flex-col items-center justify-center min-h-[90px]">
-              <Calendar size={18} className="text-white/80 mb-1" />
-              <p className="text-[8px] font-black text-white/60 uppercase tracking-wider mb-0.5">Lifetime Time</p>
-              <p className="text-sm sm:text-base font-black text-white leading-none mt-1">
-                {Math.floor(focusTime / 3600)}h {Math.floor((focusTime % 3600) / 60)}m
+            <div className="bg-accent-blue rounded-2xl p-2 sm:p-4 text-center shadow-lg shadow-accent-blue/15 flex flex-col items-center justify-center min-h-[80px] sm:min-h-[90px] min-w-0">
+              <Calendar size={16} className="text-white/80 mb-0.5 sm:mb-1" />
+              <p className="text-[7px] sm:text-[8px] font-black text-white/60 uppercase tracking-wider mb-0.5 truncate max-w-full">Lifetime</p>
+              <p className="text-[10px] sm:text-base font-black text-white leading-none mt-0.5 sm:mt-1 truncate">
+                {Math.floor(focusTime / 3600)}h{Math.floor((focusTime % 3600) / 60)}m
               </p>
             </div>
           </div>

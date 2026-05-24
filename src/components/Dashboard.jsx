@@ -168,7 +168,7 @@ const QuickThoughtsWidget = () => {
                       {/* Delete Action */}
                       <button 
                         onClick={() => deleteQuickThought(thought.id)}
-                        className="text-text-muted hover:text-red-500 opacity-0 group-hover:opacity-100 p-1 rounded-lg hover:bg-red-500/10 transition-all shrink-0 flex items-center justify-center"
+                        className="text-text-muted hover:text-red-500 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 p-1 rounded-lg hover:bg-red-500/10 transition-all shrink-0 flex items-center justify-center"
                       >
                         <Trash2 size={14} />
                       </button>
@@ -375,19 +375,19 @@ export const Dashboard = ({ setView }) => {
         <div className="lg:col-span-8 flex flex-col gap-6 lg:gap-8">
           
           {/* Discipline + XP Hero Card */}
-          <section className="bg-gradient-to-br from-bg-dark-elem to-[#1e1e2e] rounded-[32px] p-6 md:p-8 shadow-2xl relative overflow-hidden group">
+          <section className="bg-gradient-to-br from-bg-dark-elem to-[#1e1e2e] rounded-[32px] p-4 sm:p-6 md:p-8 shadow-2xl relative overflow-hidden group">
             <div className="absolute -top-10 -right-10 opacity-10 group-hover:scale-110 group-hover:rotate-12 transition-transform duration-700">
               <Trophy size={200} className="text-white" />
             </div>
             <div className="relative z-10">
-              <div className="flex justify-between items-start mb-6">
-                <div>
-                  <p className="text-[10px] font-black text-white/60 uppercase tracking-[0.15em] mb-1">Level {currentLevelInfo.level}</p>
-                  <h2 className="text-3xl md:text-4xl font-black text-white tracking-tighter">{currentLevelInfo.title}</h2>
+              <div className="flex justify-between items-start mb-5 sm:mb-6 gap-2 min-w-0">
+                <div className="min-w-0 flex-1 pr-2">
+                  <p className="text-[9px] sm:text-[10px] font-black text-white/60 uppercase tracking-[0.15em] mb-1">Level {currentLevelInfo.level}</p>
+                  <h2 className="text-xl min-[360px]:text-3xl md:text-4xl font-black text-white tracking-tighter truncate">{currentLevelInfo.title}</h2>
                 </div>
-                <div className="text-right">
-                  <div className="text-4xl md:text-5xl font-black text-white leading-none tracking-tighter">{xpData.totalXP.toLocaleString()}</div>
-                  <p className="text-[10px] font-black text-white/50 uppercase tracking-widest mt-1">Total XP</p>
+                <div className="text-right shrink-0">
+                  <div className="text-2xl min-[360px]:text-4xl md:text-5xl font-black text-white leading-none tracking-tighter">{xpData.totalXP.toLocaleString()}</div>
+                  <p className="text-[9px] sm:text-[10px] font-black text-white/50 uppercase tracking-widest mt-1">Total XP</p>
                 </div>
               </div>
 
@@ -416,9 +416,9 @@ export const Dashboard = ({ setView }) => {
                     <p className="text-lg font-black text-white leading-none tracking-tighter">{disciplineScore}</p>
                   </div>
                   {insights.length > 0 && (
-                    <div className="flex items-center gap-2.5 bg-white/5 px-3.5 py-2 rounded-xl border border-white/10 min-w-0 flex-1 animate-in fade-in">
+                    <div className="flex items-center gap-2 bg-white/5 px-2.5 py-2 rounded-xl border border-white/10 min-w-0 flex-1 animate-in fade-in">
                       <Sparkles size={14} className="text-accent-blue shrink-0 animate-pulse" />
-                      <p className="text-[11px] font-semibold text-white/80 leading-relaxed">{insights[0]}</p>
+                      <p className="text-[10px] sm:text-[11px] font-semibold text-white/80 leading-relaxed line-clamp-2">{insights[0]}</p>
                     </div>
                   )}
                 </div>

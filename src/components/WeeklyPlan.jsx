@@ -82,15 +82,15 @@ const QuickAddModal = ({ dateStr, dayLabel, onClose, addTask }) => {
             placeholder="Task for this day..."
             className="w-full bg-bg-input border border-border-light rounded-xl px-4 py-3.5 text-sm font-bold text-text-main placeholder:text-text-muted/40 focus:outline-none focus:border-accent-blue/50 transition-all"
           />
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-3 gap-1.5">
             {[
               { key: 'check', label: '✅ Check' },
               { key: 'time',  label: '⏱ Time'  },
               { key: 'count', label: '🔢 Count' },
             ].map(t => (
               <button key={t.key} type="button" onClick={() => setType(t.key)}
-                className={`py-2.5 rounded-xl text-xs font-black transition-all border-2 ${
-                  type === t.key ? 'border-accent-blue bg-accent-blue/10 text-accent-blue' : 'border-bg-input bg-bg-input text-text-muted'
+                className={`py-2 px-0.5 rounded-xl text-[10px] min-[360px]:text-xs font-black transition-all border-2 ${
+                  type === t.key ? 'border-accent-blue bg-accent-blue/10 text-accent-blue' : 'border-bg-input bg-bg-input text-text-muted hover:border-border-med'
                 }`}
               >
                 {t.label}
@@ -340,7 +340,7 @@ export const WeeklyPlan = () => {
             </p>
             <p className="text-lg font-black text-white tracking-tight">{weekRangeLabel}</p>
           </div>
-          <div className="flex gap-5">
+          <div className="flex flex-wrap gap-3 sm:gap-5 justify-between sm:justify-start w-full sm:w-auto">
             {[
               {
                 label: 'Week Acc.',
@@ -350,9 +350,9 @@ export const WeeklyPlan = () => {
               { label: 'Discipline', val: `${disciplineScore}`, color: 'text-accent-blue' },
               { label: 'Active Habits', val: weekHabitCount, color: 'text-white' },
             ].map((s, i) => (
-              <div key={i} className="text-center">
-                <p className={`text-2xl font-black tracking-tighter ${s.color}`}>{s.val}</p>
-                <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">{s.label}</p>
+              <div key={i} className="text-center min-w-[70px] sm:min-w-0">
+                <p className={`text-xl sm:text-2xl font-black tracking-tighter ${s.color}`}>{s.val}</p>
+                <p className="text-[8px] sm:text-[9px] font-black text-white/40 uppercase tracking-widest">{s.label}</p>
               </div>
             ))}
           </div>
@@ -425,18 +425,18 @@ export const WeeklyPlan = () => {
 
       {/* Week Summary — only for current week */}
       {isCurrentWeek && weeklyReport && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 min-[360px]:grid-cols-2 md:grid-cols-4 gap-3">
           {[
             { label: 'Best Streak', val: `${weeklyReport?.bestStreak || 0}d`, icon: <Flame size={16} className="text-orange-400" />, color: 'text-orange-400' },
             { label: 'Focus Time', val: `${Math.round((weeklyReport?.totalFocusTime || 0) / 60)}h`, icon: <Clock size={16} className="text-accent-blue" />, color: 'text-accent-blue' },
             { label: 'Days Active', val: weeklyReport?.activeDays ?? '—', icon: <Zap size={16} className="text-amber-400" />, color: 'text-amber-400' },
             { label: 'Goals Active', val: goals.length, icon: <Target size={16} className="text-purple-400" />, color: 'text-purple-400' },
           ].map((s, i) => (
-            <div key={i} className="bg-bg-card border border-border-light rounded-[20px] p-4 flex items-center gap-3">
+            <div key={i} className="bg-bg-card border border-border-light rounded-[20px] p-3 sm:p-4 flex items-center gap-3 min-w-0">
               <div className="w-9 h-9 rounded-xl bg-bg-input flex items-center justify-center shrink-0">{s.icon}</div>
-              <div>
-                <p className={`text-xl font-black tracking-tighter ${s.color}`}>{s.val}</p>
-                <p className="text-[10px] font-black text-text-muted uppercase tracking-widest">{s.label}</p>
+              <div className="min-w-0">
+                <p className={`text-lg sm:text-xl font-black tracking-tighter truncate ${s.color}`}>{s.val}</p>
+                <p className="text-[9px] sm:text-[10px] font-black text-text-muted uppercase tracking-widest truncate">{s.label}</p>
               </div>
             </div>
           ))}

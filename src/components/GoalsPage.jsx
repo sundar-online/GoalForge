@@ -369,7 +369,7 @@ const HabitRow = ({ habit, goalId, logHabitTime, deleteHabit, toggleHabitCheck, 
   // If not scheduled today, show a greyed-out rest-day card
   if (!scheduledToday) {
     return (
-      <div className="p-2.5 sm:p-4 rounded-xl border border-dashed border-border-light bg-bg-input/30 flex items-center gap-2.5 sm:gap-3 opacity-50">
+      <div className="p-2 sm:p-4 rounded-xl border border-dashed border-border-light bg-bg-input/30 flex items-center gap-1.5 sm:gap-3 opacity-50">
         <div className="w-8 h-8 sm:w-9 sm:h-9 shrink-0 rounded-lg border-2 border-border-light bg-bg-card flex items-center justify-center">
           <Calendar size={13} className="text-text-muted" />
         </div>
@@ -388,21 +388,21 @@ const HabitRow = ({ habit, goalId, logHabitTime, deleteHabit, toggleHabitCheck, 
   return (
     <>
       <div className={`
-        p-2.5 sm:p-4 rounded-xl transition-all duration-300 border flex flex-col gap-2 sm:gap-3
+        p-2 sm:p-4 rounded-xl transition-all duration-300 border flex flex-col gap-1.5 sm:gap-3
         ${done ? 'bg-emerald-500/5 border-emerald-500/10 opacity-70' : 'bg-bg-input border-border-light hover:border-border-med'}
       `}>
         {/* Main Content Line: Checkbox + Title + Streak & Inline Controls */}
-        <div className="flex items-center justify-between gap-2.5 sm:gap-4 w-full">
-          <div className="flex items-center gap-2.5 sm:gap-3 flex-1 min-w-0">
+        <div className="flex items-center justify-between gap-1.5 sm:gap-4 w-full">
+          <div className="flex items-center gap-1.5 sm:gap-3 flex-1 min-w-0">
             {/* Touch-Friendly Checkbox */}
             <button
                onClick={() => toggleHabitCheck(goalId, habit.id)}
                className={`
-                 w-9 h-9 sm:w-10 sm:h-10 shrink-0 rounded-lg border-2 flex items-center justify-center transition-all duration-200
+                 w-8 h-8 sm:w-10 sm:h-10 shrink-0 rounded-lg border-2 flex items-center justify-center transition-all duration-200
                  ${done ? 'bg-emerald-500 border-emerald-500 scale-95' : 'bg-bg-card border-border-med cursor-pointer hover:border-accent-blue'}
                `}
             >
-              {done ? <Check size={16} className="text-white animate-in zoom-in-50" strokeWidth={3} /> : (isCheck ? null : <Icon size={14} className="text-text-muted" />)}
+              {done ? <Check size={14} className="text-white animate-in zoom-in-50" strokeWidth={3} /> : (isCheck ? null : <Icon size={12} className="text-text-muted" />)}
             </button>
             
             <div className="flex-1 min-w-0">
@@ -418,17 +418,17 @@ const HabitRow = ({ habit, goalId, logHabitTime, deleteHabit, toggleHabitCheck, 
           </div>
 
           {/* Stacking controls inline on the same row */}
-          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          <div className="flex items-center gap-1 sm:gap-2 shrink-0">
             {isCount ? (
-              <div className="flex bg-bg-card rounded-lg border border-border-light overflow-hidden shadow-sm h-8 sm:h-9">
-                 <button onClick={() => updateHabitCount(goalId, habit.id, -1)} className="px-2.5 sm:px-3.5 py-1 sm:py-2 text-text-main font-black hover:bg-bg-input transition-colors text-xs sm:text-sm">−</button>
-                 <button onClick={() => updateHabitCount(goalId, habit.id, 1)} className="px-2.5 sm:px-3.5 py-1 sm:py-2 text-accent-blue font-black border-l border-border-light hover:bg-bg-input transition-colors text-xs sm:text-sm">+</button>
+              <div className="flex bg-bg-card rounded-lg border border-border-light overflow-hidden shadow-sm h-7 sm:h-9">
+                 <button onClick={() => updateHabitCount(goalId, habit.id, -1)} className="px-2 sm:px-3.5 py-0.5 sm:py-2 text-text-main font-black hover:bg-bg-input transition-colors text-xs sm:text-sm">−</button>
+                 <button onClick={() => updateHabitCount(goalId, habit.id, 1)} className="px-2 sm:px-3.5 py-0.5 sm:py-2 text-accent-blue font-black border-l border-border-light hover:bg-bg-input transition-colors text-xs sm:text-sm">+</button>
               </div>
             ) : (!isCheck && !done) && (
-              <button onClick={() => setShowLog(true)} className="h-8 sm:h-9 px-2.5 sm:px-4 rounded-lg bg-accent-blue text-white text-[10px] sm:text-[11px] font-black shadow-sm active:scale-95 transition-all">+ Log</button>
+              <button onClick={() => setShowLog(true)} className="h-7 sm:h-9 px-2 sm:px-4 rounded-lg bg-accent-blue text-white text-[10px] sm:text-[11px] font-black shadow-sm active:scale-95 transition-all">+ Log</button>
             )}
-            <button onClick={() => deleteHabit(goalId, habit.id)} className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg text-text-muted hover:text-rose-500 hover:bg-rose-500/10 transition-all flex items-center justify-center shrink-0">
-              <Trash2 size={14} />
+            <button onClick={() => deleteHabit(goalId, habit.id)} className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg text-text-muted hover:text-rose-500 hover:bg-rose-500/10 transition-all flex items-center justify-center shrink-0">
+              <Trash2 size={13} />
             </button>
           </div>
         </div>
@@ -666,15 +666,15 @@ export const GoalsPage = () => {
       </div>
 
       {/* Analytics Bar */}
-      <div className="bg-bg-dark-elem rounded-3xl p-6 grid grid-cols-3 gap-4 border border-white/5 shadow-xl">
+      <div className="bg-bg-dark-elem rounded-3xl p-4 sm:p-6 grid grid-cols-3 gap-1.5 sm:gap-4 border border-white/5 shadow-xl">
         {[
           { label: 'Avg Mastery', val: `${avgProgress}%`, color: 'text-accent-blue' },
           { label: 'Finished', val: doneGoals, color: 'text-emerald-400' },
           { label: 'In Progress', val: activeGoals, color: 'text-white' },
         ].map((s, i) => (
-          <div key={i} className="text-center space-y-1">
-            <p className={`text-2xl md:text-3xl font-black tracking-tighter ${s.color}`}>{s.val}</p>
-            <p className="text-[9px] font-black text-white/40 uppercase tracking-widest leading-none">{s.label}</p>
+          <div key={i} className="text-center space-y-1 min-w-0">
+            <p className={`text-lg min-[360px]:text-xl md:text-3xl font-black tracking-tighter truncate ${s.color}`}>{s.val}</p>
+            <p className="text-[8px] min-[360px]:text-[9px] font-black text-white/40 uppercase tracking-widest leading-none truncate">{s.label}</p>
           </div>
         ))}
       </div>
@@ -888,13 +888,13 @@ export const GoalsPage = () => {
                       bg-bg-card rounded-[24px] sm:rounded-[32px] overflow-hidden border-2 h-fit
                       ${doneToday ? 'border-emerald-500 shadow-lg shadow-emerald-500/5' : 'border-border-light hover:border-border-med shadow-sm'}
                     `}>
-                      <div className="p-4 sm:p-6 cursor-pointer group" onClick={() => toggleGoalExpanded(goal.id)}>
-                        <div className="flex items-center justify-between gap-3 sm:gap-5">
+                      <div className="p-3 sm:p-6 cursor-pointer group" onClick={() => toggleGoalExpanded(goal.id)}>
+                        <div className="flex items-center justify-between gap-2 sm:gap-5">
                           
                           {/* Inner Content: Progress circle + details */}
-                          <div className="flex items-center gap-3 sm:gap-5 flex-1 min-w-0 w-full">
+                          <div className="flex items-center gap-2.5 sm:gap-5 flex-1 min-w-0 w-full">
                             {/* Circular Progress Ring */}
-                            <div className="relative w-14 h-14 sm:w-20 sm:h-20 shrink-0">
+                            <div className="relative w-12 h-12 sm:w-20 sm:h-20 shrink-0">
                               <svg className="w-full h-full -rotate-90" viewBox="0 0 68 68">
                                 <circle cx="34" cy="34" r={R} fill="none" className="stroke-bg-input" strokeWidth="6" />
                                 <circle 
@@ -904,37 +904,37 @@ export const GoalsPage = () => {
                                 />
                               </svg>
                               <div className="absolute inset-0 flex flex-col items-center justify-center">
-                                <span className="text-xs sm:text-base font-black text-text-main tracking-tighter leading-none">{goal.progress || 0}%</span>
+                                <span className="text-[10px] sm:text-base font-black text-text-main tracking-tighter leading-none">{goal.progress || 0}%</span>
                                 <span className="hidden sm:block text-[5px] sm:text-[7px] font-black text-text-muted uppercase tracking-widest mt-0.5">Mastery</span>
                               </div>
                             </div>
 
                             {/* Main descriptive block */}
                             <div className="flex-1 min-w-0">
-                              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mb-1 sm:mb-2">
-                                <span className={`text-[8px] sm:text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md ${tc.bg} ${tc.color}`}>{goal.tag}</span>
-                                <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md bg-accent-blue-light text-accent-blue">Today: {dailyProgress}%</span>
+                              <div className="flex flex-wrap items-center gap-1 sm:gap-2 mb-1 sm:mb-2">
+                                <span className={`text-[8px] sm:text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md ${tc.bg} ${tc.color}`}>{goal.tag}</span>
+                                <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md bg-accent-blue-light text-accent-blue">Today: {dailyProgress}%</span>
                                 {goal.progress >= 100 && (
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       setCompletedGoalForCelebration(goal);
                                     }}
-                                    className="text-[8px] sm:text-[9px] font-black bg-amber-400/15 text-amber-400 border border-amber-400/20 px-2 py-0.5 rounded-md hover:scale-105 active:scale-95 transition-all flex items-center gap-1"
+                                    className="text-[8px] sm:text-[9px] font-black bg-amber-400/15 text-amber-400 border border-amber-400/20 px-1.5 py-0.5 rounded-md hover:scale-105 active:scale-95 transition-all flex items-center gap-1"
                                     title="Click to trigger Celebration Memory modal!"
                                   >
                                     ✨ Mastered
                                   </button>
                                 )}
                               </div>
-                              <p className="text-sm sm:text-lg font-black text-text-main tracking-tight leading-tight mb-2 sm:mb-3 group-hover:text-accent-blue transition-colors truncate sm:whitespace-normal">{goal.title}</p>
+                              <p className="text-xs sm:text-lg font-black text-text-main tracking-tight leading-tight mb-2 sm:mb-3 group-hover:text-accent-blue transition-colors truncate sm:whitespace-normal">{goal.title}</p>
                               
                               <div className="w-full bg-bg-input h-1 rounded-full overflow-hidden mb-2 sm:mb-3">
                                 <div className={`h-full ${dailyProgress === 100 ? 'bg-emerald-500' : 'bg-accent-blue'}`} style={{ width: `${dailyProgress}%` }} />
                               </div>
 
-                              <div className="flex items-center gap-2 sm:gap-3">
-                                <button onClick={(e) => { e.stopPropagation(); setExtendingGoal(goal); }} className="px-2 py-0.5 sm:py-1 rounded-md bg-bg-input text-[8px] sm:text-[10px] font-bold text-text-muted hover:bg-border-med transition-colors flex items-center gap-1">
+                              <div className="flex items-center gap-1.5 sm:gap-3">
+                                <button onClick={(e) => { e.stopPropagation(); setExtendingGoal(goal); }} className="px-1.5 py-0.5 sm:py-1 rounded-md bg-bg-input text-[8px] sm:text-[10px] font-bold text-text-muted hover:bg-border-med transition-colors flex items-center gap-1">
                                   <Calendar size={10} /> {goal.deadline || 'No deadline'}
                                 </button>
                                 {goal.extensions?.length > 0 && <History size={10} className="text-accent-blue opacity-50" />}
@@ -943,17 +943,17 @@ export const GoalsPage = () => {
                           </div>
 
                           {/* Action icons and controls */}
-                          <div className="flex sm:flex-col items-center gap-1 sm:gap-2 shrink-0">
-                            <button onClick={e => { e.stopPropagation(); setEditingGoal(goal); }} className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl text-text-muted hover:text-accent-blue hover:bg-accent-blue/10 transition-all flex items-center justify-center shrink-0" title="Edit Goal System"><Edit3 size={15} /></button>
-                            <button onClick={e => { e.stopPropagation(); setDeletingGoalItem(goal); }} className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl text-text-muted hover:text-rose-500 hover:bg-rose-500/10 transition-all flex items-center justify-center shrink-0" title="Delete Goal System"><Trash2 size={15} /></button>
-                            {isOpen ? <ChevronUp size={20} className="text-text-muted shrink-0" /> : <ChevronDown size={20} className="text-text-muted shrink-0" />}
+                          <div className="flex sm:flex-col items-center gap-0.5 sm:gap-2 shrink-0">
+                            <button onClick={e => { e.stopPropagation(); setEditingGoal(goal); }} className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl text-text-muted hover:text-accent-blue hover:bg-accent-blue/10 transition-all flex items-center justify-center shrink-0" title="Edit Goal System"><Edit3 size={14} /></button>
+                            <button onClick={e => { e.stopPropagation(); setDeletingGoalItem(goal); }} className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl text-text-muted hover:text-rose-500 hover:bg-rose-500/10 transition-all flex items-center justify-center shrink-0" title="Delete Goal System"><Trash2 size={14} /></button>
+                            {isOpen ? <ChevronUp size={18} className="text-text-muted shrink-0" /> : <ChevronDown size={18} className="text-text-muted shrink-0" />}
                           </div>
 
                         </div>
                       </div>
 
                       {isOpen && (
-                        <div className="px-3.5 sm:px-6 pb-4 sm:pb-6 pt-2 border-t border-border-light/60 space-y-4">
+                        <div className="px-2 sm:px-6 pb-3 sm:pb-6 pt-2 border-t border-border-light/60 space-y-3 sm:space-y-4">
                           <div className="flex flex-col gap-2 sm:gap-2.5">
                             {goal.habits
                               .sort((a, b) => {

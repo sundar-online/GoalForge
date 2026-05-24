@@ -58,12 +58,12 @@ export const Layout = ({ children, currentView, setView }) => {
 
       {/* Main Content Area */}
       <main className="flex-1 min-h-screen relative overflow-x-hidden">
-        <div className="w-full max-w-screen-xl mx-auto p-4 sm:p-6 lg:p-10 pb-44 lg:pb-10">
+        <div className="w-full max-w-screen-xl mx-auto safe-content-container">
           {children}
         </div>
 
         {/* Mobile Bottom Navigation */}
-        <nav className="lg:hidden fixed bottom-6 left-1/2 -translate-x-1/2 bg-bg-float/95 backdrop-blur-xl border border-border-light shadow-float rounded-[28px] p-1.5 flex items-center gap-1 z-[100] w-[calc(100%-32px)] max-w-md">
+        <nav className="lg:hidden safe-bottom-nav bg-bg-float/95 backdrop-blur-xl border border-border-light shadow-float rounded-[28px] p-1.5 flex items-center gap-1">
           {NAV.map(item => {
             const Icon = item.icon;
             const active = currentView === item.id;

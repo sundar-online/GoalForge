@@ -139,9 +139,9 @@ export const DailyTasks = () => {
           { label: 'Done', val: doneCount },
           { label: 'Focus', val: `${accuracy}%`, color: accuracy >= 80 ? 'text-emerald-500' : 'text-accent-blue' }
         ].map((s, i) => (
-          <div key={i} className={`p-4 text-center space-y-1 ${i < 2 ? 'border-r border-border-light' : ''}`}>
-            <p className={`text-2xl font-black tracking-tighter ${s.color || 'text-text-main'}`}>{s.val}</p>
-            <p className="text-[9px] font-black text-text-muted uppercase tracking-widest">{s.label}</p>
+          <div key={i} className={`p-2.5 sm:p-4 text-center space-y-1 ${i < 2 ? 'border-r border-border-light' : ''}`}>
+            <p className={`text-lg min-[360px]:text-2xl font-black tracking-tighter ${s.color || 'text-text-main'}`}>{s.val}</p>
+            <p className="text-[8px] min-[360px]:text-[9px] font-black text-text-muted uppercase tracking-widest">{s.label}</p>
           </div>
         ))}
       </div>
@@ -308,43 +308,43 @@ export const DailyTasks = () => {
 
             return (
               <motion.div layout key={task.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }}
-                className="bg-bg-card rounded-[28px] p-5 border border-border-light shadow-sm hover:border-border-med transition-all duration-300 flex flex-col gap-4"
+                className="bg-bg-card rounded-[28px] p-3.5 sm:p-5 border border-border-light shadow-sm hover:border-border-med transition-all duration-300 flex flex-col gap-3 sm:gap-4"
               >
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2.5 sm:gap-4">
                   <button onClick={() => toggleTaskComplete(task.id)} 
-                    className="w-10 h-10 shrink-0 rounded-xl border-2 flex items-center justify-center bg-bg-input border-border-med hover:border-accent-blue transition-all duration-200"
+                    className="w-8 h-8 sm:w-10 sm:h-10 shrink-0 rounded-xl border-2 flex items-center justify-center bg-bg-input border-border-med hover:border-accent-blue transition-all duration-200"
                   >
-                    {isCheck ? null : <div className="w-2 h-2 rounded-full bg-text-muted/20" />}
+                    {isCheck ? null : <div className="w-1.5 h-1.5 rounded-full bg-text-muted/20" />}
                   </button>
 
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center flex-wrap gap-2 mb-1">
-                      <span className="text-[9px] font-black uppercase tracking-widest bg-accent-blue-light text-accent-blue px-2 py-0.5 rounded-md flex items-center gap-1.5">
+                    <div className="flex items-center flex-wrap gap-1.5 sm:gap-2 mb-1">
+                      <span className="text-[9px] font-black uppercase tracking-widest bg-accent-blue-light text-accent-blue px-1.5 py-0.5 rounded-md flex items-center gap-1">
                         {SCHEDULE_ICONS[sType]} {SCHEDULE_LABELS[sType]}
                       </span>
-                      {task.currentStreak > 0 && <span className="text-[9px] font-black text-orange-500 bg-orange-500/10 px-2 py-0.5 rounded-md">🔥 {task.currentStreak}d</span>}
+                      {task.currentStreak > 0 && <span className="text-[9px] font-black text-orange-500 bg-orange-500/10 px-1.5 py-0.5 rounded-md">🔥 {task.currentStreak}d</span>}
                       {task.syncPending && (
-                        <span className="text-[9px] font-black uppercase tracking-widest bg-amber-500/10 text-amber-500 px-2 py-0.5 rounded-md flex items-center gap-1 animate-pulse">
+                        <span className="text-[9px] font-black uppercase tracking-widest bg-amber-500/10 text-amber-500 px-1.5 py-0.5 rounded-md flex items-center gap-1 animate-pulse">
                           <Cloud size={10} /> Syncing
                         </span>
                       )}
                     </div>
-                    <p className="text-base font-black tracking-tight truncate text-text-main">{task.title}</p>
-                    <p className="text-[11px] font-bold text-text-muted uppercase tracking-wide mt-0.5">
+                    <p className="text-sm sm:text-base font-black tracking-tight truncate text-text-main">{task.title}</p>
+                    <p className="text-[10px] sm:text-[11px] font-bold text-text-muted uppercase tracking-wide mt-0.5">
                       {isCheck ? 'Priority Task' : `${current} / ${target} ${isCount ? 'units' : 'mins'}`}
                     </p>
                   </div>
 
-                  <div className="flex gap-2 items-center">
+                  <div className="flex gap-1.5 sm:gap-2 items-center shrink-0">
                     {isCount ? (
-                      <div className="flex bg-bg-input rounded-xl border border-border-light overflow-hidden">
-                        <button onClick={() => updateTaskCount(task.id, -1)} className="px-3 py-1.5 text-text-main font-black hover:bg-border-light">−</button>
-                        <button onClick={() => updateTaskCount(task.id, 1)} className="px-3 py-1.5 text-accent-blue font-black border-l border-border-light hover:bg-border-light transition-colors">+</button>
+                      <div className="flex bg-bg-input rounded-xl border border-border-light overflow-hidden h-7 sm:h-9">
+                        <button onClick={() => updateTaskCount(task.id, -1)} className="px-2 py-0.5 sm:px-3 sm:py-1.5 text-text-main font-black hover:bg-border-light text-xs sm:text-sm">−</button>
+                        <button onClick={() => updateTaskCount(task.id, 1)} className="px-2 py-0.5 sm:px-3 sm:py-1.5 text-accent-blue font-black border-l border-border-light hover:bg-border-light transition-colors text-xs sm:text-sm">+</button>
                       </div>
                     ) : (isTime && !tDone) && (
-                      <button onClick={() => setShowLog(task)} className="px-4 py-2 rounded-xl bg-accent-blue text-white text-[11px] font-black shadow-md shadow-accent-blue/20 active:scale-95 transition-all">+ Log</button>
+                      <button onClick={() => setShowLog(task)} className="px-2.5 py-1.5 sm:px-4 sm:py-2 rounded-lg sm:rounded-xl bg-accent-blue text-white text-[10px] sm:text-[11px] font-black shadow-md shadow-accent-blue/20 active:scale-95 transition-all">+ Log</button>
                     )}
-                    <button onClick={() => setDeletingTaskItem(task)} className="w-9 h-9 rounded-xl text-text-muted hover:text-rose-500 hover:bg-rose-500/10 transition-all flex items-center justify-center" title="Delete Task"><Trash2 size={18} /></button>
+                    <button onClick={() => setDeletingTaskItem(task)} className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl text-text-muted hover:text-rose-500 hover:bg-rose-500/10 transition-all flex items-center justify-center" title="Delete Task"><Trash2 size={16} /></button>
                   </div>
                 </div>
                 
@@ -386,35 +386,35 @@ export const DailyTasks = () => {
 
             return (
               <motion.div layout key={task.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }}
-                className="bg-emerald-500/5 rounded-[28px] p-5 border border-emerald-500/30 opacity-70 transition-all duration-300 flex flex-col gap-4"
+                className="bg-emerald-500/5 rounded-[28px] p-3.5 sm:p-5 border border-emerald-500/30 opacity-70 transition-all duration-300 flex flex-col gap-3 sm:gap-4"
               >
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2.5 sm:gap-4">
                   <button onClick={() => toggleTaskComplete(task.id)} 
-                    className="w-10 h-10 shrink-0 rounded-xl border-2 flex items-center justify-center bg-emerald-500 border-emerald-500 scale-95 transition-all duration-200"
+                    className="w-8 h-8 sm:w-10 sm:h-10 shrink-0 rounded-xl border-2 flex items-center justify-center bg-emerald-500 border-emerald-500 scale-95 transition-all duration-200"
                   >
-                    <Check size={20} className="text-white" strokeWidth={3} />
+                    <Check size={16} className="text-white" strokeWidth={3} />
                   </button>
 
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center flex-wrap gap-2 mb-1">
-                      <span className="text-[9px] font-black uppercase tracking-widest bg-accent-blue-light text-accent-blue px-2 py-0.5 rounded-md flex items-center gap-1.5">
+                    <div className="flex items-center flex-wrap gap-1.5 sm:gap-2 mb-1">
+                      <span className="text-[9px] font-black uppercase tracking-widest bg-accent-blue-light text-accent-blue px-1.5 py-0.5 rounded-md flex items-center gap-1.5">
                         {SCHEDULE_ICONS[sType]} {SCHEDULE_LABELS[sType]}
                       </span>
-                      {task.currentStreak > 0 && <span className="text-[9px] font-black text-orange-500 bg-orange-500/10 px-2 py-0.5 rounded-md">🔥 {task.currentStreak}d</span>}
+                      {task.currentStreak > 0 && <span className="text-[9px] font-black text-orange-500 bg-orange-500/10 px-1.5 py-0.5 rounded-md">🔥 {task.currentStreak}d</span>}
                       {task.syncPending && (
-                        <span className="text-[9px] font-black uppercase tracking-widest bg-amber-500/10 text-amber-500 px-2 py-0.5 rounded-md flex items-center gap-1 animate-pulse">
+                        <span className="text-[9px] font-black uppercase tracking-widest bg-amber-500/10 text-amber-500 px-1.5 py-0.5 rounded-md flex items-center gap-1 animate-pulse">
                           <Cloud size={10} /> Syncing
                         </span>
                       )}
                     </div>
-                    <p className="text-base font-black tracking-tight truncate text-emerald-600 line-through">{task.title}</p>
-                    <p className="text-[11px] font-bold text-text-muted uppercase tracking-wide mt-0.5">
+                    <p className="text-sm sm:text-base font-black tracking-tight truncate text-emerald-600 line-through">{task.title}</p>
+                    <p className="text-[10px] sm:text-[11px] font-bold text-text-muted uppercase tracking-wide mt-0.5">
                       Completed
                     </p>
                   </div>
 
-                  <div className="flex gap-2 items-center">
-                    <button onClick={() => setDeletingTaskItem(task)} className="w-9 h-9 rounded-xl text-text-muted hover:text-rose-500 hover:bg-rose-500/10 transition-all flex items-center justify-center" title="Delete Task"><Trash2 size={18} /></button>
+                  <div className="flex gap-1.5 sm:gap-2 items-center shrink-0">
+                    <button onClick={() => setDeletingTaskItem(task)} className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl text-text-muted hover:text-rose-500 hover:bg-rose-500/10 transition-all flex items-center justify-center" title="Delete Task"><Trash2 size={16} /></button>
                   </div>
                 </div>
                 

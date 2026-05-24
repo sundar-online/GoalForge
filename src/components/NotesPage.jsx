@@ -689,13 +689,13 @@ export const NotesPage = () => {
         {!isChecklist && (
           <div className="flex flex-col gap-4">
             {/* Rich Text Toolbar */}
-            <div className="bg-bg-card border border-border-light rounded-2xl p-2.5 flex flex-wrap items-center gap-1.5 shadow-sm select-none">
+            <div className="bg-bg-card border border-border-light rounded-2xl p-1.5 sm:p-2.5 flex flex-wrap items-center gap-1 sm:gap-1.5 shadow-sm select-none">
 
               {/* History (Undo / Redo) */}
               <button
                 onMouseDown={e => e.preventDefault()}
                 onClick={() => execCmd('undo')}
-                className="p-2 rounded-lg text-text-muted hover:text-text-main hover:bg-bg-input transition-colors shrink-0"
+                className="p-1.5 sm:p-2 rounded-lg text-text-muted hover:text-text-main hover:bg-bg-input transition-colors shrink-0"
                 title="Undo"
               >
                 <Undo size={15} strokeWidth={2.5} />
@@ -703,19 +703,19 @@ export const NotesPage = () => {
               <button
                 onMouseDown={e => e.preventDefault()}
                 onClick={() => execCmd('redo')}
-                className="p-2 rounded-lg text-text-muted hover:text-text-main hover:bg-bg-input transition-colors shrink-0"
+                className="p-1.5 sm:p-2 rounded-lg text-text-muted hover:text-text-main hover:bg-bg-input transition-colors shrink-0"
                 title="Redo"
               >
                 <Redo size={15} strokeWidth={2.5} />
               </button>
 
-              <div className="h-5 w-px bg-border-med shrink-0 mx-1" />
+              <div className="h-5 w-px bg-border-med shrink-0 mx-0.5 sm:mx-1" />
 
               {/* Headings */}
               <button
                 onMouseDown={e => e.preventDefault()}
                 onClick={() => execCmd('formatBlock', '<h1>')}
-                className="px-2.5 py-1.5 rounded-lg text-xs font-black text-text-muted hover:text-text-main hover:bg-bg-input transition-colors shrink-0 flex items-center gap-1"
+                className="px-1.5 py-1 sm:px-2.5 sm:py-1.5 rounded-lg text-xs font-black text-text-muted hover:text-text-main hover:bg-bg-input transition-colors shrink-0 flex items-center gap-1"
                 title="Heading 1"
               >
                 H1
@@ -723,7 +723,7 @@ export const NotesPage = () => {
               <button
                 onMouseDown={e => e.preventDefault()}
                 onClick={() => execCmd('formatBlock', '<h2>')}
-                className="px-2.5 py-1.5 rounded-lg text-xs font-black text-text-muted hover:text-text-main hover:bg-bg-input transition-colors shrink-0 flex items-center gap-1"
+                className="px-1.5 py-1 sm:px-2.5 sm:py-1.5 rounded-lg text-xs font-black text-text-muted hover:text-text-main hover:bg-bg-input transition-colors shrink-0 flex items-center gap-1"
                 title="Heading 2"
               >
                 H2
@@ -731,7 +731,7 @@ export const NotesPage = () => {
               <button
                 onMouseDown={e => e.preventDefault()}
                 onClick={() => execCmd('formatBlock', '<h3>')}
-                className="px-2.5 py-1.5 rounded-lg text-xs font-black text-text-muted hover:text-text-main hover:bg-bg-input transition-colors shrink-0 flex items-center gap-1"
+                className="px-1.5 py-1 sm:px-2.5 sm:py-1.5 rounded-lg text-xs font-black text-text-muted hover:text-text-main hover:bg-bg-input transition-colors shrink-0 flex items-center gap-1"
                 title="Heading 3"
               >
                 H3
@@ -739,19 +739,19 @@ export const NotesPage = () => {
               <button
                 onMouseDown={e => e.preventDefault()}
                 onClick={() => execCmd('formatBlock', '<p>')}
-                className="px-2.5 py-1.5 rounded-lg text-xs font-black text-text-muted hover:text-text-main hover:bg-bg-input transition-colors shrink-0 flex items-center gap-1"
+                className="px-1.5 py-1 sm:px-2.5 sm:py-1.5 rounded-lg text-xs font-black text-text-muted hover:text-text-main hover:bg-bg-input transition-colors shrink-0 flex items-center gap-1"
                 title="Paragraph"
               >
                 P
               </button>
 
-              <div className="h-5 w-px bg-border-med shrink-0 mx-1" />
+              <div className="h-5 w-px bg-border-med shrink-0 mx-0.5 sm:mx-1" />
 
               {/* Inline formatting */}
               <button
                 onMouseDown={e => e.preventDefault()}
                 onClick={() => execCmd('bold')}
-                className="p-2 rounded-lg text-text-muted hover:text-text-main hover:bg-bg-input transition-colors shrink-0"
+                className="p-1.5 sm:p-2 rounded-lg text-text-muted hover:text-text-main hover:bg-bg-input transition-colors shrink-0"
                 title="Bold"
               >
                 <Bold size={15} strokeWidth={2.5} />
@@ -759,7 +759,7 @@ export const NotesPage = () => {
               <button
                 onMouseDown={e => e.preventDefault()}
                 onClick={() => execCmd('italic')}
-                className="p-2 rounded-lg text-text-muted hover:text-text-main hover:bg-bg-input transition-colors shrink-0"
+                className="p-1.5 sm:p-2 rounded-lg text-text-muted hover:text-text-main hover:bg-bg-input transition-colors shrink-0"
                 title="Italic"
               >
                 <Italic size={15} strokeWidth={2.5} />
@@ -767,7 +767,7 @@ export const NotesPage = () => {
               <button
                 onMouseDown={e => e.preventDefault()}
                 onClick={() => execCmd('underline')}
-                className="p-2 rounded-lg text-text-muted hover:text-text-main hover:bg-bg-input transition-colors shrink-0"
+                className="p-1.5 sm:p-2 rounded-lg text-text-muted hover:text-text-main hover:bg-bg-input transition-colors shrink-0"
                 title="Underline"
               >
                 <Underline size={15} strokeWidth={2.5} />
@@ -775,19 +775,19 @@ export const NotesPage = () => {
               <button
                 onMouseDown={e => e.preventDefault()}
                 onClick={() => execCmd('strikeThrough')}
-                className="p-2 rounded-lg text-text-muted hover:text-text-main hover:bg-bg-input transition-colors shrink-0"
+                className="p-1.5 sm:p-2 rounded-lg text-text-muted hover:text-text-main hover:bg-bg-input transition-colors shrink-0"
                 title="Strikethrough"
               >
                 <Strikethrough size={15} strokeWidth={2.5} />
               </button>
 
-              <div className="h-5 w-px bg-border-med shrink-0 mx-1" />
+              <div className="h-5 w-px bg-border-med shrink-0 mx-0.5 sm:mx-1" />
 
               {/* Alignment */}
               <button
                 onMouseDown={e => e.preventDefault()}
                 onClick={() => execCmd('justifyLeft')}
-                className="p-2 rounded-lg text-text-muted hover:text-text-main hover:bg-bg-input transition-colors shrink-0"
+                className="p-1.5 sm:p-2 rounded-lg text-text-muted hover:text-text-main hover:bg-bg-input transition-colors shrink-0"
                 title="Align Left"
               >
                 <AlignLeft size={15} strokeWidth={2.5} />
@@ -795,7 +795,7 @@ export const NotesPage = () => {
               <button
                 onMouseDown={e => e.preventDefault()}
                 onClick={() => execCmd('justifyCenter')}
-                className="p-2 rounded-lg text-text-muted hover:text-text-main hover:bg-bg-input transition-colors shrink-0"
+                className="p-1.5 sm:p-2 rounded-lg text-text-muted hover:text-text-main hover:bg-bg-input transition-colors shrink-0"
                 title="Align Center"
               >
                 <AlignCenter size={15} strokeWidth={2.5} />
@@ -803,19 +803,19 @@ export const NotesPage = () => {
               <button
                 onMouseDown={e => e.preventDefault()}
                 onClick={() => execCmd('justifyRight')}
-                className="p-2 rounded-lg text-text-muted hover:text-text-main hover:bg-bg-input transition-colors shrink-0"
+                className="p-1.5 sm:p-2 rounded-lg text-text-muted hover:text-text-main hover:bg-bg-input transition-colors shrink-0"
                 title="Align Right"
               >
                 <AlignRight size={15} strokeWidth={2.5} />
               </button>
 
-              <div className="h-5 w-px bg-border-med shrink-0 mx-1" />
+              <div className="h-5 w-px bg-border-med shrink-0 mx-0.5 sm:mx-1" />
 
               {/* Lists */}
               <button
                 onMouseDown={e => e.preventDefault()}
                 onClick={() => execCmd('insertUnorderedList')}
-                className="p-2 rounded-lg text-text-muted hover:text-text-main hover:bg-bg-input transition-colors shrink-0"
+                className="p-1.5 sm:p-2 rounded-lg text-text-muted hover:text-text-main hover:bg-bg-input transition-colors shrink-0"
                 title="Bullet List"
               >
                 <List size={15} strokeWidth={2.5} />
@@ -823,7 +823,7 @@ export const NotesPage = () => {
               <button
                 onMouseDown={e => e.preventDefault()}
                 onClick={() => execCmd('insertOrderedList')}
-                className="p-2 rounded-lg text-text-muted hover:text-text-main hover:bg-bg-input transition-colors shrink-0"
+                className="p-1.5 sm:p-2 rounded-lg text-text-muted hover:text-text-main hover:bg-bg-input transition-colors shrink-0"
                 title="Numbered List"
               >
                 <ListOrdered size={15} strokeWidth={2.5} />
@@ -831,19 +831,19 @@ export const NotesPage = () => {
               <button
                 onMouseDown={e => e.preventDefault()}
                 onClick={insertChecklist}
-                className="p-2 rounded-lg text-text-muted hover:text-text-main hover:bg-bg-input transition-colors shrink-0 flex items-center gap-1.5"
+                className="p-1.5 sm:p-2 rounded-lg text-text-muted hover:text-text-main hover:bg-bg-input transition-colors shrink-0 flex items-center gap-1.5"
                 title="Checklist Item"
               >
                 <CheckSquare size={15} strokeWidth={2.5} />
               </button>
 
-              <div className="h-5 w-px bg-border-med shrink-0 mx-1" />
+              <div className="h-5 w-px bg-border-med shrink-0 mx-0.5 sm:mx-1" />
 
               {/* Blocks */}
               <button
                 onMouseDown={e => e.preventDefault()}
                 onClick={() => execCmd('formatBlock', '<blockquote>')}
-                className="p-2 rounded-lg text-text-muted hover:text-text-main hover:bg-bg-input transition-colors shrink-0"
+                className="p-1.5 sm:p-2 rounded-lg text-text-muted hover:text-text-main hover:bg-bg-input transition-colors shrink-0"
                 title="Quote Block"
               >
                 <Quote size={15} strokeWidth={2.5} />
@@ -851,20 +851,20 @@ export const NotesPage = () => {
               <button
                 onMouseDown={e => e.preventDefault()}
                 onClick={() => execCmd('formatBlock', '<pre>')}
-                className="p-2 rounded-lg text-text-muted hover:text-text-main hover:bg-bg-input transition-colors shrink-0"
+                className="p-1.5 sm:p-2 rounded-lg text-text-muted hover:text-text-main hover:bg-bg-input transition-colors shrink-0"
                 title="Code Block"
               >
                 <Code size={15} strokeWidth={2.5} />
               </button>
 
-              <div className="h-5 w-px bg-border-med shrink-0 mx-1" />
+              <div className="h-5 w-px bg-border-med shrink-0 mx-0.5 sm:mx-1" />
 
               {/* Text Color Selection */}
               <div className="relative shrink-0">
                 <button
                   onMouseDown={e => e.preventDefault()}
                   onClick={() => { setShowColorPopover(!showColorPopover); setShowHighlightPopover(false); }}
-                  className="p-2 rounded-lg text-text-muted hover:text-text-main hover:bg-bg-input transition-colors flex items-center gap-1"
+                  className="p-1.5 sm:p-2 rounded-lg text-text-muted hover:text-text-main hover:bg-bg-input transition-colors flex items-center gap-1"
                   title="Text Color"
                 >
                   <Palette size={15} strokeWidth={2.5} />
@@ -899,7 +899,7 @@ export const NotesPage = () => {
                 <button
                   onMouseDown={e => e.preventDefault()}
                   onClick={() => { setShowHighlightPopover(!showHighlightPopover); setShowColorPopover(false); }}
-                  className="p-2 rounded-lg text-text-muted hover:text-text-main hover:bg-bg-input transition-colors flex items-center gap-1"
+                  className="p-1.5 sm:p-2 rounded-lg text-text-muted hover:text-text-main hover:bg-bg-input transition-colors flex items-center gap-1"
                   title="Highlight Text"
                 >
                   <Highlighter size={15} strokeWidth={2.5} />
@@ -929,13 +929,13 @@ export const NotesPage = () => {
                 )}
               </div>
 
-              <div className="h-5 w-px bg-border-med shrink-0 mx-1" />
+              <div className="h-5 w-px bg-border-med shrink-0 mx-0.5 sm:mx-1" />
 
               {/* Clear Formatting */}
               <button
                 onMouseDown={e => e.preventDefault()}
                 onClick={() => execCmd('removeFormat')}
-                className="p-2 rounded-lg text-text-muted hover:text-text-main hover:bg-bg-input transition-colors shrink-0"
+                className="p-1.5 sm:p-2 rounded-lg text-text-muted hover:text-text-main hover:bg-bg-input transition-colors shrink-0"
                 title="Clear Formatting"
               >
                 <Type size={15} strokeWidth={2.5} />
@@ -950,7 +950,7 @@ export const NotesPage = () => {
               onKeyDown={handleEditorKeyDown}
               onClick={handleEditorClick}
               data-placeholder="Start forging your thoughts with rich formats..."
-              className="rich-editor rich-editor-canvas w-full min-h-[400px] max-h-[60vh] overflow-y-auto bg-bg-card border border-border-light rounded-[32px] p-5 sm:p-8 text-base font-medium text-text-main leading-relaxed outline-hidden focus:border-accent-blue transition-colors shadow-sm select-text"
+              className="rich-editor rich-editor-canvas w-full min-h-[400px] max-h-[60vh] overflow-y-auto bg-bg-card border border-border-light rounded-[32px] p-3.5 sm:p-8 text-base font-medium text-text-main leading-relaxed outline-hidden focus:border-accent-blue transition-colors shadow-sm select-text"
             />
 
             <button
@@ -1183,7 +1183,7 @@ export const NotesPage = () => {
       {/* FAB */}
       <button
         onClick={() => setView('new')}
-        className="fixed bottom-24 right-6 md:right-8 lg:right-12 w-14 h-14 rounded-2xl bg-accent-blue text-white shadow-lg shadow-accent-blue/30 flex items-center justify-center hover:scale-110 active:scale-90 transition-all z-50 group"
+        className="safe-notes-fab w-14 h-14 rounded-2xl bg-accent-blue text-white shadow-lg shadow-accent-blue/30 flex items-center justify-center hover:scale-110 active:scale-90 transition-all group"
       >
         <Plus size={28} strokeWidth={3} className="group-hover:rotate-90 transition-transform duration-300" />
       </button>
