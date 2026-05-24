@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { calculateGoalDailyProgress, isHabitDoneToday, calculateOverallProgress, isGoalDoneToday } from '../utils/calculationUtils';
+import { calculateGoalDailyProgress, isHabitDoneToday, calculateOverallProgress, isGoalDoneToday, calculateGoalStreak, recalculateGoalCompletedDates, getGoalScheduledDays, calculateGoalConsecutiveMissedDays } from '../utils/calculationUtils';
 import { TODAY } from '../utils/dateUtils';
 import { BADGE_DEFINITIONS } from '../utils/gamificationEngine';
 import { useAuth } from '../context/AuthContext';
@@ -283,12 +283,16 @@ export const Dashboard = ({ setView }) => {
 
   const topStreaks = (goals || [])
     .map(g => {
-      const habits = g.habits || [];
+      // Always derive streak live from completedDates so we never show stale cached values
+      const liveCompletedDates = recalculateGoalCompletedDates(g);
+      const goalSchedule = getGoalScheduledDays(g);
+      const liveStreak = calculateGoalStreak(liveCompletedDates, goalSchedule);
+      const liveMissed = calculateGoalConsecutiveMissedDays(liveCompletedDates, goalSchedule, g.startDate || g.createdAt);
       return { 
         name: g.title, 
         tag: g.tag, 
-        streak: g.streak || 0, 
-        missed: g.missedDays || 0 
+        streak: liveStreak, 
+        missed: liveMissed 
       };
     })
     .filter(g => g.streak > 0 || g.missed > 0)
@@ -568,7 +572,8 @@ export const Dashboard = ({ setView }) => {
                 const activeGoalsList = (goals || [])
                   .map(g => {
                     const liveProgress = calculateOverallProgress(g);
-                    const isFinished = liveProgress >= 100 || (g.deadline && todayStr >= g.deadline);
+                    // Only hide truly finished goals (deadline passed or 100% mastery)
+                    const isFinished = liveProgress >= 100 || (g.deadline && todayStr > g.deadline);
                     const isDoneToday = isGoalDoneToday(g);
                     return {
                       ...g,
@@ -577,7 +582,7 @@ export const Dashboard = ({ setView }) => {
                       isDoneToday
                     };
                   })
-                  .filter(goal => !goal.isFinished && !goal.isDoneToday);
+                  .filter(goal => !goal.isFinished);
 
                 if (activeGoalsList.length === 0) {
                   return (
@@ -594,26 +599,26 @@ export const Dashboard = ({ setView }) => {
                 return activeGoalsList.slice(0, 4).map(goal => {
                   const habitsTotal = goal.habits.length;
                   const dailyProgress = calculateGoalDailyProgress(goal);
-                  const achieved = dailyProgress === 100;
+                  const achieved = goal.isDoneToday || dailyProgress === 100;
                   const habitsDone = goal.habits.filter(isHabitDoneToday).length;
                   const targetReq = goal.mode === 'ANY' ? 1 : (goal.mode === 'CUSTOM' ? (goal.minHabits || 1) : habitsTotal);
                   const habitAccuracy = Math.min(100, Math.round((habitsDone / (targetReq || 1)) * 100));
                   const ruleLabel = goal.mode === 'ANY' ? 'Any Rule' : goal.mode === 'CUSTOM' ? `Min ${goal.minHabits} Rule` : 'All Habits Rule';
 
                   return (
-                    <div key={goal.id} className={`bg-bg-card rounded-[28px] p-6 shadow-sm border-2 transition-all hover:shadow-md ${achieved ? 'border-emerald-500/30' : 'border-border-light hover:border-accent-blue/30'}`}>
+                    <div key={goal.id} className={`bg-bg-card rounded-[28px] p-6 shadow-sm border-2 transition-all hover:shadow-md ${achieved ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-border-light hover:border-accent-blue/30'}`}>
                       <div className="flex justify-between items-start mb-5">
                         <div className="space-y-1">
                           <div className="flex items-center gap-2">
                             <p className="font-black text-lg text-text-main tracking-tight truncate max-w-[140px]">{goal.title}</p>
-                            {achieved && <span className="bg-emerald-100 text-emerald-700 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest">Done</span>}
+                            {achieved && <span className="bg-emerald-500/20 text-emerald-400 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest">Done ✓</span>}
                           </div>
                           <div className="flex flex-wrap gap-2">
                             <span className="text-[9px] font-bold text-text-muted bg-bg-input px-2 py-0.5 rounded-md uppercase tracking-widest">{ruleLabel}</span>
                           </div>
                         </div>
                         <div className="text-right">
-                          <span className={`text-2xl font-black leading-none tracking-tighter ${achieved ? 'text-emerald-500' : 'text-accent-blue'}`}>{habitAccuracy}%</span>
+                          <span className={`text-2xl font-black leading-none tracking-tighter ${achieved ? 'text-emerald-500' : 'text-accent-blue'}`}>{achieved ? 100 : habitAccuracy}%</span>
                           <p className="text-[8px] font-black text-text-muted uppercase tracking-widest mt-0.5">Grit Score</p>
                         </div>
                       </div>

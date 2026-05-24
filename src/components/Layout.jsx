@@ -62,32 +62,34 @@ export const Layout = ({ children, currentView, setView }) => {
           {children}
         </div>
 
-        {/* Mobile Bottom Navigation */}
-        <nav className="lg:hidden safe-bottom-nav bg-bg-float/95 backdrop-blur-xl border border-border-light shadow-float rounded-[28px] p-1.5 flex items-center gap-1">
-          {NAV.map(item => {
-            const Icon = item.icon;
-            const active = currentView === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => setView(item.id)}
-                className={`
-                  flex-1 flex flex-col items-center gap-1 py-2.5 rounded-[20px] transition-all duration-300
-                  ${active ? 'bg-bg-dark-elem text-text-inverted scale-[1.02] shadow-sm' : 'text-text-muted hover:bg-bg-input'}
-                `}
-              >
-                <Icon
-                  size={20}
-                  strokeWidth={active ? 2.5 : 2}
-                  className="transition-all duration-200"
-                />
-                <span className="text-[9px] font-black uppercase tracking-[0.06em] leading-none">
-                  {item.label}
-                </span>
-              </button>
-            );
-          })}
-        </nav>
+        {/* Mobile Bottom Navigation — wrapper anchored at bottom:0, pill lifted via padding-bottom */}
+        <div className="lg:hidden safe-bottom-nav-wrapper">
+          <nav className="safe-bottom-nav-pill bg-bg-float/95 backdrop-blur-xl border border-border-light shadow-float rounded-[28px] p-1.5 flex items-center gap-1">
+            {NAV.map(item => {
+              const Icon = item.icon;
+              const active = currentView === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setView(item.id)}
+                  className={`
+                    flex-1 flex flex-col items-center gap-1 py-3 rounded-[20px] transition-all duration-300
+                    ${active ? 'bg-bg-dark-elem text-text-inverted scale-[1.02] shadow-sm' : 'text-text-muted hover:bg-bg-input'}
+                  `}
+                >
+                  <Icon
+                    size={20}
+                    strokeWidth={active ? 2.5 : 2}
+                    className="transition-all duration-200"
+                  />
+                  <span className="text-[9px] font-black uppercase tracking-[0.06em] leading-none">
+                    {item.label}
+                  </span>
+                </button>
+              );
+            })}
+          </nav>
+        </div>
       </main>
     </div>
   );

@@ -888,7 +888,7 @@ export const GoalsPage = () => {
                       bg-bg-card rounded-[24px] sm:rounded-[32px] overflow-hidden border-2 h-fit w-full
                       ${doneToday ? 'border-emerald-500 shadow-lg shadow-emerald-500/5' : 'border-border-light hover:border-border-med shadow-sm'}
                     `}>
-                      <div className="px-2.5 py-3 sm:p-6 cursor-pointer group" onClick={() => toggleGoalExpanded(goal.id)}>
+                      <div className="px-3 py-4 sm:p-6 cursor-pointer group" onClick={() => toggleGoalExpanded(goal.id)}>
                         <div className="flex items-center justify-between gap-1.5 sm:gap-5">
                           
                           {/* Inner Content: Progress circle + details */}
@@ -911,7 +911,7 @@ export const GoalsPage = () => {
 
                             {/* Main descriptive block */}
                             <div className="flex-1 min-w-0">
-                              <div className="flex flex-wrap items-center gap-1 sm:gap-2 mb-1 sm:mb-2">
+                              <div className="flex flex-wrap items-center gap-1 sm:gap-2 mb-1.5 sm:mb-2">
                                 <span className={`text-[8px] sm:text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md ${tc.bg} ${tc.color}`}>{goal.tag}</span>
                                 <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md bg-accent-blue-light text-accent-blue">Today: {dailyProgress}%</span>
                                 {goal.progress >= 100 && (
@@ -927,9 +927,9 @@ export const GoalsPage = () => {
                                   </button>
                                 )}
                               </div>
-                              <p className="text-xs sm:text-lg font-black text-text-main tracking-tight leading-tight mb-2 sm:mb-3 group-hover:text-accent-blue transition-colors whitespace-normal">{goal.title}</p>
+                              <p className="text-xs sm:text-lg font-black text-text-main tracking-tight leading-tight mb-2.5 sm:mb-3 group-hover:text-accent-blue transition-colors whitespace-normal">{goal.title}</p>
                               
-                              <div className="w-full bg-bg-input h-1 rounded-full overflow-hidden mb-2 sm:mb-3">
+                              <div className="w-full bg-bg-input h-1.5 rounded-full overflow-hidden mb-2.5 sm:mb-3">
                                 <div className={`h-full ${dailyProgress === 100 ? 'bg-emerald-500' : 'bg-accent-blue'}`} style={{ width: `${dailyProgress}%` }} />
                               </div>
 
@@ -953,7 +953,7 @@ export const GoalsPage = () => {
                       </div>
 
                       {isOpen && (
-                        <div className="px-2 sm:px-6 pb-3 sm:pb-6 pt-2 border-t border-border-light/60 space-y-3 sm:space-y-4">
+                        <div className="px-3 sm:px-6 pb-4 sm:pb-6 pt-2 border-t border-border-light/60 space-y-3 sm:space-y-4">
                           <div className="flex flex-col gap-2 sm:gap-2.5">
                             {goal.habits
                               .sort((a, b) => {
