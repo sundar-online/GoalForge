@@ -871,11 +871,11 @@ export const GoalsPage = () => {
 
         return (
           <div className={`
-            flex gap-6 items-start w-full mx-auto
-            ${colsCount === 1 ? 'max-w-2xl flex-col' : colsCount === 2 ? 'max-w-5xl' : 'max-w-7xl'}
+            flex gap-6 w-full mx-auto
+            ${colsCount === 1 ? 'max-w-2xl flex-col items-stretch' : colsCount === 2 ? 'max-w-5xl items-start' : 'max-w-7xl items-start'}
           `}>
             {masonryColumns.map((colGoals, colIdx) => (
-              <div key={colIdx} className="flex flex-col gap-6 flex-1 min-w-0">
+              <div key={colIdx} className="flex flex-col gap-6 flex-1 min-w-0 w-full">
                 {colGoals.map(goal => {
                   const tc = TAG_COLORS[goal.tag] || TAG_COLORS.General;
                   const isOpen = expandedGoalIds.includes(goal.id);
@@ -885,16 +885,16 @@ export const GoalsPage = () => {
 
                   return (
                     <div key={goal.id} className={`
-                      bg-bg-card rounded-[24px] sm:rounded-[32px] overflow-hidden border-2 h-fit
+                      bg-bg-card rounded-[24px] sm:rounded-[32px] overflow-hidden border-2 h-fit w-full
                       ${doneToday ? 'border-emerald-500 shadow-lg shadow-emerald-500/5' : 'border-border-light hover:border-border-med shadow-sm'}
                     `}>
-                      <div className="p-3 sm:p-6 cursor-pointer group" onClick={() => toggleGoalExpanded(goal.id)}>
-                        <div className="flex items-center justify-between gap-2 sm:gap-5">
+                      <div className="px-2.5 py-3 sm:p-6 cursor-pointer group" onClick={() => toggleGoalExpanded(goal.id)}>
+                        <div className="flex items-center justify-between gap-1.5 sm:gap-5">
                           
                           {/* Inner Content: Progress circle + details */}
-                          <div className="flex items-center gap-2.5 sm:gap-5 flex-1 min-w-0 w-full">
+                          <div className="flex items-center gap-2 sm:gap-5 flex-1 min-w-0 w-full">
                             {/* Circular Progress Ring */}
-                            <div className="relative w-12 h-12 sm:w-20 sm:h-20 shrink-0">
+                            <div className="relative w-10 h-10 sm:w-20 sm:h-20 shrink-0">
                               <svg className="w-full h-full -rotate-90" viewBox="0 0 68 68">
                                 <circle cx="34" cy="34" r={R} fill="none" className="stroke-bg-input" strokeWidth="6" />
                                 <circle 
@@ -904,7 +904,7 @@ export const GoalsPage = () => {
                                 />
                               </svg>
                               <div className="absolute inset-0 flex flex-col items-center justify-center">
-                                <span className="text-[10px] sm:text-base font-black text-text-main tracking-tighter leading-none">{goal.progress || 0}%</span>
+                                <span className="text-[9px] sm:text-base font-black text-text-main tracking-tighter leading-none">{goal.progress || 0}%</span>
                                 <span className="hidden sm:block text-[5px] sm:text-[7px] font-black text-text-muted uppercase tracking-widest mt-0.5">Mastery</span>
                               </div>
                             </div>
@@ -927,7 +927,7 @@ export const GoalsPage = () => {
                                   </button>
                                 )}
                               </div>
-                              <p className="text-xs sm:text-lg font-black text-text-main tracking-tight leading-tight mb-2 sm:mb-3 group-hover:text-accent-blue transition-colors truncate sm:whitespace-normal">{goal.title}</p>
+                              <p className="text-xs sm:text-lg font-black text-text-main tracking-tight leading-tight mb-2 sm:mb-3 group-hover:text-accent-blue transition-colors whitespace-normal">{goal.title}</p>
                               
                               <div className="w-full bg-bg-input h-1 rounded-full overflow-hidden mb-2 sm:mb-3">
                                 <div className={`h-full ${dailyProgress === 100 ? 'bg-emerald-500' : 'bg-accent-blue'}`} style={{ width: `${dailyProgress}%` }} />
@@ -943,10 +943,10 @@ export const GoalsPage = () => {
                           </div>
 
                           {/* Action icons and controls */}
-                          <div className="flex sm:flex-col items-center gap-0.5 sm:gap-2 shrink-0">
-                            <button onClick={e => { e.stopPropagation(); setEditingGoal(goal); }} className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl text-text-muted hover:text-accent-blue hover:bg-accent-blue/10 transition-all flex items-center justify-center shrink-0" title="Edit Goal System"><Edit3 size={14} /></button>
-                            <button onClick={e => { e.stopPropagation(); setDeletingGoalItem(goal); }} className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl text-text-muted hover:text-rose-500 hover:bg-rose-500/10 transition-all flex items-center justify-center shrink-0" title="Delete Goal System"><Trash2 size={14} /></button>
-                            {isOpen ? <ChevronUp size={18} className="text-text-muted shrink-0" /> : <ChevronDown size={18} className="text-text-muted shrink-0" />}
+                          <div className="flex sm:flex-col items-center gap-1 sm:gap-2 shrink-0">
+                            <button onClick={e => { e.stopPropagation(); setEditingGoal(goal); }} className="w-6 h-6 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl text-text-muted hover:text-accent-blue hover:bg-accent-blue/10 transition-all flex items-center justify-center shrink-0" title="Edit Goal System"><Edit3 size={12} /></button>
+                            <button onClick={e => { e.stopPropagation(); setDeletingGoalItem(goal); }} className="w-6 h-6 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl text-text-muted hover:text-rose-500 hover:bg-rose-500/10 transition-all flex items-center justify-center shrink-0" title="Delete Goal System"><Trash2 size={12} /></button>
+                            {isOpen ? <ChevronUp className="text-text-muted shrink-0 w-3.5 h-3.5 sm:w-[18px] sm:h-[18px]" /> : <ChevronDown className="text-text-muted shrink-0 w-3.5 h-3.5 sm:w-[18px] sm:h-[18px]" />}
                           </div>
 
                         </div>
