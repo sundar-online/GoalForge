@@ -13,6 +13,7 @@ export class ErrorBoundary extends React.Component {
   componentDidCatch(error, errorInfo) {
     console.error("ErrorBoundary caught an error:", error, errorInfo);
     this.setState({ errorInfo });
+
   }
 
   render() {
@@ -30,14 +31,14 @@ export class ErrorBoundary extends React.Component {
             </div>
             <h1 className="text-2xl font-bold text-red-400 mb-2">Application Error</h1>
             <p className="text-text-muted mb-6">A critical component failed to render. Please see the details below.</p>
-            
+
             <div className="bg-black/40 rounded-lg p-4 text-left overflow-auto max-h-[300px] font-mono text-sm border border-white/5 mb-6">
               <div className="text-red-300 font-bold mb-2">{this.state.error?.toString()}</div>
               <div className="text-gray-400 whitespace-pre-wrap">{this.state.errorInfo?.componentStack || this.state.error?.stack}</div>
             </div>
-            
+
             <div className="flex gap-4 justify-center">
-              <button 
+              <button
                 onClick={() => window.location.reload()}
                 className="px-6 py-2.5 rounded-xl bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors font-semibold"
               >
