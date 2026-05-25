@@ -6,6 +6,7 @@ import { LevelUpModal } from './components/LevelUpModal';
 import { BadgeToast } from './components/BadgeToast';
 import { GoalCompletionModal } from './components/GoalCompletionModal';
 import { registerServiceWorker } from './utils/notificationUtils';
+import ErrorBoundary from './components/ErrorBoundary';
 
 // Lazy loading heavy bundles & pages for code splitting & bundle size optimization
 const Dashboard = React.lazy(() => import('./components/Dashboard').then(m => ({ default: m.Dashboard })));
@@ -161,8 +162,10 @@ function GamificationOverlays() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <AppInner />
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <AppInner />
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }

@@ -11,6 +11,7 @@ import { WeeklyReportCard } from './WeeklyReportCard';
 import { SkeletonLoader } from './SkeletonLoader';
 import AIInsights from './AIInsights';
 import { GoalActivityChart } from './GoalActivityChart';
+import ErrorBoundary from './ErrorBoundary';
 
 const QuickThoughtsWidget = () => {
   const {
@@ -661,7 +662,9 @@ export const Dashboard = ({ setView }) => {
           <WeeklyReportCard report={weeklyReport} />
 
           {/* Goal Activity Distribution Pie Chart */}
-          <GoalActivityChart goals={goals} />
+          <ErrorBoundary fallbackType="widget" errorMessage="Goal activity distribution statistics could not be loaded. Please complete active habits to populate.">
+            <GoalActivityChart goals={goals} />
+          </ErrorBoundary>
 
           {/* Consistency Heatmap Widget */}
           <WeeklyHeatmap focusHistory={focusHistory} taskLogs={taskLogs} accuracy={accuracy} />
