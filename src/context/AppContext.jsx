@@ -7,6 +7,7 @@ import { TODAY, addDays, diffDays, parseLocalDate } from '../utils/dateUtils';
 import {
   isGoalDoneToday,
   isTaskDone,
+  isHabitDoneToday,
   calculateAccuracy,
   calculateDisciplineScore,
   getUserLevel,
@@ -20,7 +21,9 @@ import {
   calculateConsecutiveMissedDays,
   calculateGoalConsecutiveMissedDays,
   getGoalScheduledDays,
-  calculateOverallProgress
+  calculateOverallProgress,
+  calculateProductiveStreak,
+  getTaskTrackingKey
 } from '../utils/calculationUtils';
 import { XP_SOURCES, getLevelFromXP, evaluateBadges, getNewlyEarnedBadges, getBadgeById } from '../utils/gamificationEngine';
 import { scheduleLocalNotification, scheduleReminder, cancelReminder } from '../utils/notificationUtils';
@@ -130,6 +133,7 @@ export const AppProvider = ({ children }) => {
   });
   const [tasks, setTasks] = useState(() => safeParse(STORAGE_KEYS.TASKS, []));
   const [taskLogs, setTaskLogs] = useState(() => safeParse(STORAGE_KEYS.LOGS, {}));
+  const [recurringHistory, setRecurringHistory] = useState(() => safeParse('gf_recurring_history', {}));
   const [notes, setNotes] = useState(() => safeParse(STORAGE_KEYS.NOTES, []));
   const [memories, setMemories] = useState(() => safeParse(STORAGE_KEYS.MEMORIES, []));
   const [quickThoughts, setQuickThoughts] = useState(() => safeParse(STORAGE_KEYS.QUICK_THOUGHTS, []));
@@ -294,8 +298,9 @@ export const AppProvider = ({ children }) => {
     return false;
   }), [tasks, todayStr]);
 
-  const allHabits = useMemo(() => (goals || []).flatMap(g => g.habits || []), [goals]);
+  const allHabits = useMemo(() => (goals || []).filter(g => !g.isMissingDream).flatMap(g => g.habits || []), [goals]);
   const todayGoals = useMemo(() => (goals || []).filter(g => {
+    if (g.isMissingDream) return false;
     const habits = g.habits || [];
     if (habits.length === 0) return false;
     return habits.some(isHabitScheduledToday);
@@ -304,28 +309,45 @@ export const AppProvider = ({ children }) => {
   const goalsDone = useMemo(() => (todayGoals || []).filter(g => isGoalDoneToday(g)).length, [todayGoals]);
   const tasksDone = useMemo(() => (todayTasks || []).filter(t => isTaskDone(t) && t.lastCompletedDate === todayStr).length, [todayTasks, todayStr]);
 
-  const totalItems = (todayGoals?.length || 0) + (todayTasks?.length || 0);
-  const completedItems = (goalsDone || 0) + (tasksDone || 0);
+  const todayHabits = useMemo(() => {
+    return (goals || [])
+      .filter(g => !g.isMissingDream)
+      .flatMap(g => g.habits || [])
+      .filter(isHabitScheduledToday);
+  }, [goals]);
+
+  const completedTodayHabitsCount = useMemo(() => {
+    return todayHabits.filter(isHabitDoneToday).length;
+  }, [todayHabits]);
+
+  const totalItems = todayHabits.length;
+  const completedItems = completedTodayHabitsCount;
 
   const accuracy = useMemo(() => {
-    if (completedItems === 0) return 0;
-    return totalItems === 0 ? 100 : Math.round((completedItems / totalItems) * 100);
+    if (totalItems === 0) return 100;
+    return Math.round((completedItems / totalItems) * 100);
   }, [completedItems, totalItems]);
 
   const avgStreak = useMemo(() => {
-    if (!goals || goals.length === 0) return 0;
-    const totalBestStreaks = goals.reduce((acc, goal) => {
+    const activeGoals = (goals || []).filter(g => !g.isMissingDream);
+    if (activeGoals.length === 0) return 0;
+    const totalBestStreaks = activeGoals.reduce((acc, goal) => {
       const habits = goal.habits || [];
       const bestHabitStreak = habits.length === 0 ? 0 : Math.max(0, ...habits.map(h => h.streak || 0));
       return acc + bestHabitStreak;
     }, 0);
-    return totalBestStreaks / goals.length;
+    return totalBestStreaks / activeGoals.length;
   }, [goals]);
 
   const disciplineScore = calculateDisciplineScore(accuracy, avgStreak, focusTime);
   const userLevel = getUserLevel(disciplineScore);
 
   const weeklyReport = useMemo(() => calculateWeeklyReport(taskLogs), [taskLogs]);
+
+  const taskStreak = useMemo(() => {
+    const { currentStreak } = calculateProductiveStreak(taskLogs);
+    return currentStreak;
+  }, [taskLogs]);
 
   const smartAlerts = useMemo(() =>
     getSmartAlerts(accuracy, goals, tasks, weeklyReport, settings.dismissedInsights || []),
@@ -341,6 +363,7 @@ export const AppProvider = ({ children }) => {
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.GOALS, JSON.stringify(goals)); }, [goals]);
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.TASKS, JSON.stringify(tasks)); }, [tasks]);
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify(taskLogs)); }, [taskLogs]);
+  useEffect(() => { localStorage.setItem('gf_recurring_history', JSON.stringify(recurringHistory)); }, [recurringHistory]);
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.NOTES, JSON.stringify(notes)); }, [notes]);
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.XP, JSON.stringify(xpData)); }, [xpData]);
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.QUICK_THOUGHTS, JSON.stringify(quickThoughts)); }, [quickThoughts]);
@@ -557,6 +580,7 @@ export const AppProvider = ({ children }) => {
             startDate: g.start_date || null,
             createdAt: g.created_at,
             extensions: g.extensions || [],
+            isMissingDream: g.is_missing_dream ?? false,
             syncPending: docSnap.metadata.hasPendingWrites,
             habits: [] // Will be populated in real-time by nested listeners below
           };
@@ -735,6 +759,27 @@ export const AppProvider = ({ children }) => {
         console.error('[Realtime Sync] Error in Task Logs subscription:', error);
       });
       unsubscribes.push(unsubLogs);
+
+      // X. Subscribe to Recurring Task History
+      const recQuery = collection(fireDb, 'users', user.id, 'recurring_task_history');
+      const unsubRec = onSnapshot(recQuery, (snapshot) => {
+        const history = {};
+        snapshot.docs.forEach(doc => {
+          const data = doc.data();
+          db.updateCache(`users/${user.id}/recurring_task_history/${doc.id}`, data);
+          history[doc.id] = {
+            id: doc.id,
+            completedDates: data.completed_dates || data.completedDates || [],
+            title: data.title || '',
+            type: data.type || 'daily',
+            streak: data.streak || 0,
+          };
+        });
+        setRecurringHistory(history);
+      }, (error) => {
+        console.error('[Realtime Sync] Error in Recurring Task History subscription:', error);
+      });
+      unsubscribes.push(unsubRec);
 
       // 5. Subscribe to Focus History Collection
       const focusQuery = collection(fireDb, 'users', user.id, 'focus_history');
@@ -982,36 +1027,38 @@ export const AppProvider = ({ children }) => {
             const tLastActive = t.lastActiveDate || settings.lastActiveDate || yesterdayStr;
             if (tLastActive === todayStr) return t; // Already reset for today
 
-            const start = parseLocalDate(tLastActive);
-            const end = parseLocalDate(todayStr);
-            let daysDiff = 0;
-            if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
-              daysDiff = Math.floor((end - start) / (1000 * 60 * 60 * 24));
-            }
-
-            let newMissed = t.missedDays || 0;
-            let newStreak = t.currentStreak || 0;
-
             const isCompleted = t.completed ||
               (t.completionType === 'count' && (t.currentCount || 0) >= (t.targetCount || 10)) ||
               (t.completionType === 'time' && (t.timeSpent ?? 0) >= (t.targetTime ?? 30));
 
-            if (!isCompleted) {
-              newMissed += 1;
-            } else {
-              newMissed = 0;
+            const recId = t.recurringId || getTaskTrackingKey(t);
+            let recDates = (recurringHistory[recId]?.completedDates ? [...recurringHistory[recId].completedDates] : (t.completedDates ? [...t.completedDates] : []));
+
+            if (isCompleted && !recDates.includes(tLastActive)) {
+              recDates.push(tLastActive);
             }
 
-            if (daysDiff > 1) {
-              for (let i = 1; i < daysDiff; i++) {
-                newMissed += 1;
-                if (newMissed >= 3) { newStreak = 0; newMissed = 0; }
-              }
-            }
-            if (newMissed >= 3) { newStreak = 0; newMissed = 0; }
+            // Calculate new missed days and streak dynamically using calculations
+            const newMissed = calculateConsecutiveMissedDays(recDates, []);
+            const newStreak = calculateStreakFromHistory(recDates, []);
+
+            // Sync to recurring history
+            const recPayload = {
+              title: t.title,
+              type: t.type || 'daily',
+              completedDates: recDates,
+              streak: newStreak
+            };
+
+            setRecurringHistory(prev => ({
+              ...prev,
+              [recId]: { id: recId, ...recPayload }
+            }));
+            db.upsertRecurringHistory(user.id, recId, recPayload);
 
             const finalTask = {
               ...t,
+              completedDates: recDates,
               timeSpent: 0,
               currentCount: 0,
               completed: false,
@@ -1037,7 +1084,7 @@ export const AppProvider = ({ children }) => {
       });
     }
 
-  }, [loading, user, settings, goals, tasks, currentDate]);
+  }, [loading, user, settings, goals, tasks, currentDate, recurringHistory]);
 
   // ── Automatic Daily Summary Sync ─────────────────────────
   useEffect(() => {
@@ -1263,6 +1310,7 @@ export const AppProvider = ({ children }) => {
       progress: 0,
       streak: 0,
       missedDays: 0,
+      isMissingDream: false,
       createdAt: TODAY(),
       lastActiveDate: TODAY(),
       habits: initialHabits
@@ -2023,15 +2071,26 @@ export const AppProvider = ({ children }) => {
   };
 
   const addTask = async (task) => {
+    const trackingKey = getTaskTrackingKey(task);
+    const existingRec = recurringHistory[trackingKey];
+    const recDates = existingRec ? existingRec.completedDates : [];
+    const today = TODAY();
+    const isCompletedToday = recDates.includes(today);
+    const sortedDates = [...recDates].sort((a, b) => b.localeCompare(a));
+    const newLastCompleted = sortedDates.length > 0 ? sortedDates[0] : null;
+
     const newT = {
       ...task,
       id: Date.now().toString(),
-      timeSpent: 0,
-      currentCount: 0,
-      completed: false,
-      currentStreak: 0,
-      missedDays: 0,
-      lastActiveDate: TODAY()
+      recurringId: trackingKey,
+      timeSpent: isCompletedToday && task.completionType === 'time' ? (task.targetTime || 30) : 0,
+      currentCount: isCompletedToday && task.completionType === 'count' ? (task.targetCount || 10) : 0,
+      completed: isCompletedToday,
+      currentStreak: existingRec ? existingRec.streak : 0,
+      completedDates: recDates,
+      lastCompletedDate: newLastCompleted,
+      missedDays: calculateConsecutiveMissedDays(recDates, []),
+      lastActiveDate: today
     };
     setTasks(prev => [newT, ...prev]);
     if (user) {
@@ -2113,29 +2172,40 @@ export const AppProvider = ({ children }) => {
       isDone = updated.completed;
     }
 
-    let updatedDates = updated.completedDates ? [...updated.completedDates] : [];
-    if (updated.lastCompletedDate && !updatedDates.includes(updated.lastCompletedDate)) {
-      updatedDates.push(updated.lastCompletedDate);
-    }
+    const recId = updated.recurringId || getTaskTrackingKey(updated);
+    let recDates = (recurringHistory[recId]?.completedDates ? [...recurringHistory[recId].completedDates] : (updated.completedDates ? [...updated.completedDates] : []));
 
     if (isDone) {
-      if (!updatedDates.includes(today)) {
-        updatedDates.push(today);
+      if (!recDates.includes(today)) {
+        recDates.push(today);
       }
     } else {
-      updatedDates = updatedDates.filter(d => d !== today);
+      recDates = recDates.filter(d => d !== today);
     }
 
-    const newStreak = isDaily ? calculateStreakFromHistory(updatedDates, []) : 0;
-    const sortedDates = [...updatedDates].sort((a, b) => b.localeCompare(a));
+    const newStreak = isDaily ? calculateStreakFromHistory(recDates, []) : 0;
+    const sortedDates = [...recDates].sort((a, b) => b.localeCompare(a));
     const newLastCompleted = sortedDates.length > 0 ? sortedDates[0] : null;
 
-    updated.completedDates = updatedDates;
+    updated.completedDates = recDates;
     updated.currentStreak = newStreak;
     updated.lastCompletedDate = newLastCompleted;
     updated.lastActiveDate = today;
     if (isDone) {
       updated.missedDays = 0;
+    }
+
+    if (isDaily) {
+      const recPayload = {
+        title: updated.title,
+        type: updated.type || 'daily',
+        completedDates: recDates,
+        streak: newStreak
+      };
+      setRecurringHistory(prev => ({ ...prev, [recId]: { id: recId, ...recPayload } }));
+      if (user) {
+        db.upsertRecurringHistory(user.id, recId, recPayload);
+      }
     }
 
     // XP: Task completed via toggle
@@ -2190,29 +2260,40 @@ export const AppProvider = ({ children }) => {
     updated.currentCount = newCount;
     updated.completed = isDone;
 
-    let updatedDates = updated.completedDates ? [...updated.completedDates] : [];
-    if (updated.lastCompletedDate && !updatedDates.includes(updated.lastCompletedDate)) {
-      updatedDates.push(updated.lastCompletedDate);
-    }
+    const recId = updated.recurringId || getTaskTrackingKey(updated);
+    let recDates = (recurringHistory[recId]?.completedDates ? [...recurringHistory[recId].completedDates] : (updated.completedDates ? [...updated.completedDates] : []));
 
     if (isDone) {
-      if (!updatedDates.includes(today)) {
-        updatedDates.push(today);
+      if (!recDates.includes(today)) {
+        recDates.push(today);
       }
     } else {
-      updatedDates = updatedDates.filter(d => d !== today);
+      recDates = recDates.filter(d => d !== today);
     }
 
-    const newStreak = isDaily ? calculateStreakFromHistory(updatedDates, []) : 0;
-    const sortedDates = [...updatedDates].sort((a, b) => b.localeCompare(a));
+    const newStreak = isDaily ? calculateStreakFromHistory(recDates, []) : 0;
+    const sortedDates = [...recDates].sort((a, b) => b.localeCompare(a));
     const newLastCompleted = sortedDates.length > 0 ? sortedDates[0] : null;
 
-    updated.completedDates = updatedDates;
+    updated.completedDates = recDates;
     updated.currentStreak = newStreak;
     updated.lastCompletedDate = newLastCompleted;
     updated.lastActiveDate = today;
     if (isDone) {
       updated.missedDays = 0;
+    }
+
+    if (isDaily) {
+      const recPayload = {
+        title: updated.title,
+        type: updated.type || 'daily',
+        completedDates: recDates,
+        streak: newStreak
+      };
+      setRecurringHistory(prev => ({ ...prev, [recId]: { id: recId, ...recPayload } }));
+      if (user) {
+        db.upsertRecurringHistory(user.id, recId, recPayload);
+      }
     }
 
     if (isDone && !wasCompleted) {
@@ -2266,29 +2347,40 @@ export const AppProvider = ({ children }) => {
     updated.timeSpent = newTime;
     updated.completed = isDone;
 
-    let updatedDates = updated.completedDates ? [...updated.completedDates] : [];
-    if (updated.lastCompletedDate && !updatedDates.includes(updated.lastCompletedDate)) {
-      updatedDates.push(updated.lastCompletedDate);
-    }
+    const recId = updated.recurringId || getTaskTrackingKey(updated);
+    let recDates = (recurringHistory[recId]?.completedDates ? [...recurringHistory[recId].completedDates] : (updated.completedDates ? [...updated.completedDates] : []));
 
     if (isDone) {
-      if (!updatedDates.includes(today)) {
-        updatedDates.push(today);
+      if (!recDates.includes(today)) {
+        recDates.push(today);
       }
     } else {
-      updatedDates = updatedDates.filter(d => d !== today);
+      recDates = recDates.filter(d => d !== today);
     }
 
-    const newStreak = isDaily ? calculateStreakFromHistory(updatedDates, []) : 0;
-    const sortedDates = [...updatedDates].sort((a, b) => b.localeCompare(a));
+    const newStreak = isDaily ? calculateStreakFromHistory(recDates, []) : 0;
+    const sortedDates = [...recDates].sort((a, b) => b.localeCompare(a));
     const newLastCompleted = sortedDates.length > 0 ? sortedDates[0] : null;
 
-    updated.completedDates = updatedDates;
+    updated.completedDates = recDates;
     updated.currentStreak = newStreak;
     updated.lastCompletedDate = newLastCompleted;
     updated.lastActiveDate = today;
     if (isDone) {
       updated.missedDays = 0;
+    }
+
+    if (isDaily) {
+      const recPayload = {
+        title: updated.title,
+        type: updated.type || 'daily',
+        completedDates: recDates,
+        streak: newStreak
+      };
+      setRecurringHistory(prev => ({ ...prev, [recId]: { id: recId, ...recPayload } }));
+      if (user) {
+        db.upsertRecurringHistory(user.id, recId, recPayload);
+      }
     }
 
     if (isDone && !wasCompleted) {
@@ -2735,7 +2827,7 @@ export const AppProvider = ({ children }) => {
 
   const tasksValue = {
     tasks, addTask, updateTask, deleteTask, logTaskTime, toggleTaskComplete, updateTaskCount,
-    todayTasks, taskLogs, weeklyReport, totalItems, completedItems, accuracy,
+    todayTasks, taskLogs, weeklyReport, totalItems, completedItems, accuracy, taskStreak,
     loading, syncError, retrySync: syncFromCloud, clearProfileData
   };
 
@@ -2775,7 +2867,7 @@ export const AppProvider = ({ children }) => {
     accuracy, alerts, weeklyReport, disciplineScore, userLevel, insights: getInsights(accuracy, avgStreak, focusTime),
     notes, addNote, updateNote, deleteNote,
     loading, taskLogs, syncError, retrySync: syncFromCloud,
-    totalItems, completedItems, todayTasks, allHabits,
+    totalItems, completedItems, todayTasks, allHabits, taskStreak,
     // Gamification
     xpData, awardXP, incrementCompletions, awardFocusXP, recordComeback,
     currentLevelInfo, levelUpEvent, setLevelUpEvent,

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useGoals } from '../context/AppContext';
-import { Target, Plus, ChevronDown, ChevronUp, Trash2, Clock, Check, Layers, Calendar, History, Edit3, Maximize2, Minimize2 } from 'lucide-react';
+import { Target, Plus, ChevronDown, ChevronUp, Trash2, Clock, Check, Layers, Calendar, History, Edit3, Maximize2, Minimize2, Moon } from 'lucide-react';
 import { isGoalDoneToday, calculateGoalDailyProgress, isHabitScheduledToday, calculateOverallProgress } from '../utils/calculationUtils';
 import { addDays, TODAY } from '../utils/dateUtils';
 import { DeleteConfirmationModal } from './DeleteConfirmationModal';
@@ -476,18 +476,29 @@ const HabitRow = ({ habit, goalId, logHabitTime, deleteHabit, toggleHabitCheck, 
 };
 
 export const GoalsPage = () => {
-  const { goals, addGoal, deleteGoal, addHabit, deleteHabit, logHabitTime, toggleHabitCheck, updateHabitCount, updateHabitReminder, extendGoalDeadline, editGoalSystem, setCompletedGoalForCelebration } = useGoals();
+  const { goals, addGoal, updateGoal, deleteGoal, addHabit, deleteHabit, logHabitTime, toggleHabitCheck, updateHabitCount, updateHabitReminder, extendGoalDeadline, editGoalSystem, setCompletedGoalForCelebration } = useGoals();
 
   const todayStr = TODAY();
+  const [activeTab, setActiveTab] = useState('active'); // 'active' or 'missing'
+
   const calculatedGoals = goals.map(g => {
     const liveProgress = calculateOverallProgress(g);
-    const isFinished = liveProgress === 100 || (g.deadline && todayStr >= g.deadline);
+    // Only mark goals as finished/mastered when they reach 100% progress
+    const isFinished = liveProgress === 100;
     return {
       ...g,
       progress: liveProgress,
       isFinished
     };
   });
+
+  const activeCalculatedGoals = calculatedGoals.filter(g => !g.isMissingDream);
+  const missingCalculatedGoals = calculatedGoals.filter(g => g.isMissingDream);
+
+  const doneGoals = activeCalculatedGoals.filter(g => g.isFinished).length;
+  const activeGoals = activeCalculatedGoals.filter(g => !g.isFinished).length;
+  const avgProgress = activeCalculatedGoals.length === 0 ? 0 : Math.round(activeCalculatedGoals.reduce((s, g) => s + (g.progress || 0), 0) / activeCalculatedGoals.length);
+  const missingDreamGoalsCount = missingCalculatedGoals.length;
 
   const [expandedGoalIds, setExpandedGoalIds] = useState([]);
   const [isMobile, setIsMobile] = useState(false);
@@ -563,9 +574,7 @@ export const GoalsPage = () => {
   });
   const [newHabit, setNewHabit] = useState({ title: '', type: 'time', targetTime: 15, targetCount: 10, scheduleDays: [], reminderEnabled: false, reminderTime: '08:00' });
 
-  const doneGoals = calculatedGoals.filter(g => g.isFinished).length;
-  const activeGoals = calculatedGoals.filter(g => !g.isFinished).length;
-  const avgProgress = calculatedGoals.length === 0 ? 0 : Math.round(calculatedGoals.reduce((s, g) => s + (g.progress || 0), 0) / calculatedGoals.length);
+  // Derived stats already computed at the top level
 
   const submitGoal = (e) => {
     e.preventDefault();
@@ -666,11 +675,12 @@ export const GoalsPage = () => {
       </div>
 
       {/* Analytics Bar */}
-      <div className="bg-bg-dark-elem rounded-3xl p-4 sm:p-6 grid grid-cols-3 gap-1.5 sm:gap-4 border border-white/5 shadow-xl">
+      <div className="bg-bg-dark-elem rounded-3xl p-4 sm:p-6 grid grid-cols-2 min-[480px]:grid-cols-4 gap-4 sm:gap-4 border border-white/5 shadow-xl">
         {[
           { label: 'Avg Mastery', val: `${avgProgress}%`, color: 'text-accent-blue' },
           { label: 'Finished', val: doneGoals, color: 'text-emerald-400' },
           { label: 'In Progress', val: activeGoals, color: 'text-white' },
+          { label: 'Missing Dreams', val: missingDreamGoalsCount, color: 'text-purple-400' },
         ].map((s, i) => (
           <div key={i} className="text-center space-y-1 min-w-0">
             <p className={`text-lg min-[360px]:text-xl md:text-3xl font-black tracking-tighter truncate ${s.color}`}>{s.val}</p>
@@ -838,9 +848,38 @@ export const GoalsPage = () => {
         </div>
       )}
 
+      {/* Segmented Tab Selector */}
+      {calculatedGoals.length > 0 && (
+        <div className="flex bg-bg-input/60 rounded-2xl p-1 max-w-[360px] border border-border-light shadow-sm">
+          <button
+            type="button"
+            onClick={() => setActiveTab('active')}
+            className={`flex-1 py-2.5 rounded-xl font-black text-xs transition-all flex items-center justify-center gap-2 active:scale-[0.98] ${
+              activeTab === 'active' 
+                ? 'bg-accent-blue text-white shadow-md' 
+                : 'text-text-muted hover:text-text-main hover:bg-bg-input'
+            }`}
+          >
+            <Target size={13} /> Active Targets ({activeCalculatedGoals.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('missing')}
+            className={`flex-1 py-2.5 rounded-xl font-black text-xs transition-all flex items-center justify-center gap-2 active:scale-[0.98] ${
+              activeTab === 'missing' 
+                ? 'bg-purple-500 text-white shadow-md' 
+                : 'text-text-muted hover:text-text-main hover:bg-bg-input'
+            }`}
+          >
+            <Moon size={13} /> Missing Dreams ({missingDreamGoalsCount})
+          </button>
+        </div>
+      )}
+
       {/* Goal Cards Masonry Grid / Accordion List */}
       {(() => {
-        const sortedGoals = [...calculatedGoals].sort((a, b) => {
+        const goalsToRender = activeTab === 'active' ? activeCalculatedGoals : missingCalculatedGoals;
+        const sortedGoals = [...goalsToRender].sort((a, b) => {
           const aDone = isGoalDoneToday(a);
           const bDone = isGoalDoneToday(b);
           if (aDone !== bDone) return aDone ? 1 : -1;
@@ -944,6 +983,16 @@ export const GoalsPage = () => {
 
                           {/* Action icons and controls */}
                           <div className="flex sm:flex-col items-center gap-1 sm:gap-2 shrink-0">
+                            <button 
+                              onClick={e => { 
+                                e.stopPropagation(); 
+                                updateGoal(goal.id, { isMissingDream: !goal.isMissingDream }); 
+                              }} 
+                              className="w-6 h-6 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl text-text-muted hover:text-purple-400 hover:bg-purple-400/10 transition-all flex items-center justify-center shrink-0"
+                              title={goal.isMissingDream ? "Restore to Main Targets" : "Move to Missing Dreams"}
+                            >
+                              <Moon size={12} fill={goal.isMissingDream ? "currentColor" : "none"} className={goal.isMissingDream ? "text-purple-400" : ""} />
+                            </button>
                             <button onClick={e => { e.stopPropagation(); setEditingGoal(goal); }} className="w-6 h-6 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl text-text-muted hover:text-accent-blue hover:bg-accent-blue/10 transition-all flex items-center justify-center shrink-0" title="Edit Goal System"><Edit3 size={12} /></button>
                             <button onClick={e => { e.stopPropagation(); setDeletingGoalItem(goal); }} className="w-6 h-6 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl text-text-muted hover:text-rose-500 hover:bg-rose-500/10 transition-all flex items-center justify-center shrink-0" title="Delete Goal System"><Trash2 size={12} /></button>
                             {isOpen ? <ChevronUp className="text-text-muted shrink-0 w-3.5 h-3.5 sm:w-[18px] sm:h-[18px]" /> : <ChevronDown className="text-text-muted shrink-0 w-3.5 h-3.5 sm:w-[18px] sm:h-[18px]" />}

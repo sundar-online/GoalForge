@@ -343,6 +343,7 @@ export async function fetchGoals(userId) {
         startDate: g.start_date || null,
         createdAt: g.created_at,
         extensions: g.extensions || [],
+        isMissingDream: g.is_missing_dream ?? false,
         habits,
       });
     }
@@ -370,6 +371,7 @@ export async function upsertGoal(userId, goal) {
     days_completed: goal.daysCompleted ?? 0,
     start_date: goal.startDate || null,
     extensions: goal.extensions || [],
+    is_missing_dream: goal.isMissingDream ?? false,
     created_at: goal.createdAt || new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
@@ -893,6 +895,13 @@ export async function clearUserDataDb(userId) {
       batch.delete(q.ref);
     });
 
+    // 7. Delete all recurring task histories
+    const recSnap = await getDocs(userCol(userId, 'recurring_task_history'));
+    recSnap.docs.forEach(r => {
+      invalidateCache(`users/${userId}/recurring_task_history/${r.id}`);
+      batch.delete(r.ref);
+    });
+
     // Commit deletions
     await batch.commit();
 
@@ -1008,4 +1017,40 @@ export function enableNetworkReconnectSync(onReconnectCallback) {
     window.removeEventListener('online', handleOnline);
     window.removeEventListener('offline', handleOffline);
   };
+}
+
+export async function upsertRecurringHistory(userId, historyId, historyData) {
+  const payload = {
+    title: historyData.title || '',
+    type: historyData.type || 'daily',
+    completed_dates: historyData.completedDates || [],
+    streak: historyData.streak || 0,
+    updated_at: new Date().toISOString(),
+  };
+  const pathKey = `users/${userId}/recurring_task_history/${historyId}`;
+  const docRef = doc(fireDb, 'users', userId, 'recurring_task_history', historyId);
+  return smartWrite(docRef, payload, pathKey, false, 1500);
+}
+
+export async function fetchRecurringHistory(userId) {
+  try {
+    const snap = await getDocs(collection(fireDb, 'users', userId, 'recurring_task_history'));
+    const history = {};
+    snap.docs.forEach(d => {
+      const data = d.data();
+      const pathKey = `users/${userId}/recurring_task_history/${d.id}`;
+      writeCache.set(pathKey, cleanPayload(data));
+      history[d.id] = {
+        id: d.id,
+        completedDates: data.completed_dates || [],
+        title: data.title || '',
+        type: data.type || 'daily',
+        streak: data.streak || 0,
+      };
+    });
+    return history;
+  } catch (err) {
+    errorLog('fetchRecurringHistory', err);
+    return null;
+  }
 }

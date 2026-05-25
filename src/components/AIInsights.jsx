@@ -21,7 +21,8 @@ const AIInsights = () => {
     dismissInsight, 
     applyRecoveryPlan,
     smartSuggestions,
-    theme
+    theme,
+    updateGoal
   } = useAppContext();
 
   if (aiInsights.length === 0 && recoveryStrategies.length === 0 && !smartSuggestions) {
@@ -180,7 +181,12 @@ const AIInsights = () => {
               </p>
               {insight.actionLabel && (
                 <button 
-                  onClick={() => dismissInsight(insight.id)}
+                  onClick={() => {
+                    if (insight.actionPayload && insight.actionPayload.goalId) {
+                      updateGoal(insight.actionPayload.goalId, { isMissingDream: true });
+                    }
+                    dismissInsight(insight.id);
+                  }}
                   className="mt-4 text-[10px] font-black text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5 hover:gap-2.5 transition-all uppercase tracking-widest active:scale-95"
                 >
                   {insight.actionLabel} <ArrowRight size={12} strokeWidth={2.5} />

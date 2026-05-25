@@ -57,31 +57,14 @@ export const isTaskDone = (t) => {
 };
 
 export const calculateAccuracy = (tasks, goals) => {
-  const todayDate = TODAY();
-  const todayTasks = tasks.filter(t => {
-    const type = t.type || 'daily';
-    if (type === 'daily') return true;
-    if (type === 'single') return t.targetDate === todayDate || t.date === todayDate;
-    if (type === 'range') return t.startDate <= todayDate && t.endDate >= todayDate;
-    return false;
-  });
+  const activeGoals = goals.filter(g => !g.isMissingDream);
+  const todayHabits = activeGoals.flatMap(g => g.habits || []).filter(isHabitScheduledToday);
+  const completedTodayHabitsCount = todayHabits.filter(isHabitDoneToday).length;
 
-  const todayGoals = goals.filter(g => {
-    const habits = g.habits || [];
-    if (habits.length === 0) return false;
-    return habits.some(isHabitScheduledToday);
-  });
-
-  const goalsDone = todayGoals.filter(isGoalDoneToday).length;
-  const tasksDone = todayTasks.filter(t => isTaskDone(t) && t.lastCompletedDate === todayDate).length;
-  
-  const completedUnits = goalsDone + tasksDone;
-  if (completedUnits === 0) return 0;
-
-  const totalUnits = todayGoals.length + todayTasks.length;
+  const totalUnits = todayHabits.length;
   if (totalUnits === 0) return 100;
   
-  return Math.round((completedUnits / totalUnits) * 100);
+  return Math.round((completedTodayHabitsCount / totalUnits) * 100);
 };
 
 export const calculateDisciplineScore = (accuracy, avgStreak, focusTime) => {
@@ -109,14 +92,75 @@ export const getInsights = (accuracy, avgStreak, focusTime) => {
   return insights;
 };
 
+export const calculateProductiveStreak = (taskLogs) => {
+  if (!taskLogs || Object.keys(taskLogs).length === 0) {
+    return { currentStreak: 0, bestStreak: 0 };
+  }
+
+  const todayStr = TODAY();
+  const yesterdayStr = addDays(todayStr, -1);
+
+  // Filter logs where at least one task/habit was completed
+  const productiveDates = new Set(
+    Object.keys(taskLogs).filter(date => {
+      const log = taskLogs[date];
+      return log && (log.completed_tasks || 0) > 0;
+    })
+  );
+
+  if (productiveDates.size === 0) {
+    return { currentStreak: 0, bestStreak: 0 };
+  }
+
+  // Calculate current streak:
+  // Starts from today if completed today, otherwise starts from yesterday.
+  let currentStreak = 0;
+  let checkDate = todayStr;
+  
+  if (productiveDates.has(todayStr)) {
+    while (productiveDates.has(checkDate)) {
+      currentStreak++;
+      checkDate = addDays(checkDate, -1);
+    }
+  } else if (productiveDates.has(yesterdayStr)) {
+    checkDate = yesterdayStr;
+    while (productiveDates.has(checkDate)) {
+      currentStreak++;
+      checkDate = addDays(checkDate, -1);
+    }
+  }
+
+  // Calculate best streak:
+  // Iterate from the earliest date to today, keeping track of the longest consecutive productive run.
+  const sortedDates = Array.from(productiveDates).sort();
+  let bestStreak = 0;
+  let currentRun = 0;
+  let lastDate = null;
+
+  for (const dateStr of sortedDates) {
+    if (lastDate === null) {
+      currentRun = 1;
+    } else {
+      const expectedNext = addDays(lastDate, 1);
+      if (dateStr === expectedNext) {
+        currentRun++;
+      } else {
+        bestStreak = Math.max(bestStreak, currentRun);
+        currentRun = 1;
+      }
+    }
+    lastDate = dateStr;
+  }
+  bestStreak = Math.max(bestStreak, currentRun);
+
+  return { currentStreak, bestStreak };
+};
+
 export const calculateWeeklyReport = (taskLogs) => {
   const today = TODAY();
   const last7Days = [];
   for (let i = 0; i < 7; i++) {
-    const d = new Date(today);
-    d.setDate(d.getDate() - i);
-    const dayKey = d.toISOString().split('T')[0];
-    last7Days.push(dayKey);
+    last7Days.push(addDays(today, -i));
   }
 
   const weeklyStats = last7Days.map(date => taskLogs[date] || { date, completed_tasks: 0, total_tasks: 0, time_spent: 0 });
@@ -139,14 +183,18 @@ export const calculateWeeklyReport = (taskLogs) => {
   // Improvement comparison (this week vs previous week)
   const prev7Days = [];
   for (let i = 7; i < 14; i++) {
-    const d = new Date(today);
-    d.setDate(d.getDate() - i);
-    prev7Days.push(d.toISOString().split('T')[0]);
+    prev7Days.push(addDays(today, -i));
   }
   const prevStats = prev7Days.map(date => taskLogs[date] || { total_tasks: 0, completed_tasks: 0 });
   const prevTotalComp = prevStats.reduce((acc, d) => acc + (d.completed_tasks || 0), 0);
   const prevTotalTasks = prevStats.reduce((acc, d) => acc + (d.total_tasks || 0), 0);
   const prevAccuracy = prevTotalTasks === 0 ? 0 : Math.round((prevTotalComp / prevTotalTasks) * 100);
+
+  // Calculate active days in the last 7 days
+  const activeDays = weeklyStats.filter(s => (s.completed_tasks || 0) > 0).length;
+
+  // Calculate best productive streak overall
+  const { bestStreak } = calculateProductiveStreak(taskLogs);
 
   return {
     weeklyAccuracy,
@@ -154,15 +202,18 @@ export const calculateWeeklyReport = (taskLogs) => {
     bestDay: bestDay?.date || 'N/A',
     worstDay: worstDay?.date || 'N/A',
     improvement: weeklyAccuracy - prevAccuracy,
-    dailyBreakdown: statsWithAccuracy
+    dailyBreakdown: statsWithAccuracy,
+    activeDays,
+    bestStreak
   };
 };
 
 export const getSmartAlerts = (accuracy, goals = [], tasks = [], weeklyReport = {}, dismissedInsights = []) => {
   const alerts = [];
   try {
+    const activeGoals = goals.filter(g => !g.isMissingDream);
     // 1. Streak Alert
-    const hasHabitRisk = goals.some(g => 
+    const hasHabitRisk = activeGoals.some(g => 
       (g.habits || []).some(h => {
         const isAtRisk = (h.missedDays || 0) >= 2 && (h.streak || 0) > 0 && !isHabitDoneToday(h) && !h.isRecovering;
         if (!isAtRisk) return false;
@@ -187,7 +238,7 @@ export const getSmartAlerts = (accuracy, goals = [], tasks = [], weeklyReport = 
       return !isDismissed;
     });
 
-    const hasGoalRisk = goals.some(g => {
+    const hasGoalRisk = activeGoals.some(g => {
       const isAtRisk = (g.missedDays || 0) >= 2 && (g.streak || 0) > 0 && !isGoalDoneToday(g) && !g.isRecovering;
       if (!isAtRisk) return false;
       const isDismissed = dismissedInsights.some(d => 
@@ -205,7 +256,7 @@ export const getSmartAlerts = (accuracy, goals = [], tasks = [], weeklyReport = 
     if (accuracy < 50) alerts.push({ type: 'danger', message: "📉 Low productivity detected" });
 
     // 3. Consistency Alert
-    const habitStreaks = goals.flatMap(g => (g?.habits || []).map(h => h?.streak || 0));
+    const habitStreaks = activeGoals.flatMap(g => (g?.habits || []).map(h => h?.streak || 0));
     const taskStreaks = tasks.map(t => t?.currentStreak || 0);
     const maxStreak = Math.max(0, ...habitStreaks, ...taskStreaks);
     if (maxStreak >= 5) alerts.push({ type: 'success', message: "🔥 Great consistency!" });
@@ -490,6 +541,13 @@ export const calculateOverallProgress = (g) => {
   const totalDays = diffDays(startStr, endStr);
   const completedDays = (g.completedDates || []).length;
   return Math.min(100, Math.round((completedDays / totalDays) * 100));
+};
+
+export const getTaskTrackingKey = (task) => {
+  if (task.recurringId) return task.recurringId;
+  const titlePart = (task.title || '').trim().toLowerCase();
+  const typePart = task.type || 'daily';
+  return `${titlePart}_${typePart}`;
 };
 
 

@@ -109,7 +109,8 @@ export const analyzeUserBehavior = (goals, tasks, taskLogs, focusTime) => {
   }
 
   // Also celebrate high-streak habits
-  const allHabits = goals.flatMap((g) => g.habits || []);
+  const activeGoals = (goals || []).filter((g) => !g.isMissingDream);
+  const allHabits = activeGoals.flatMap((g) => g.habits || []);
   const topHabit = [...allHabits].sort((a, b) => (b.streak || 0) - (a.streak || 0))[0];
 
   if (topHabit && topHabit.streak >= 5) {
@@ -217,6 +218,26 @@ export const analyzeUserBehavior = (goals, tasks, taskLogs, focusTime) => {
       icon: '🔋',
     });
   }
+  // ── 5. Missing Dream Recommendations (Shelve Inactive Goals) ───────────────
+  (goals || []).forEach(g => {
+    if (g.isMissingDream) return; // Already shelved
+    const missed = g.missedDays || 0;
+    const habits = g.habits || [];
+    const maxHabitMissed = habits.length === 0 ? 0 : Math.max(...habits.map(h => h.missedDays || 0));
+
+    if (missed >= 7 || maxHabitMissed >= 7) {
+      insights.push({
+        id: `missing_dream_recommend_${g.id}`,
+        type: 'improvement',
+        priority: 'medium',
+        title: `🌙 Rest & Refocus: "${g.title}"`,
+        message: `You haven't completed any habits for "${g.title}" in over 7 days. Rather than letting it build mental guilt or lower your accuracy scores, consider moving it to "Missing Dream" mode. You can restore it anytime!`,
+        icon: '🌙',
+        actionLabel: 'Move to Missing Dreams',
+        actionPayload: { goalId: g.id }
+      });
+    }
+  });
 
   return insights;
 };
@@ -237,10 +258,11 @@ const isItemDoneToday = (item) => {
 export const generateRecoveryStrategies = (goals, tasks) => {
   const strategies = [];
   const today = TODAY();
+  const activeGoals = (goals || []).filter((g) => !g.isMissingDream);
 
   // Aggregate all tracker items
   const allItems = [
-    ...goals.flatMap((g) =>
+    ...activeGoals.flatMap((g) =>
       (g.habits || []).map((h) => ({ ...h, parentId: g.id, isHabit: true, streak: h.streak || 0 }))
     ),
     ...tasks.filter((t) => t.type === 'daily').map((t) => ({ ...t, isHabit: false, streak: t.currentStreak || 0 })),

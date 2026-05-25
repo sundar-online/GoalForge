@@ -4,7 +4,7 @@ import { calculateGoalDailyProgress, isHabitDoneToday, calculateOverallProgress,
 import { TODAY } from '../utils/dateUtils';
 import { BADGE_DEFINITIONS } from '../utils/gamificationEngine';
 import { useAuth } from '../context/AuthContext';
-import { AlertTriangle, AlertCircle, TrendingUp, TrendingDown, CheckCircle2, Clock, Zap, LogOut, Moon, Sun, Sparkles, Trophy, ChevronRight, Target, Award, CalendarDays, Brain, Plus, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { AlertTriangle, AlertCircle, TrendingUp, TrendingDown, CheckCircle2, Clock, Zap, LogOut, Moon, Sun, Sparkles, Trophy, ChevronRight, Target, Award, CalendarDays, Brain, Plus, Trash2, ChevronDown, ChevronUp, Flame } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { WeeklyHeatmap } from './WeeklyHeatmap';
 import { WeeklyReportCard } from './WeeklyReportCard';
@@ -239,7 +239,7 @@ export const Dashboard = ({ setView }) => {
     focusTime, focusHistory, taskLogs,
     disciplineScore, userLevel, insights,
     theme, toggleTheme, loading, weeklyReport, syncError, retrySync,
-    xpData: rawXpData, currentLevelInfo: rawLevelInfo
+    xpData: rawXpData, currentLevelInfo: rawLevelInfo, taskStreak
   } = useAppContext();
 
   const xpData = rawXpData || { totalXP: 0, earnedBadges: [], xpHistory: [] };
@@ -282,6 +282,7 @@ export const Dashboard = ({ setView }) => {
   else accColor = '#ef4444';
 
   const topStreaks = (goals || [])
+    .filter(g => !g.isMissingDream)
     .map(g => {
       // Always derive streak live from completedDates so we never show stale cached values
       const liveCompletedDates = recalculateGoalCompletedDates(g);
@@ -572,8 +573,8 @@ export const Dashboard = ({ setView }) => {
                 const activeGoalsList = (goals || [])
                   .map(g => {
                     const liveProgress = calculateOverallProgress(g);
-                    // Only hide truly finished goals (deadline passed or 100% mastery)
-                    const isFinished = liveProgress >= 100 || (g.deadline && todayStr > g.deadline);
+                    // Only hide goals that are fully completed (100% progress)
+                    const isFinished = liveProgress >= 100;
                     const isDoneToday = isGoalDoneToday(g);
                     return {
                       ...g,
@@ -582,7 +583,12 @@ export const Dashboard = ({ setView }) => {
                       isDoneToday
                     };
                   })
-                  .filter(goal => !goal.isFinished);
+                  .filter(goal => !goal.isFinished && !goal.isMissingDream)
+                  .sort((a, b) => {
+                    // Place completed goals today at the end of the list, matching GoalsPage ordering consistency
+                    if (a.isDoneToday !== b.isDoneToday) return a.isDoneToday ? 1 : -1;
+                    return 0;
+                  });
 
                 if (activeGoalsList.length === 0) {
                   return (
@@ -596,7 +602,7 @@ export const Dashboard = ({ setView }) => {
                   );
                 }
 
-                return activeGoalsList.slice(0, 4).map(goal => {
+                return activeGoalsList.map(goal => {
                   const habitsTotal = goal.habits.length;
                   const dailyProgress = calculateGoalDailyProgress(goal);
                   const achieved = goal.isDoneToday || dailyProgress === 100;
@@ -661,7 +667,7 @@ export const Dashboard = ({ setView }) => {
             {[
               { label: 'Total Units', val: totalItems, icon: <Zap size={18} className="text-accent-blue" />, color: "text-accent-blue" },
               { label: 'Completed', val: completedItems, icon: <CheckCircle2 size={18} className="text-emerald-500" />, color: "text-emerald-500" },
-              { label: 'Max Peak', val: Math.max(totalItems, completedItems), icon: <Clock size={18} className="text-orange-500" />, color: "text-orange-500" },
+              { label: 'Task Streak', val: taskStreak ? `${taskStreak}d` : '0d', icon: <Flame size={18} className="text-orange-500" />, color: "text-orange-500" },
             ].map((s, i) => (
               <div key={i} className="bg-bg-card rounded-3xl p-5 shadow-sm border border-border-light flex flex-col lg:flex-row items-center lg:items-center justify-between gap-2 lg:gap-4 hover:shadow-md transition-shadow">
                 <div className="w-10 h-10 rounded-xl bg-bg-input flex items-center justify-center shrink-0">
