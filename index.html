@@ -3,6 +3,50 @@
 
 <head>
   <meta charset="UTF-8" />
+  <script>
+    window.addEventListener('error', function(event) {
+      var errorDiv = document.getElementById('debug-error-console');
+      if (!errorDiv) {
+        errorDiv = document.createElement('div');
+        errorDiv.id = 'debug-error-console';
+        errorDiv.style.position = 'fixed';
+        errorDiv.style.top = '0';
+        errorDiv.style.left = '0';
+        errorDiv.style.width = '100%';
+        errorDiv.style.height = '100%';
+        errorDiv.style.backgroundColor = '#0b0b14';
+        errorDiv.style.color = '#f87171';
+        errorDiv.style.padding = '24px';
+        errorDiv.style.zIndex = '999999';
+        errorDiv.style.fontFamily = 'monospace';
+        errorDiv.style.overflow = 'auto';
+        errorDiv.style.boxSizing = 'border-box';
+        document.body.appendChild(errorDiv);
+      }
+      errorDiv.innerHTML += '<h3 style="color:#ef4444;margin-top:0;">Uncaught Error:</h3><pre style="white-space:pre-wrap;word-break:break-all;">' + event.message + '\n at ' + event.filename + ':' + event.lineno + ':' + event.colno + '\n' + (event.error ? event.error.stack : '') + '</pre><hr style="border-color:#374151;"/>';
+    });
+    window.addEventListener('unhandledrejection', function(event) {
+      var errorDiv = document.getElementById('debug-error-console');
+      if (!errorDiv) {
+        errorDiv = document.createElement('div');
+        errorDiv.id = 'debug-error-console';
+        errorDiv.style.position = 'fixed';
+        errorDiv.style.top = '0';
+        errorDiv.style.left = '0';
+        errorDiv.style.width = '100%';
+        errorDiv.style.height = '100%';
+        errorDiv.style.backgroundColor = '#0b0b14';
+        errorDiv.style.color = '#f87171';
+        errorDiv.style.padding = '24px';
+        errorDiv.style.zIndex = '999999';
+        errorDiv.style.fontFamily = 'monospace';
+        errorDiv.style.overflow = 'auto';
+        errorDiv.style.boxSizing = 'border-box';
+        document.body.appendChild(errorDiv);
+      }
+      errorDiv.innerHTML += '<h3 style="color:#ef4444;margin-top:0;">Unhandled Promise Rejection:</h3><pre style="white-space:pre-wrap;word-break:break-all;">' + (event.reason ? (event.reason.stack || event.reason) : 'No reason provided') + '</pre><hr style="border-color:#374151;"/>';
+    });
+  </script>
   <!-- Favicon -->
   <link rel="icon" type="image/x-icon" href="/favicon.ico" />
   <link rel="icon" type="image/png" sizes="96x96" href="/favicon-96x96.png" />
