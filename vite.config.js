@@ -6,6 +6,9 @@ import tailwindcss from '@tailwindcss/vite'
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   base: '/',
+  optimizeDeps: {
+    include: ['recharts', 'es-toolkit', 'es-toolkit/compat']
+  },
   build: {
     rolldownOptions: {
       output: {
