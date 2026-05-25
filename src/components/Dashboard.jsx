@@ -10,6 +10,7 @@ import { WeeklyHeatmap } from './WeeklyHeatmap';
 import { WeeklyReportCard } from './WeeklyReportCard';
 import { SkeletonLoader } from './SkeletonLoader';
 import AIInsights from './AIInsights';
+import { GoalActivityChart } from './GoalActivityChart';
 
 const QuickThoughtsWidget = () => {
   const {
@@ -658,6 +659,9 @@ export const Dashboard = ({ setView }) => {
 
           {/* Weekly Performance Widget */}
           <WeeklyReportCard report={weeklyReport} />
+
+          {/* Goal Activity Distribution Pie Chart */}
+          <GoalActivityChart goals={goals} />
 
           {/* Consistency Heatmap Widget */}
           <WeeklyHeatmap focusHistory={focusHistory} taskLogs={taskLogs} accuracy={accuracy} />
