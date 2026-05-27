@@ -7,9 +7,9 @@ import { TODAY } from '../utils/dateUtils';
 import { DeleteConfirmationModal } from './DeleteConfirmationModal';
 
 const SCHEDULE_ICONS = {
-  daily:  <Clock size={12} />,
+  daily: <Clock size={12} />,
   single: <Calendar size={12} />,
-  range:  <CalendarRange size={12} />
+  range: <CalendarRange size={12} />
 };
 
 const SCHEDULE_LABELS = { daily: 'Daily', single: 'Single', range: 'Range' };
@@ -42,15 +42,15 @@ const LogTaskTimeModal = ({ task, onClose, logTaskTime }) => {
 };
 
 export const DailyTasks = () => {
-  const defaultTask = { 
-    title: '', 
-    type: 'daily', 
+  const defaultTask = {
+    title: '',
+    type: 'daily',
     completionType: 'check',
-    targetTime: 30, 
+    targetTime: 30,
     targetCount: 10,
-    priority: 'Medium', 
-    targetDate: TODAY(), 
-    startDate: TODAY(), 
+    priority: 'Medium',
+    targetDate: TODAY(),
+    startDate: TODAY(),
     endDate: TODAY(),
     reminderEnabled: false,
     reminderTime: '08:00'
@@ -99,8 +99,8 @@ export const DailyTasks = () => {
   const submit = (e) => {
     e.preventDefault();
     if (!newTask.title.trim()) return;
-    addTask({ 
-      ...newTask, 
+    addTask({
+      ...newTask,
       targetTime: Number(newTask.targetTime),
       targetCount: Number(newTask.targetCount)
     });
@@ -149,18 +149,18 @@ export const DailyTasks = () => {
       {/* Add Form */}
       <AnimatePresence>
         {isAdding && (
-          <motion.form 
+          <motion.form
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            onSubmit={submit} 
+            onSubmit={submit}
             className="bg-bg-card rounded-[32px] p-6 flex flex-col gap-6 border border-border-light shadow-float overflow-hidden"
           >
-            <input autoFocus required type="text" value={newTask.title} onChange={e => setNewTask({ ...newTask, title: e.target.value })} 
-              placeholder="What are we accomplishing?" 
-              className="w-full text-lg font-black text-text-main border-none bg-bg-input p-5 rounded-2xl outline-none placeholder:text-text-muted/40 focus:ring-2 ring-accent-blue/10 transition-all" 
+            <input autoFocus required type="text" value={newTask.title} onChange={e => setNewTask({ ...newTask, title: e.target.value })}
+              placeholder="What are we accomplishing?"
+              className="w-full text-lg font-black text-text-main border-none bg-bg-input p-5 rounded-2xl outline-none placeholder:text-text-muted/40 focus:ring-2 ring-accent-blue/10 transition-all"
             />
-            
+
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <p className="text-[10px] font-black text-text-muted uppercase tracking-widest ml-1">Schedule</p>
@@ -220,23 +220,23 @@ export const DailyTasks = () => {
               </div>
               <div className="flex items-center gap-4">
                 {newTask.reminderEnabled && (
-                  <input 
-                    type="time" 
-                    value={newTask.reminderTime} 
-                    onChange={e => setNewTask({...newTask, reminderTime: e.target.value})} 
-                    className="bg-white/5 dark:bg-black/20 border border-white/10 rounded-lg px-2 py-1 text-sm font-black text-accent-blue outline-none animate-in fade-in" 
+                  <input
+                    type="time"
+                    value={newTask.reminderTime}
+                    onChange={e => setNewTask({ ...newTask, reminderTime: e.target.value })}
+                    className="bg-white/5 dark:bg-black/20 border border-white/10 rounded-lg px-2 py-1 text-sm font-black text-accent-blue outline-none animate-in fade-in"
                   />
                 )}
-                <button 
-                  type="button" 
-                  onClick={() => setNewTask({...newTask, reminderEnabled: !newTask.reminderEnabled})}
+                <button
+                  type="button"
+                  onClick={() => setNewTask({ ...newTask, reminderEnabled: !newTask.reminderEnabled })}
                   className={`w-12 h-6 rounded-full relative transition-all duration-300 ${newTask.reminderEnabled ? 'bg-accent-blue' : 'bg-bg-dark-elem/20 border border-white/10'}`}
                 >
                   <div className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow-sm transition-all duration-300 ${newTask.reminderEnabled ? 'left-7' : 'left-1'}`} />
                 </button>
               </div>
             </div>
-            
+
             <button type="submit" className="w-full bg-accent-blue text-white rounded-2xl py-4 font-black text-base shadow-xl shadow-accent-blue/30 hover:opacity-90 active:scale-[0.98] transition-all">
               Create Task
             </button>
@@ -247,9 +247,9 @@ export const DailyTasks = () => {
       {/* Search Bar */}
       {todayTasks.length > 0 && (
         <div className="relative">
-          <input 
-            type="text" 
-            value={searchQuery} 
+          <input
+            type="text"
+            value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             placeholder="Search tasks instantly..."
             className="w-full text-sm font-black text-text-main bg-bg-card border border-border-light hover:border-border-med focus:border-accent-blue/30 p-4 pl-12 rounded-2xl outline-none transition-all placeholder:text-text-muted/40"
@@ -260,7 +260,7 @@ export const DailyTasks = () => {
             </svg>
           </div>
           {searchQuery && (
-            <button 
+            <button
               onClick={() => setSearchQuery('')}
               className="absolute right-4 top-1/2 -translate-y-1/2 text-text-muted/50 hover:text-rose-500 font-bold text-xs"
             >
@@ -311,7 +311,7 @@ export const DailyTasks = () => {
                 className="bg-bg-card rounded-[28px] p-3.5 sm:p-5 border border-border-light shadow-sm hover:border-border-med transition-all duration-300 flex flex-col gap-3 sm:gap-4"
               >
                 <div className="flex items-center gap-2.5 sm:gap-4">
-                  <button onClick={() => toggleTaskComplete(task.id)} 
+                  <button onClick={() => toggleTaskComplete(task.id)}
                     className="w-8 h-8 sm:w-10 sm:h-10 shrink-0 rounded-xl border-2 flex items-center justify-center bg-bg-input border-border-med hover:border-accent-blue transition-all duration-200"
                   >
                     {isCheck ? null : <div className="w-1.5 h-1.5 rounded-full bg-text-muted/20" />}
@@ -347,7 +347,7 @@ export const DailyTasks = () => {
                     <button onClick={() => setDeletingTaskItem(task)} className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl text-text-muted hover:text-rose-500 hover:bg-rose-500/10 transition-all flex items-center justify-center" title="Delete Task"><Trash2 size={16} /></button>
                   </div>
                 </div>
-                
+
                 {!isCheck && (
                   <div className="bg-bg-input rounded-full h-1.5 overflow-hidden">
                     <div className="h-full transition-all duration-700 bg-accent-blue" style={{ width: `${pct}%` }} />
@@ -389,7 +389,7 @@ export const DailyTasks = () => {
                 className="bg-emerald-500/5 rounded-[28px] p-3.5 sm:p-5 border border-emerald-500/30 opacity-70 transition-all duration-300 flex flex-col gap-3 sm:gap-4"
               >
                 <div className="flex items-center gap-2.5 sm:gap-4">
-                  <button onClick={() => toggleTaskComplete(task.id)} 
+                  <button onClick={() => toggleTaskComplete(task.id)}
                     className="w-8 h-8 sm:w-10 sm:h-10 shrink-0 rounded-xl border-2 flex items-center justify-center bg-emerald-500 border-emerald-500 scale-95 transition-all duration-200"
                   >
                     <Check size={16} className="text-white" strokeWidth={3} />
@@ -417,7 +417,7 @@ export const DailyTasks = () => {
                     <button onClick={() => setDeletingTaskItem(task)} className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl text-text-muted hover:text-rose-500 hover:bg-rose-500/10 transition-all flex items-center justify-center" title="Delete Task"><Trash2 size={16} /></button>
                   </div>
                 </div>
-                
+
                 {!isCheck && (
                   <div className="bg-bg-input rounded-full h-1.5 overflow-hidden">
                     <div className="h-full transition-all duration-700 bg-emerald-500" style={{ width: `${pct}%` }} />
@@ -430,7 +430,7 @@ export const DailyTasks = () => {
 
         {/* Lazy Loading Load More Button */}
         {completedTasks.length > completedLimit && (
-          <button 
+          <button
             type="button"
             onClick={() => setCompletedLimit(prev => prev + 10)}
             className="w-full py-4 rounded-2xl bg-bg-card border border-border-light hover:border-border-med text-text-muted hover:text-text-main text-xs font-black tracking-wider uppercase transition-all flex items-center justify-center gap-2 mt-2"
@@ -439,19 +439,19 @@ export const DailyTasks = () => {
             <span className="bg-emerald-500/10 text-emerald-500 px-2 py-0.5 rounded-md text-[10px]">+{completedTasks.length - completedLimit}</span>
           </button>
         )}
-        
+
         {todayTasks.length === 0 && !isAdding && (
           <div className="py-24 flex flex-col items-center justify-center text-center">
-             <div className="w-20 h-20 rounded-full bg-bg-input flex items-center justify-center mb-6">
-                <CalendarCheck size={32} className="text-text-muted/30" />
-             </div>
-             <p className="text-lg font-black text-text-muted tracking-tight">Your forge is silent.</p>
-             <p className="text-sm font-bold text-text-muted/50 mt-1">Add a task to start crushing your day.</p>
-             <button onClick={() => setIsAdding(true)} className="mt-8 px-8 py-4 rounded-2xl bg-accent-blue text-white font-black shadow-lg shadow-accent-blue/20 hover:opacity-90 transition-all active:scale-95">Add First Task</button>
+            <div className="w-20 h-20 rounded-full bg-bg-input flex items-center justify-center mb-6">
+              <CalendarCheck size={32} className="text-text-muted/30" />
+            </div>
+            <p className="text-lg font-black text-text-muted tracking-tight">Your forge is silent.</p>
+            <p className="text-sm font-bold text-text-muted/50 mt-1">Add a task to start crushing your day.</p>
+            <button onClick={() => setIsAdding(true)} className="mt-8 px-8 py-4 rounded-2xl bg-accent-blue text-white font-black shadow-lg shadow-accent-blue/20 hover:opacity-90 transition-all active:scale-95">Add First Task</button>
           </div>
         )}
       </div>
-      
+
       {showLog && <LogTaskTimeModal task={showLog} onClose={() => setShowLog(null)} logTaskTime={logTaskTime} />}
 
       <DeleteConfirmationModal

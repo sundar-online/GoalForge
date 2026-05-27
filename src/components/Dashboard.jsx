@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { calculateGoalDailyProgress, isHabitDoneToday, calculateOverallProgress, isGoalDoneToday, calculateGoalStreak, recalculateGoalCompletedDates, getGoalScheduledDays, calculateGoalConsecutiveMissedDays } from '../utils/calculationUtils';
+import { calculateGoalDailyProgress, isHabitDoneToday, calculateOverallProgress, isGoalDoneToday, calculateGoalStreak, recalculateGoalCompletedDates, getGoalScheduledDays, calculateGoalConsecutiveMissedDays, isTaskDone } from '../utils/calculationUtils';
 import { TODAY } from '../utils/dateUtils';
 import { BADGE_DEFINITIONS } from '../utils/gamificationEngine';
 import { useAuth } from '../context/AuthContext';
@@ -12,6 +12,7 @@ import { SkeletonLoader } from './SkeletonLoader';
 import AIInsights from './AIInsights';
 import { GoalActivityChart } from './GoalActivityChart';
 import ErrorBoundary from './ErrorBoundary';
+import { TaskAnalytics } from './TaskAnalytics';
 
 const QuickThoughtsWidget = () => {
   const {
@@ -241,7 +242,8 @@ export const Dashboard = ({ setView }) => {
     focusTime, focusHistory, taskLogs,
     disciplineScore, userLevel, insights,
     theme, toggleTheme, loading, weeklyReport, syncError, retrySync,
-    xpData: rawXpData, currentLevelInfo: rawLevelInfo, taskStreak
+    xpData: rawXpData, currentLevelInfo: rawLevelInfo, taskStreak,
+    tasks
   } = useAppContext();
 
   const xpData = rawXpData || { totalXP: 0, earnedBadges: [], xpHistory: [] };
@@ -264,6 +266,7 @@ export const Dashboard = ({ setView }) => {
 
   const { displayName, signOut, user } = useAuth();
   const [showSignOut, setShowSignOut] = useState(false);
+  const [activeDashboardTab, setActiveDashboardTab] = useState('intel'); // 'intel', 'goals', 'tasks'
 
   const initial = displayName ? displayName[0].toUpperCase() : 'U';
   const focusHrs = Math.floor(focusTime / 3600);
@@ -301,8 +304,111 @@ export const Dashboard = ({ setView }) => {
     .filter(g => g.streak > 0 || g.missed > 0)
     .sort((a, b) => b.streak - a.streak).slice(0, 3);
 
+  const activeStreakSystems = topStreaks.filter(s => s.streak > 0);
+
+  const activeTasksCount = React.useMemo(() => {
+    return (todayTasks || []).filter(t => !isTaskDone(t)).length;
+  }, [todayTasks]);
+
+  const completedTasksCount = React.useMemo(() => {
+    return (todayTasks || []).filter(isTaskDone).length;
+  }, [todayTasks]);
+
+  const highestTaskStreak = React.useMemo(() => {
+    if (!tasks || tasks.length === 0) return 0;
+    const streaks = tasks.map(t => t.currentStreak || 0);
+    return Math.max(...streaks, 0);
+  }, [tasks]);
+
+  const topStreakTasksList = React.useMemo(() => {
+    return (tasks || [])
+      .filter(t => (t.currentStreak || 0) > 0)
+      .sort((a, b) => (b.currentStreak || 0) - (a.currentStreak || 0))
+      .slice(0, 3);
+  }, [tasks]);
+
   const QUOTES = ['"Focus is the art of knowing what to ignore."', '"Small daily improvements lead to stunning results."', '"Discipline is choosing between what you want now and what you want most."', '"The only way to predict the future is to create it."'];
   const quote = QUOTES[new Date().getDay() % QUOTES.length];
+
+  const renderGoalsList = () => {
+    const activeGoalsList = (goals || [])
+      .map(g => {
+        const liveProgress = calculateOverallProgress(g);
+        // Only hide goals that are fully completed (100% progress)
+        const isFinished = liveProgress >= 100;
+        const isDoneToday = isGoalDoneToday(g);
+        return {
+          ...g,
+          progress: liveProgress,
+          isFinished,
+          isDoneToday
+        };
+      })
+      .filter(goal => !goal.isFinished && !goal.isMissingDream)
+      .sort((a, b) => {
+        // Place completed goals today at the end of the list, matching GoalsPage ordering consistency
+        if (a.isDoneToday !== b.isDoneToday) return a.isDoneToday ? 1 : -1;
+        return 0;
+      });
+
+    if (activeGoalsList.length === 0) {
+      return (
+        <div onClick={() => setView('goals')} className="py-16 text-center border-2 border-dashed border-border-med rounded-[32px] cursor-pointer hover:bg-bg-input transition-colors space-y-3">
+          <div className="w-12 h-12 rounded-2xl bg-bg-input flex items-center justify-center mx-auto mb-2">
+            <Target className="text-text-muted" size={24} />
+          </div>
+          <p className="font-black text-text-main">No systems defined</p>
+          <p className="text-sm text-text-muted font-bold">Forge your first goal to start tracking.</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6">
+        {activeGoalsList.map(goal => {
+          const habitsTotal = goal.habits.length;
+          const dailyProgress = calculateGoalDailyProgress(goal);
+          const achieved = goal.isDoneToday || dailyProgress === 100;
+          const habitsDone = goal.habits.filter(isHabitDoneToday).length;
+          const targetReq = goal.mode === 'ANY' ? 1 : (goal.mode === 'CUSTOM' ? (goal.minHabits || 1) : habitsTotal);
+          const habitAccuracy = Math.min(100, Math.round((habitsDone / (targetReq || 1)) * 100));
+          const ruleLabel = goal.mode === 'ANY' ? 'Any Rule' : goal.mode === 'CUSTOM' ? `Min ${goal.minHabits} Rule` : 'All Habits Rule';
+
+          return (
+            <div key={goal.id} className={`bg-bg-card rounded-[28px] p-6 shadow-sm border-2 transition-all hover:shadow-md ${achieved ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-border-light hover:border-accent-blue/30'}`}>
+              <div className="flex justify-between items-start mb-5">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <p className="font-black text-lg text-text-main tracking-tight truncate max-w-[140px]">{goal.title}</p>
+                    {achieved && <span className="bg-emerald-500/20 text-emerald-400 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest">Done ✓</span>}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <span className="text-[9px] font-bold text-text-muted bg-bg-input px-2 py-0.5 rounded-md uppercase tracking-widest">{ruleLabel}</span>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <span className={`text-2xl font-black leading-none tracking-tighter ${achieved ? 'text-emerald-500' : 'text-accent-blue'}`}>{achieved ? 100 : habitAccuracy}%</span>
+                  <p className="text-[8px] font-black text-text-muted uppercase tracking-widest mt-0.5">Grit Score</p>
+                </div>
+              </div>
+
+              <div className="h-2 bg-bg-input rounded-full overflow-hidden mb-4">
+                <div 
+                  className={`h-full rounded-full transition-all duration-700 ${achieved ? 'bg-emerald-500' : 'bg-accent-blue'}`}
+                  style={{ width: `${achieved ? 100 : dailyProgress}%` }}
+                />
+              </div>
+              
+              <div className="flex justify-between items-center pt-4 border-t border-border-light">
+                <span className="text-[9px] font-black text-text-muted uppercase tracking-widest">Mastery</span>
+                <span className="text-sm font-black text-text-main tracking-tighter">{goal.progress || 0}%</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
 
   if (loading) {
     return (
@@ -450,17 +556,41 @@ export const Dashboard = ({ setView }) => {
             </div>
           </section>
 
+          {/* Mobile Segmented Navigation Tabs */}
+          <div className="flex lg:hidden gap-2 p-1 rounded-2xl bg-bg-card border border-border-light shadow-sm mb-2">
+            {[
+              { id: 'intel', label: 'Overview', icon: <Brain size={14} /> },
+              { id: 'goals', label: 'Goals', icon: <Target size={14} /> },
+              { id: 'tasks', label: 'Tasks', icon: <Zap size={14} /> }
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveDashboardTab(tab.id)}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-black uppercase tracking-wider rounded-xl transition-all ${
+                  activeDashboardTab === tab.id
+                    ? 'bg-bg-dark-elem text-text-inverted shadow-md'
+                    : 'text-text-muted hover:text-text-main'
+                }`}
+              >
+                {tab.icon}
+                <span>{tab.label}</span>
+              </button>
+            ))}
+          </div>
+
           {/* Quick Thoughts Widget - Mobile Only */}
-          <div className="block lg:hidden">
+          <div className={activeDashboardTab === 'intel' ? 'block lg:hidden' : 'hidden'}>
             <QuickThoughtsWidget />
           </div>
 
           {/* AI Insights & Recovery */}
-          <AIInsights />
+          <div className={activeDashboardTab === 'intel' ? 'block' : 'hidden lg:block'}>
+            <AIInsights />
+          </div>
 
           {/* Alert Banners (Stacked) */}
           {alerts.length > 0 && (
-            <div className="flex flex-col gap-3">
+            <div className={`flex flex-col gap-3 ${activeDashboardTab === 'intel' ? 'flex' : 'hidden lg:flex'}`}>
               {alerts.map((alert, i) => {
                 const colors = {
                   danger: "bg-red-500/10 border-red-500/20 text-red-500",
@@ -483,7 +613,7 @@ export const Dashboard = ({ setView }) => {
 
           {/* Reminders Horizon */}
           {reminders.length > 0 && (
-            <div className="space-y-4">
+            <div className={`space-y-4 ${activeDashboardTab === 'intel' ? 'block' : 'hidden lg:block'}`}>
               <div className="flex justify-between items-center px-1">
                 <p className="text-[10px] font-black text-text-muted uppercase tracking-[0.2em]">Next Alerts</p>
                 <span className="text-[10px] font-bold text-accent-blue bg-accent-blue/10 px-2 py-0.5 rounded-full">{reminders.length} Scheduled</span>
@@ -509,7 +639,7 @@ export const Dashboard = ({ setView }) => {
 
 
           {/* Accuracy + Focus Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+          <div className={`${activeDashboardTab === 'goals' ? 'grid' : 'hidden lg:grid'} grid-cols-1 md:grid-cols-2 gap-6`}>
             {/* Accuracy Card */}
             <div className="bg-bg-card rounded-3xl p-5 sm:p-8 shadow-sm border border-border-light flex flex-col items-center gap-4 sm:gap-5 hover:shadow-md transition-shadow">
               <p className="text-[10px] font-black text-text-muted uppercase tracking-[0.15em]">Today's Accuracy</p>
@@ -534,9 +664,9 @@ export const Dashboard = ({ setView }) => {
             </div>
 
             {/* Deep Work Card */}
-            <div className="bg-bg-dark-elem rounded-3xl p-5 sm:p-8 shadow-xl flex flex-col justify-between group hover:scale-[1.02] transition-transform">
+            <div className="bg-bg-dark-elem rounded-3xl pt-12 px-6 pb-6 sm:pt-16 sm:px-8 sm:pb-8 shadow-xl flex flex-col justify-between group hover:scale-[1.02] transition-transform">
               <p className="text-[10px] font-black text-white/40 uppercase tracking-[0.15em]">Deep Work</p>
-              <div className="my-6">
+              <div className="flex-1 flex flex-col justify-center my-8 sm:my-10">
                 <div className="flex items-baseline gap-2">
                   <span className="text-6xl font-black text-text-inverted tracking-tighter leading-none">
                     {String(focusHrs).padStart(2, '0')}:{String(focusMins).padStart(2, '0')}
@@ -558,9 +688,14 @@ export const Dashboard = ({ setView }) => {
               </button>
             </div>
           </div>
+          
+          {/* Standalone Task Analytics Section */}
+          <div className={activeDashboardTab === 'tasks' ? 'block' : 'hidden lg:block'}>
+            <TaskAnalytics setView={setView} />
+          </div>
 
           {/* Goal Progress List */}
-          <section className="hidden md:block space-y-5">
+          <section className="space-y-5 hidden lg:block">
             <div className="flex justify-between items-end px-2">
               <div className="space-y-1">
                 <h3 className="text-[10px] font-black text-text-muted uppercase tracking-[0.15em]">Active Goals</h3>
@@ -568,85 +703,7 @@ export const Dashboard = ({ setView }) => {
               </div>
               <button onClick={() => setView('goals')} className="text-xs font-black text-accent-blue hover:underline underline-offset-4">View All Systems</button>
             </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6">
-              {(() => {
-                const todayStr = TODAY();
-                const activeGoalsList = (goals || [])
-                  .map(g => {
-                    const liveProgress = calculateOverallProgress(g);
-                    // Only hide goals that are fully completed (100% progress)
-                    const isFinished = liveProgress >= 100;
-                    const isDoneToday = isGoalDoneToday(g);
-                    return {
-                      ...g,
-                      progress: liveProgress,
-                      isFinished,
-                      isDoneToday
-                    };
-                  })
-                  .filter(goal => !goal.isFinished && !goal.isMissingDream)
-                  .sort((a, b) => {
-                    // Place completed goals today at the end of the list, matching GoalsPage ordering consistency
-                    if (a.isDoneToday !== b.isDoneToday) return a.isDoneToday ? 1 : -1;
-                    return 0;
-                  });
-
-                if (activeGoalsList.length === 0) {
-                  return (
-                    <div onClick={() => setView('goals')} className="col-span-full py-16 text-center border-2 border-dashed border-border-med rounded-[32px] cursor-pointer hover:bg-bg-input transition-colors space-y-3">
-                      <div className="w-12 h-12 rounded-2xl bg-bg-input flex items-center justify-center mx-auto mb-2">
-                        <Target className="text-text-muted" size={24} />
-                      </div>
-                      <p className="font-black text-text-main">No systems defined</p>
-                      <p className="text-sm text-text-muted font-bold">Forge your first goal to start tracking.</p>
-                    </div>
-                  );
-                }
-
-                return activeGoalsList.map(goal => {
-                  const habitsTotal = goal.habits.length;
-                  const dailyProgress = calculateGoalDailyProgress(goal);
-                  const achieved = goal.isDoneToday || dailyProgress === 100;
-                  const habitsDone = goal.habits.filter(isHabitDoneToday).length;
-                  const targetReq = goal.mode === 'ANY' ? 1 : (goal.mode === 'CUSTOM' ? (goal.minHabits || 1) : habitsTotal);
-                  const habitAccuracy = Math.min(100, Math.round((habitsDone / (targetReq || 1)) * 100));
-                  const ruleLabel = goal.mode === 'ANY' ? 'Any Rule' : goal.mode === 'CUSTOM' ? `Min ${goal.minHabits} Rule` : 'All Habits Rule';
-
-                  return (
-                    <div key={goal.id} className={`bg-bg-card rounded-[28px] p-6 shadow-sm border-2 transition-all hover:shadow-md ${achieved ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-border-light hover:border-accent-blue/30'}`}>
-                      <div className="flex justify-between items-start mb-5">
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <p className="font-black text-lg text-text-main tracking-tight truncate max-w-[140px]">{goal.title}</p>
-                            {achieved && <span className="bg-emerald-500/20 text-emerald-400 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest">Done ✓</span>}
-                          </div>
-                          <div className="flex flex-wrap gap-2">
-                            <span className="text-[9px] font-bold text-text-muted bg-bg-input px-2 py-0.5 rounded-md uppercase tracking-widest">{ruleLabel}</span>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <span className={`text-2xl font-black leading-none tracking-tighter ${achieved ? 'text-emerald-500' : 'text-accent-blue'}`}>{achieved ? 100 : habitAccuracy}%</span>
-                          <p className="text-[8px] font-black text-text-muted uppercase tracking-widest mt-0.5">Grit Score</p>
-                        </div>
-                      </div>
-
-                      <div className="h-2 bg-bg-input rounded-full overflow-hidden mb-4">
-                        <div 
-                          className={`h-full rounded-full transition-all duration-700 ${achieved ? 'bg-emerald-500' : 'bg-accent-blue'}`}
-                          style={{ width: `${achieved ? 100 : dailyProgress}%` }}
-                        />
-                      </div>
-                      
-                      <div className="flex justify-between items-center pt-4 border-t border-border-light">
-                        <span className="text-[9px] font-black text-text-muted uppercase tracking-widest">Mastery</span>
-                        <span className="text-sm font-black text-text-main tracking-tighter">{goal.progress || 0}%</span>
-                      </div>
-                    </div>
-                  );
-                });
-              })()}
-            </div>
+            {renderGoalsList()}
           </section>
         </div>
 
@@ -659,63 +716,107 @@ export const Dashboard = ({ setView }) => {
           </div>
 
           {/* Weekly Performance Widget */}
-          <WeeklyReportCard report={weeklyReport} />
+          <div className={activeDashboardTab === 'intel' ? 'block' : 'hidden lg:block'}>
+            <WeeklyReportCard report={weeklyReport} />
+          </div>
 
           {/* Goal Activity Distribution Pie Chart */}
-          <ErrorBoundary fallbackType="widget" errorMessage="Goal activity distribution statistics could not be loaded. Please complete active habits to populate.">
-            <GoalActivityChart goals={goals} />
-          </ErrorBoundary>
+          <div className={activeDashboardTab === 'goals' ? 'block' : 'hidden lg:block'}>
+            <ErrorBoundary fallbackType="widget" errorMessage="Goal activity distribution statistics could not be loaded. Please complete active habits to populate.">
+              <GoalActivityChart goals={goals} />
+            </ErrorBoundary>
+          </div>
 
           {/* Consistency Heatmap Widget */}
-          <WeeklyHeatmap focusHistory={focusHistory} taskLogs={taskLogs} accuracy={accuracy} />
+          <div className={activeDashboardTab === 'goals' ? 'block' : 'hidden lg:block'}>
+            <WeeklyHeatmap focusHistory={focusHistory} taskLogs={taskLogs} accuracy={accuracy} />
+          </div>
 
           {/* Task Stats Widget */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-1 gap-4">
-            {[
-              { label: 'Total Units', val: totalItems, icon: <Zap size={18} className="text-accent-blue" />, color: "text-accent-blue" },
-              { label: 'Completed', val: completedItems, icon: <CheckCircle2 size={18} className="text-emerald-500" />, color: "text-emerald-500" },
-              { label: 'Task Streak', val: taskStreak ? `${taskStreak}d` : '0d', icon: <Flame size={18} className="text-orange-500" />, color: "text-orange-500" },
-            ].map((s, i) => (
-              <div key={i} className="bg-bg-card rounded-3xl p-5 shadow-sm border border-border-light flex flex-col lg:flex-row items-center lg:items-center justify-between gap-2 lg:gap-4 hover:shadow-md transition-shadow">
-                <div className="w-10 h-10 rounded-xl bg-bg-input flex items-center justify-center shrink-0">
-                  {s.icon}
-                </div>
-                <div className="text-center lg:text-right">
-                  <p className="text-2xl font-black text-text-main tracking-tighter leading-none">{s.val}</p>
-                  <p className="text-[9px] font-black text-text-muted uppercase tracking-widest mt-1">{s.label}</p>
-                </div>
+          <div className={activeDashboardTab === 'tasks' ? 'block' : 'hidden lg:block'}>
+            <div className="bg-bg-card rounded-[32px] p-5 border border-border-light shadow-sm hover:shadow-md transition-shadow">
+              <p className="text-[10px] font-black text-text-muted uppercase tracking-[0.15em] mb-4">Task Overview</p>
+              <div className="grid grid-cols-3 gap-2 divide-x divide-border-light dark:divide-border-med">
+                {[
+                  { label: 'Current Active Tasks', val: activeTasksCount, icon: <Zap size={15} className="text-accent-blue" />, bgColor: "bg-accent-blue/10" },
+                  { label: 'Current Completed Tasks', val: completedTasksCount, icon: <CheckCircle2 size={15} className="text-emerald-500" />, bgColor: "bg-emerald-500/10" },
+                  { label: 'Highest Task Completion Streak', val: highestTaskStreak ? `${highestTaskStreak}d` : '0d', icon: <Flame size={15} className="text-orange-500" />, bgColor: "bg-orange-500/10" },
+                ].map((s, i) => (
+                  <div key={i} className={`flex flex-col items-center text-center px-1 ${i > 0 ? 'pl-2' : ''}`}>
+                    <div className={`w-8 h-8 rounded-xl ${s.bgColor} flex items-center justify-center shrink-0 mb-2.5`}>
+                      {s.icon}
+                    </div>
+                    <p className="text-xl sm:text-2xl font-black text-text-main tracking-tighter leading-none">{s.val}</p>
+                    <p className="text-[9px] font-black text-text-muted uppercase tracking-wider mt-1.5">{s.label}</p>
+                  </div>
+                ))}
               </div>
-            ))}
+
+              {/* Compact Top Streaks area */}
+              <div className="my-4 border-t border-border-light dark:border-border-med" />
+              <div className="flex items-center gap-1.5 mb-2.5">
+                <Flame size={12} className="text-orange-500" fill="currentColor" />
+                <span className="text-[9px] font-black text-text-muted uppercase tracking-wider">Top System Streaks</span>
+              </div>
+              {topStreakTasksList.length > 0 ? (
+                <div className="space-y-2">
+                  {topStreakTasksList.map((s, i) => (
+                    <div key={i} className="flex items-center justify-between text-xs font-bold text-text-main bg-bg-input/30 hover:bg-bg-input/60 px-3 py-1.5 rounded-xl border border-border-light/50 transition-colors">
+                      <span className="truncate pr-2">{s.title}</span>
+                      <span className="text-orange-500 font-black shrink-0 whitespace-nowrap">🔥 {s.currentStreak}d</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-[11px] text-text-muted italic text-center py-1">
+                  No active task streaks today — keep completing tasks!
+                </p>
+              )}
+            </div>
           </div>
 
           {/* Streak Leaders Widget */}
           {topStreaks.length > 0 && (
-            <section className="bg-bg-card rounded-[32px] p-6 shadow-sm border border-border-light">
-              <div className="flex items-center gap-2 mb-6">
-                <Zap size={18} className="text-orange-500" fill="currentColor" />
-                <h3 className="text-[10px] font-black text-text-muted uppercase tracking-[0.15em]">Streak Power</h3>
-              </div>
-              <div className="flex flex-col gap-3">
-                {topStreaks.map((s, i) => (
-                  <div key={i} className="flex items-center justify-between p-4 rounded-2xl bg-bg-input/50 border border-border-light hover:bg-bg-input transition-colors group">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-1.5 h-6 rounded-full ${i === 0 ? 'bg-orange-500' : 'bg-text-muted/30'}`} />
-                      <div>
-                        <p className="text-sm font-black text-text-main truncate max-w-[120px]">{s.name}</p>
-                        <p className="text-[9px] font-bold text-text-muted uppercase tracking-widest">{s.tag}</p>
+            <div className={activeDashboardTab === 'goals' ? 'block' : 'hidden lg:block'}>
+              <section className="bg-bg-card rounded-[32px] p-6 shadow-sm border border-border-light">
+                <div className="flex items-center gap-2 mb-6">
+                  <Zap size={18} className="text-orange-500" fill="currentColor" />
+                  <h3 className="text-[10px] font-black text-text-muted uppercase tracking-[0.15em]">Streak Power</h3>
+                </div>
+                <div className="flex flex-col gap-3">
+                  {topStreaks.map((s, i) => (
+                    <div key={i} className="flex items-center justify-between p-4 rounded-2xl bg-bg-input/50 border border-border-light hover:bg-bg-input transition-colors group">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-1.5 h-6 rounded-full ${i === 0 ? 'bg-orange-500' : 'bg-text-muted/30'}`} />
+                        <div>
+                          <p className="text-sm font-black text-text-main truncate max-w-[120px]">{s.name}</p>
+                          <p className="text-[9px] font-bold text-text-muted uppercase tracking-widest">{s.tag}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {s.missed >= 2 && (
+                          <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" title="Vulnerable" />
+                        )}
+                        <span className="text-base font-black text-orange-500 group-hover:scale-110 transition-transform">🔥 {s.streak}d</span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      {s.missed >= 2 && (
-                        <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" title="Vulnerable" />
-                      )}
-                      <span className="text-base font-black text-orange-500 group-hover:scale-110 transition-transform">🔥 {s.streak}d</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </section>
+                  ))}
+                </div>
+              </section>
+            </div>
           )}
+
+          {/* Mobile Goal Progress List */}
+          <section className={`space-y-5 ${activeDashboardTab === 'goals' ? 'block lg:hidden' : 'hidden'}`}>
+            <div className="flex justify-between items-end px-2">
+              <div className="space-y-1">
+                <h3 className="text-[10px] font-black text-text-muted uppercase tracking-[0.15em]">Active Goals</h3>
+                <p className="text-xl font-black text-text-main tracking-tight">Main Targets</p>
+              </div>
+              <button onClick={() => setView('goals')} className="text-xs font-black text-accent-blue hover:underline underline-offset-4">View All Systems</button>
+            </div>
+            {renderGoalsList()}
+          </section>
 
           {/* Footer Quote / Branding */}
           <div className="mt-auto pt-6 text-center lg:text-left opacity-40">
