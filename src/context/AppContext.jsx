@@ -420,6 +420,13 @@ export const AppProvider = ({ children }) => {
     setLoading(true);
     setSyncError(null);
 
+    // Safety timeout — if Firestore subscriptions all fail silently,
+    // force the dashboard to render after 15 seconds max
+    const loadingTimeout = setTimeout(() => {
+      setLoading(false);
+      console.warn('[AppContext] Safety timeout: forcing loading=false after 15s');
+    }, 15000);
+
     const unsubscribes = [];
 
     try {
@@ -471,10 +478,12 @@ export const AppProvider = ({ children }) => {
         }
 
         setTasks(updatedTasks);
+        clearTimeout(loadingTimeout);
         setLoading(false);
       }, (error) => {
         console.error('[Realtime Sync] Error in Tasks subscription:', error);
         setSyncError('Real-time task synchronization paused.');
+        setLoading(false); // Ensure dashboard shows even if Tasks subscription fails
       });
       unsubscribes.push(unsubTasks);
 
@@ -871,10 +880,12 @@ export const AppProvider = ({ children }) => {
     } catch (err) {
       console.error('[Realtime Sync] Error mounting realtime listeners:', err);
       setSyncError('Offline-first fallback active.');
+      clearTimeout(loadingTimeout);
       setLoading(false);
     }
 
     return () => {
+      clearTimeout(loadingTimeout);
       unsubscribes.forEach(unsub => unsub());
       Object.values(habitsListeners.current).forEach(unsub => unsub());
       habitsListeners.current = {};

@@ -4,177 +4,226 @@ import {
   onAuthStateChanged,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
-  signInWithPopup,
   signInWithRedirect,
+  signInWithPopup,
   getRedirectResult,
-  browserPopupRedirectResolver,
   signOut as firebaseSignOut,
   updateProfile,
-  sendPasswordResetEmail
+  sendPasswordResetEmail,
 } from 'firebase/auth';
 import { upsertUserProfile } from '../lib/firebaseDb';
+import { Capacitor } from '@capacitor/core';
+
+// ─────────────────────────────────────────────────────────
+// Constants
+// ─────────────────────────────────────────────────────────
+const REDIRECT_KEY = 'gf_google_redirect_ts'; // localStorage key for redirect guard
 
 const AuthContext = createContext(null);
 
+// ─────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────
+function normalizeUser(fbUser) {
+  if (!fbUser) return null;
+  return {
+    id: fbUser.uid,
+    uid: fbUser.uid,
+    email: fbUser.email,
+    displayName: fbUser.displayName || fbUser.email?.split('@')[0] || 'User',
+    photoURL: fbUser.photoURL,
+    user_metadata: { full_name: fbUser.displayName },
+  };
+}
+
+// ─────────────────────────────────────────────────────────
+// Provider
+// ─────────────────────────────────────────────────────────
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
+  const [user, setUser]       = useState(null);
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState(null);
   const [signingIn, setSigningIn] = useState(false);
 
   useEffect(() => {
-    // Set a timeout to prevent infinite loading (safety net)
-    const loadingTimeout = setTimeout(() => {
-      if (loading) {
-        console.warn('[Auth] Loading timeout - setting loading to false');
-        setLoading(false);
-      }
-    }, 5000); // 5 second timeout
+    let alive = true;
 
-    // Process redirect results (handles mobile/redirect-flow completions)
-    getRedirectResult(auth, browserPopupRedirectResolver)
-      .then((result) => {
-        if (result?.user) {
-          console.log('[Auth] ✓ Google Redirect sign-in completed:', result.user.email);
-          // onAuthStateChanged will fire immediately after this and set the user
+    const boot = async () => {
+      const isNative = Capacitor.isNativePlatform();
+
+      // On desktop web, we never use redirect auth, so we don't await getRedirectResult.
+      // Clean up any legacy redirect timestamp if it exists.
+      if (!isNative) {
+        localStorage.removeItem(REDIRECT_KEY);
+      }
+
+      // ── Was a Google redirect in progress? ──────────────────────────────
+      // We store a timestamp in localStorage before calling signInWithRedirect.
+      // localStorage survives page navigation (unlike sessionStorage which can
+      // be cleared on cross-origin hops in some browsers).
+      const redirectPending = isNative && !!localStorage.getItem(REDIRECT_KEY);
+
+      if (redirectPending) {
+        // MUST process the redirect result BEFORE setting up onAuthStateChanged.
+        // If we set up the listener first, it may fire with null before
+        // getRedirectResult() has had a chance to establish the auth session.
+        console.log('[Auth] Redirect return detected — awaiting getRedirectResult...');
+        try {
+          const result = await getRedirectResult(auth);
+          if (result?.user) {
+            console.log('[Auth] ✓ Redirect sign-in complete:', result.user.uid);
+          } else {
+            console.warn('[Auth] getRedirectResult returned null (redirect may have been cancelled).');
+          }
+        } catch (err) {
+          console.error('[Auth] getRedirectResult error:', err.code, err.message);
+          if (alive) {
+            setAuthError(`${firebaseMsg(err.code)} [${err.code || 'unknown'}]`);
+          }
+        } finally {
+          localStorage.removeItem(REDIRECT_KEY);
         }
-      })
-      .catch((error) => {
-        console.error('[Auth] ✗ Google Redirect sign-in error:', error.code, error.message);
-        // Don't block loading on redirect errors
+      }
+
+      if (!alive) return;
+
+      // ── Subscribe to auth state — single source of truth ───────────────
+      // By the time we reach here, getRedirectResult (if needed) has already
+      // been awaited, so onAuthStateChanged will fire with the FINAL, correct
+      // auth state — never an intermediate null from a pending redirect.
+      const unsub = onAuthStateChanged(auth, (fbUser) => {
+        if (!alive) return;
+        console.log('[Auth] onAuthStateChanged →', fbUser ? `✓ ${fbUser.uid}` : '✗ null');
+        setUser(normalizeUser(fbUser));
+        setLoading(false);
+
+        if (fbUser) {
+          upsertUserProfile(fbUser.uid, {
+            displayName: fbUser.displayName,
+            email: fbUser.email,
+            photoURL: fbUser.photoURL,
+          }).catch(e => console.warn('[Auth] profile sync (non-critical):', e));
+        }
       });
 
-    // Listen for auth state changes — this is the single source of truth
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      if (firebaseUser) {
-        console.log('[Auth] onAuthStateChanged: user signed in:', firebaseUser.email);
-        const normalizedUser = {
-          id: firebaseUser.uid,
-          uid: firebaseUser.uid,
-          email: firebaseUser.email,
-          displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
-          photoURL: firebaseUser.photoURL,
-          user_metadata: {
-            full_name: firebaseUser.displayName,
-          },
-        };
-        setUser(normalizedUser);
+      // Store cleanup
+      return unsub;
+    };
 
-        // Sync profile in background (fire-and-forget, non-blocking)
-        upsertUserProfile(firebaseUser.uid, {
-          displayName: normalizedUser.displayName,
-          email: firebaseUser.email,
-          photoURL: firebaseUser.photoURL,
-        }).catch(err => console.warn('[Auth] Profile sync failed:', err));
-      } else {
-        console.log('[Auth] onAuthStateChanged: no user (signed out)');
-        setUser(null);
+    // Hold a ref to the unsub fn returned asynchronously
+    let unsub = null;
+    boot().then(fn => { unsub = fn ?? null; });
+
+    // Safety timeout — prevents infinite loading screen
+    const timer = setTimeout(() => {
+      if (alive) {
+        console.warn('[Auth] Safety timeout — forcing loading=false');
+        setLoading(false);
       }
-      
-      clearTimeout(loadingTimeout);
-      setLoading(false);
-    });
+    }, 15000);
 
     return () => {
-      unsubscribe();
-      clearTimeout(loadingTimeout);
+      alive = false;
+      if (unsub) unsub();
+      clearTimeout(timer);
     };
   }, []);
 
-  // ── Email / Password Sign Up ──────────────────────────
+  // ── Email Sign Up ──────────────────────────────────────
   const signUp = async (email, password, fullName) => {
+    setAuthError(null);
     try {
-      setAuthError(null);
-      const result = await createUserWithEmailAndPassword(auth, email, password);
-      if (fullName) {
-        await updateProfile(result.user, { displayName: fullName });
-      }
-      return { data: result, error: null };
-    } catch (error) {
-      const message = getFirebaseErrorMessage(error.code);
-      setAuthError(message);
-      return { data: null, error: { message } };
+      const cred = await createUserWithEmailAndPassword(auth, email, password);
+      if (fullName) await updateProfile(cred.user, { displayName: fullName });
+      return { data: cred, error: null };
+    } catch (err) {
+      const msg = firebaseMsg(err.code);
+      setAuthError(msg);
+      return { data: null, error: { message: msg } };
     }
   };
 
-  // ── Email / Password Sign In ──────────────────────────
+  // ── Email Sign In ──────────────────────────────────────
   const signIn = async (email, password) => {
+    setAuthError(null);
     try {
-      setAuthError(null);
-      const result = await signInWithEmailAndPassword(auth, email, password);
-      return { data: result, error: null };
-    } catch (error) {
-      const message = getFirebaseErrorMessage(error.code);
-      setAuthError(message);
-      return { data: null, error: { message } };
+      const cred = await signInWithEmailAndPassword(auth, email, password);
+      return { data: cred, error: null };
+    } catch (err) {
+      const msg = firebaseMsg(err.code);
+      setAuthError(msg);
+      return { data: null, error: { message: msg } };
     }
   };
 
-  // ── Google Sign-In (Popup for Web, Redirect for Android APK) ────────────
+  // ── Google Sign-In (hybrid popup/redirect) ──────────────────────────────────
+  // • Native App (Android/iOS): uses signInWithRedirect
+  // • Web Browsers: uses signInWithPopup (ignores third-party cookie blocks on localhost)
   const signInWithGoogle = async () => {
-    try {
-      setAuthError(null);
-      setSigningIn(true);
+    setAuthError(null);
+    setSigningIn(true);
 
-      const isAndroidAPK = typeof window !== 'undefined' && (
-        !!window.Capacitor || 
-        navigator.userAgent.includes('wv') || 
-        (navigator.userAgent.includes('Android') && !navigator.userAgent.includes('Chrome'))
-      );
+    const isNative = Capacitor.isNativePlatform();
 
-      console.log('[Auth] Google Sign-In mode:', isAndroidAPK ? 'Android APK (redirect)' : 'Web (popup)');
-
-      if (isAndroidAPK) {
-        // MOBILE: signInWithRedirect — page reloads when done; getRedirectResult handles completion
+    if (isNative) {
+      try {
+        localStorage.setItem(REDIRECT_KEY, Date.now().toString());
+        console.log('[Auth] Native platform detected — using signInWithRedirect...');
         await signInWithRedirect(auth, googleProvider);
-        return { data: null, error: null };
-      } else {
-        // WEB: signInWithPopup — resolves after user selects account
-        // Pass browserPopupRedirectResolver explicitly for Firebase v11+ compatibility
-        console.log('[Auth] Opening Google sign-in popup...');
-        const result = await signInWithPopup(auth, googleProvider, browserPopupRedirectResolver);
-        console.log('[Auth] ✓ Popup sign-in completed for:', result.user.email);
-        // onAuthStateChanged will update user state — just clear the loading flag
+      } catch (err) {
+        localStorage.removeItem(REDIRECT_KEY);
+        setSigningIn(false);
+        const msg = firebaseMsg(err.code);
+        setAuthError(`${msg} [${err.code || 'unknown'}]`);
+        console.error('[Auth] signInWithRedirect error:', err);
+        return { data: null, error: { message: msg } };
+      }
+    } else {
+      try {
+        console.log('[Auth] Web browser environment detected — using signInWithPopup...');
+        const result = await signInWithPopup(auth, googleProvider);
+        console.log('[Auth] ✓ Google popup sign-in complete:', result.user.uid);
+        setUser(normalizeUser(result.user));
         setSigningIn(false);
         return { data: result, error: null };
+      } catch (err) {
+        setSigningIn(false);
+        if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') {
+          console.warn('[Auth] Google sign-in popup closed by user.');
+          return { data: null, error: null };
+        }
+        const msg = firebaseMsg(err.code);
+        setAuthError(`${msg} [${err.code || 'unknown'}]`);
+        console.error('[Auth] signInWithPopup error:', err);
+        return { data: null, error: { message: msg } };
       }
-    } catch (error) {
-      setSigningIn(false);
-      // Ignore user-cancelled popup — not a real error
-      if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
-        console.log('[Auth] Google popup closed by user.');
-        return { data: null, error: null };
-      }
-      const message = getFirebaseErrorMessage(error.code || error.message);
-      setAuthError(message);
-      console.error('[Auth] Google Sign-In error:', error.code, error.message);
-      return { data: null, error: { message } };
     }
+    return { data: null, error: null };
   };
 
-  // ── Password Reset ────────────────────────────────────
+  // ── Password Reset ─────────────────────────────────────
   const resetPassword = async (email) => {
+    setAuthError(null);
     try {
-      setAuthError(null);
       await sendPasswordResetEmail(auth, email);
       return { error: null };
-    } catch (error) {
-      const message = getFirebaseErrorMessage(error.code);
-      setAuthError(message);
-      return { error: { message } };
+    } catch (err) {
+      const msg = firebaseMsg(err.code);
+      setAuthError(msg);
+      return { error: { message: msg } };
     }
   };
 
-  // ── Sign Out ──────────────────────────────────────────
+  // ── Sign Out ───────────────────────────────────────────
   const signOut = async () => {
     try {
+      localStorage.removeItem(REDIRECT_KEY);
       await firebaseSignOut(auth);
-    } catch (error) {
-      console.error('[Auth] Sign-out error:', error);
+      setUser(null);
+    } catch (err) {
+      console.error('[Auth] signOut error:', err);
     }
   };
-
-  const displayName = user?.displayName || user?.email?.split('@')[0] || 'User';
 
   return (
     <AuthContext.Provider value={{
@@ -182,12 +231,14 @@ export const AuthProvider = ({ children }) => {
       loading,
       signingIn,
       authError,
+      setAuthError,
       signUp,
       signIn,
       signInWithGoogle,
       resetPassword,
       signOut,
-      displayName
+      displayName: user?.displayName || user?.email?.split('@')[0] || 'User',
+      isNative: Capacitor.isNativePlatform(),
     }}>
       {children}
     </AuthContext.Provider>
@@ -200,22 +251,31 @@ export const useAuth = () => {
   return ctx;
 };
 
-// ── Firebase Error Code → User-Friendly Message ─────────
-function getFirebaseErrorMessage(code) {
-  const messages = {
-    'auth/email-already-in-use': 'This email is already registered. Try signing in instead.',
-    'auth/invalid-email': 'Please enter a valid email address.',
-    'auth/user-disabled': 'This account has been disabled. Contact support.',
-    'auth/user-not-found': 'No account found with this email. Sign up first.',
-    'auth/wrong-password': 'Incorrect password. Please try again.',
-    'auth/weak-password': 'Password must be at least 6 characters.',
-    'auth/too-many-requests': 'Too many attempts. Please wait a moment and try again.',
-    'auth/popup-closed-by-user': 'Sign-in popup was closed. Please try again.',
-    'auth/popup-blocked': 'Sign-in popup was blocked. Please allow popups for this site.',
-    'auth/account-exists-with-different-credential': 'An account already exists with this email but using a different sign-in method.',
-    'auth/invalid-credential': 'Invalid email or password. Please check and try again.',
-    'auth/network-request-failed': 'Network error. Please check your connection.',
-    'auth/timeout': 'Sign-in timed out. Please try again.',
+// ─────────────────────────────────────────────────────────
+// Firebase error codes → human-readable messages
+// ─────────────────────────────────────────────────────────
+function firebaseMsg(code) {
+  const map = {
+    'auth/email-already-in-use':                     'This email is already registered. Try signing in instead.',
+    'auth/invalid-email':                            'Please enter a valid email address.',
+    'auth/user-disabled':                            'This account has been disabled.',
+    'auth/user-not-found':                           'No account found with this email.',
+    'auth/wrong-password':                           'Incorrect password. Please try again.',
+    'auth/weak-password':                            'Password must be at least 6 characters.',
+    'auth/too-many-requests':                        'Too many attempts. Please wait and try again.',
+    'auth/popup-closed-by-user':                     'Sign-in popup was closed. Please try again.',
+    'auth/popup-blocked':                            'Popup blocked — please allow popups for this site.',
+    'auth/cancelled-popup-request':                  'Sign-in was cancelled. Please try again.',
+    'auth/account-exists-with-different-credential': 'An account exists with a different sign-in method.',
+    'auth/invalid-credential':                       'Invalid credentials. Please try again.',
+    'auth/network-request-failed':                   'Network error — please check your connection.',
+    'auth/timeout':                                  'Request timed out. Please try again.',
+    'auth/unauthorized-domain':                      '🚫 Domain not authorised. Add it in Firebase Console → Authentication → Authorised Domains.',
+    'auth/operation-not-allowed':                    'Google sign-in is not enabled in Firebase Console.',
+    'auth/internal-error':                           'Firebase internal error. Please try again.',
+    'auth/redirect-cancelled-by-user':               'Sign-in was cancelled. Please try again.',
+    'auth/redirect-operation-pending':               'A sign-in redirect is already in progress.',
+    'auth/web-storage-unsupported':                  'Browser storage is blocked — please enable cookies/storage.',
   };
-  return messages[code] || 'An unexpected error occurred. Please try again.';
+  return map[code] ?? `Sign-in error (${code ?? 'unknown'}). Please try again.`;
 }

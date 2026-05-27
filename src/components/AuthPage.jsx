@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Rocket, Eye, EyeOff, Loader2, Mail, KeyRound } from 'lucide-react';
+import { Rocket, Eye, EyeOff, Loader2, Mail, KeyRound, AlertTriangle } from 'lucide-react';
 
 export const AuthPage = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -9,10 +9,13 @@ export const AuthPage = () => {
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const { signIn, signUp, signInWithGoogle, resetPassword, loading } = useAuth();
+  const { signIn, signUp, signInWithGoogle, resetPassword, loading, signingIn, authError: contextAuthError, setAuthError: clearContextError } = useAuth();
   const [authError, setAuthError] = useState('');
   const [message, setMessage] = useState('');
   const [socialLoading, setSocialLoading] = useState('');
+
+  // Combine local + context errors — context error wins (it has Firebase error codes)
+  const displayError = contextAuthError || authError;
 
   const isAndroidAPK = typeof window !== 'undefined' && (
     !!window.Capacitor || 
@@ -46,11 +49,39 @@ export const AuthPage = () => {
 
   const handleGoogleSignIn = async () => {
     setSocialLoading('google');
-    setAuthError(''); setMessage('');
+    setAuthError('');
+    if (clearContextError) clearContextError(null);
+    setMessage('');
+    // For web: signInWithPopup returns when the popup closes (success or cancel)
+    // For mobile: signInWithRedirect navigates away — this line won't continue
     const { error } = await signInWithGoogle();
     if (error) setAuthError(error.message);
-    setSocialLoading('');
+    setSocialLoading(''); // Only reaches here on web (popup resolved)
   };
+
+  // Show full-screen redirect loading overlay while Google redirects
+  if (signingIn || socialLoading === 'google') {
+    return (
+      <div className="min-h-screen bg-bg-app flex flex-col items-center justify-center gap-6 font-inter">
+        <div className="absolute w-80 h-80 rounded-full bg-accent-blue/15 blur-[40px] animate-pulse" />
+        <div className="relative w-[120px] h-[120px]">
+          <div className="absolute inset-0 rounded-full border-[1.5px] border-accent-blue/20 animate-[spin_3s_linear_infinite]">
+            <div className="absolute top-[-4px] left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-accent-blue shadow-[0_0_12px_rgba(77,124,255,0.8)]" />
+          </div>
+          <div className="absolute inset-4 rounded-full border border-indigo-400/10 animate-[spin_5s_linear_infinite_reverse]">
+            <div className="absolute bottom-[-3px] left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-indigo-400" />
+          </div>
+          <div className="absolute inset-[30px] rounded-2xl bg-linear-to-br from-accent-blue to-indigo-400 flex items-center justify-center shadow-lg shadow-accent-blue/40">
+            <svg width="28" height="28" viewBox="0 0 48 48"><path fill="#ffffff" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#ffffffcc" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#ffffffaa" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#ffffff88" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+          </div>
+        </div>
+        <div className="text-center relative z-10">
+          <h2 className="text-xl font-black text-text-main tracking-tighter">Connecting to Google</h2>
+          <p className="text-xs font-bold text-text-muted uppercase tracking-[0.2em] mt-1 animate-pulse">Redirecting to Google Sign-In...</p>
+        </div>
+      </div>
+    );
+  }
 
 
 
@@ -114,9 +145,10 @@ export const AuthPage = () => {
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-          {authError && (
-            <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-500 text-xs font-black text-center uppercase tracking-widest animate-in fade-in slide-in-from-top-2">
-              {authError}
+          {displayError && (
+            <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-bold text-center tracking-wide animate-in fade-in slide-in-from-top-2 flex items-start gap-2">
+              <AlertTriangle size={14} className="shrink-0 mt-0.5" />
+              <span>{displayError}</span>
             </div>
           )}
           {message && (
@@ -317,9 +349,10 @@ export const AuthPage = () => {
 
           {/* Form wrapper */}
           <form onSubmit={handleSubmit} className="flex-1 flex flex-col justify-center gap-4 py-4">
-            {authError && (
-              <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 text-xs font-black text-center uppercase tracking-widest animate-in fade-in slide-in-from-top-2">
-                {authError}
+            {displayError && (
+              <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-bold text-center tracking-wide animate-in fade-in slide-in-from-top-2 flex items-start gap-2">
+                <AlertTriangle size={14} className="shrink-0 mt-0.5" />
+                <span>{displayError}</span>
               </div>
             )}
             {message && (
