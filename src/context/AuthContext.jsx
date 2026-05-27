@@ -7,6 +7,7 @@ import {
   signInWithPopup,
   signInWithRedirect,
   getRedirectResult,
+  browserPopupRedirectResolver,
   signOut as firebaseSignOut,
   updateProfile,
   sendPasswordResetEmail
@@ -30,21 +31,23 @@ export const AuthProvider = ({ children }) => {
       }
     }, 5000); // 5 second timeout
 
-    // Process redirect results IMMEDIATELY (don't await)
-    getRedirectResult(auth)
+    // Process redirect results (handles mobile/redirect-flow completions)
+    getRedirectResult(auth, browserPopupRedirectResolver)
       .then((result) => {
-        if (result) {
-          console.log('✓ Successfully completed Google Redirect sign-in:', result.user);
+        if (result?.user) {
+          console.log('[Auth] ✓ Google Redirect sign-in completed:', result.user.email);
+          // onAuthStateChanged will fire immediately after this and set the user
         }
       })
       .catch((error) => {
-        console.error('✗ Error during Google Redirect sign-in:', error);
+        console.error('[Auth] ✗ Google Redirect sign-in error:', error.code, error.message);
         // Don't block loading on redirect errors
       });
 
-    // Listen for auth state changes
+    // Listen for auth state changes — this is the single source of truth
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       if (firebaseUser) {
+        console.log('[Auth] onAuthStateChanged: user signed in:', firebaseUser.email);
         const normalizedUser = {
           id: firebaseUser.uid,
           uid: firebaseUser.uid,
@@ -64,6 +67,7 @@ export const AuthProvider = ({ children }) => {
           photoURL: firebaseUser.photoURL,
         }).catch(err => console.warn('[Auth] Profile sync failed:', err));
       } else {
+        console.log('[Auth] onAuthStateChanged: no user (signed out)');
         setUser(null);
       }
       
@@ -106,7 +110,7 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // ── Google Sign-In (OPTIMIZED FOR MOBILE) ──────────────────────────────────
+  // ── Google Sign-In (Popup for Web, Redirect for Android APK) ────────────
   const signInWithGoogle = async () => {
     try {
       setAuthError(null);
@@ -118,42 +122,32 @@ export const AuthProvider = ({ children }) => {
         (navigator.userAgent.includes('Android') && !navigator.userAgent.includes('Chrome'))
       );
 
-      console.log('[Auth] Google Sign-In detected as:', isAndroidAPK ? 'Android APK' : 'Web');
+      console.log('[Auth] Google Sign-In mode:', isAndroidAPK ? 'Android APK (redirect)' : 'Web (popup)');
 
       if (isAndroidAPK) {
-        // ✅ MOBILE: Use redirect (doesn't block on slow networks)
-        // The page will reload automatically when redirect completes
-        console.log('[Auth] Using signInWithRedirect for mobile...');
+        // MOBILE: signInWithRedirect — page reloads when done; getRedirectResult handles completion
         await signInWithRedirect(auth, googleProvider);
-        // Don't await completion - redirect will reload the page
         return { data: null, error: null };
       } else {
-        // ✅ WEB: Use popup with timeout
-        console.log('[Auth] Using signInWithPopup for web...');
-        const signInPromise = signInWithPopup(auth, googleProvider);
-        
-        // Race against a 15-second timeout
-        const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('auth/timeout')), 15000);
-        });
-
-        try {
-          const result = await Promise.race([signInPromise, timeoutPromise]);
-          setSigningIn(false);
-          return { data: result, error: null };
-        } catch (error) {
-          if (error.message === 'auth/timeout') {
-            setAuthError('Sign-in took too long. Please try again.');
-            console.error('[Auth] Google Sign-In timeout after 15 seconds');
-          }
-          throw error;
-        }
+        // WEB: signInWithPopup — resolves after user selects account
+        // Pass browserPopupRedirectResolver explicitly for Firebase v11+ compatibility
+        console.log('[Auth] Opening Google sign-in popup...');
+        const result = await signInWithPopup(auth, googleProvider, browserPopupRedirectResolver);
+        console.log('[Auth] ✓ Popup sign-in completed for:', result.user.email);
+        // onAuthStateChanged will update user state — just clear the loading flag
+        setSigningIn(false);
+        return { data: result, error: null };
       }
     } catch (error) {
       setSigningIn(false);
+      // Ignore user-cancelled popup — not a real error
+      if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
+        console.log('[Auth] Google popup closed by user.');
+        return { data: null, error: null };
+      }
       const message = getFirebaseErrorMessage(error.code || error.message);
       setAuthError(message);
-      console.error('[Auth] Google Sign-In error:', error);
+      console.error('[Auth] Google Sign-In error:', error.code, error.message);
       return { data: null, error: { message } };
     }
   };
