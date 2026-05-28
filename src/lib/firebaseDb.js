@@ -623,6 +623,7 @@ export async function fetchUserSettings(userId) {
       theme: data.theme || 'dark',
       focusTimeToday: data.focus_time_today || 0,
       lastReset: data.last_reset || null,
+      dailyResetProcessed: data.daily_reset_processed || '',
     };
   } catch (err) {
     log('fetchUserSettings', err);
@@ -635,6 +636,9 @@ export async function upsertUserSettings(userId, settings) {
     theme: settings.theme,
     focus_time_today: settings.focusTimeToday ?? 0,
     last_reset: settings.lastReset,
+    ...(settings.dailyResetProcessed !== undefined && {
+      daily_reset_processed: settings.dailyResetProcessed
+    }),
     updated_at: new Date().toISOString(),
   };
   const pathKey = `users/${userId}/settings/preferences`;

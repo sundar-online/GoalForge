@@ -245,7 +245,8 @@ export const AppProvider = ({ children }) => {
     focusHistory: {},
     dismissedInsights: [],
     weeklyIntentions: {},
-    lastPushDate: ''
+    lastPushDate: '',
+    dailyResetProcessed: ''
   }));
 
   // AI Insights State
@@ -816,6 +817,7 @@ export const AppProvider = ({ children }) => {
             theme: s.theme || prev.theme,
             focusTimeToday: s.focus_time_today || prev.focusTimeToday,
             lastActiveDate: s.last_reset || prev.lastActiveDate,
+            dailyResetProcessed: s.daily_reset_processed || prev.dailyResetProcessed,
           }));
         }
       }, (error) => {
@@ -941,6 +943,13 @@ export const AppProvider = ({ children }) => {
     const currentGoals = goalsRef.current;
     const currentRecurringHistory = recurringHistoryRef.current;
 
+    // ── Idempotency guard: skip if this calendar day's reset already ran ──
+    // This protects against multi-tab sessions, slow network syncs,
+    // timezone changes, and midnight race conditions.
+    if (currentSettings.dailyResetProcessed === todayStr) {
+      return;
+    }
+
     // 1. Check if ANY reset needs to be performed
     const hasSettingsNeed = currentSettings.lastActiveDate !== todayStr;
     const hasTaskNeed = currentTasks.some(t =>
@@ -956,8 +965,18 @@ export const AppProvider = ({ children }) => {
 
     // 2. Perform settings reset if needed
     if (hasSettingsNeed) {
-      setSettings(prev => ({ ...prev, focusTimeToday: 0, lastActiveDate: todayStr }));
-      db.upsertUserSettings(user.id, { theme, focusTimeToday: 0, lastReset: todayStr });
+      setSettings(prev => ({
+        ...prev,
+        focusTimeToday: 0,
+        lastActiveDate: todayStr,
+        dailyResetProcessed: todayStr   // stamp here to prevent any future re-entry today
+      }));
+      db.upsertUserSettings(user.id, {
+        theme,
+        focusTimeToday: 0,
+        lastReset: todayStr,
+        dailyResetProcessed: todayStr
+      });
     }
 
     // 3. Perform goals/habits reset if needed
@@ -1104,6 +1123,16 @@ export const AppProvider = ({ children }) => {
         });
       });
     }
+
+    // ── Stamp the reset as processed for today ──
+    // Write to both local state and Firestore so other tabs/sessions see it.
+    setSettings(prev => ({ ...prev, dailyResetProcessed: todayStr }));
+    db.upsertUserSettings(user.id, {
+      theme: currentSettings.theme,
+      focusTimeToday: currentSettings.focusTimeToday,
+      lastReset: currentSettings.lastActiveDate,
+      dailyResetProcessed: todayStr
+    });
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, user, currentDate]);
