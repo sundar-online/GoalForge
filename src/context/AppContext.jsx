@@ -307,7 +307,7 @@ export const AppProvider = ({ children }) => {
   }), [goals]);
 
   const goalsDone = useMemo(() => (todayGoals || []).filter(g => isGoalDoneToday(g)).length, [todayGoals]);
-  const tasksDone = useMemo(() => (todayTasks || []).filter(t => isTaskDone(t) && t.lastCompletedDate === todayStr).length, [todayTasks, todayStr]);
+  const tasksDone = useMemo(() => (todayTasks || []).filter(t => isTaskDone(t)).length, [todayTasks]);
 
   const todayHabits = useMemo(() => {
     return (goals || [])
@@ -924,19 +924,29 @@ export const AppProvider = ({ children }) => {
     if (user) db.upsertUserSettings(user.id, { theme: newTheme, focusTimeToday: focusTime, lastReset: settings.lastActiveDate });
   };
 
+  // ── Stable refs for daily reset to avoid stale closure deps ──
+  const settingsRef = useRef(settings);
+  const recurringHistoryRef = useRef(recurringHistory);
+  useEffect(() => { settingsRef.current = settings; }, [settings]);
+  useEffect(() => { recurringHistoryRef.current = recurringHistory; }, [recurringHistory]);
+
   useEffect(() => {
     if (loading) return;
     if (!user) return;
 
     const todayStr = currentDate;
     const yesterdayStr = addDays(todayStr, -1);
+    const currentSettings = settingsRef.current;
+    const currentTasks = tasksRef.current;
+    const currentGoals = goalsRef.current;
+    const currentRecurringHistory = recurringHistoryRef.current;
 
     // 1. Check if ANY reset needs to be performed
-    const hasSettingsNeed = settings.lastActiveDate !== todayStr;
-    const hasTaskNeed = tasks.some(t =>
+    const hasSettingsNeed = currentSettings.lastActiveDate !== todayStr;
+    const hasTaskNeed = currentTasks.some(t =>
       (t.schedule_type || t.type) === 'daily' && t.lastActiveDate !== todayStr
     );
-    const hasHabitNeed = goals.some(goal =>
+    const hasHabitNeed = currentGoals.some(goal =>
       (goal.habits || []).some(h => h.lastActiveDate !== todayStr)
     );
 
@@ -956,7 +966,7 @@ export const AppProvider = ({ children }) => {
         return prevGoals.map(goal => {
           let goalNeedsUpdate = false;
           const updatedHabits = (goal.habits || []).map(h => {
-            const hLastActive = h.lastActiveDate || settings.lastActiveDate || yesterdayStr;
+            const hLastActive = h.lastActiveDate || currentSettings.lastActiveDate || yesterdayStr;
             if (hLastActive === todayStr) return h; // Already reset for today
 
             goalNeedsUpdate = true;
@@ -1035,7 +1045,7 @@ export const AppProvider = ({ children }) => {
       setTasks(prevTasks => {
         return prevTasks.map(t => {
           if ((t.schedule_type || t.type) === 'daily') {
-            const tLastActive = t.lastActiveDate || settings.lastActiveDate || yesterdayStr;
+            const tLastActive = t.lastActiveDate || currentSettings.lastActiveDate || yesterdayStr;
             if (tLastActive === todayStr) return t; // Already reset for today
 
             const isCompleted = t.completed ||
@@ -1043,7 +1053,7 @@ export const AppProvider = ({ children }) => {
               (t.completionType === 'time' && (t.timeSpent ?? 0) >= (t.targetTime ?? 30));
 
             const recId = t.recurringId || getTaskTrackingKey(t);
-            let recDates = (recurringHistory[recId]?.completedDates ? [...recurringHistory[recId].completedDates] : (t.completedDates ? [...t.completedDates] : []));
+            let recDates = (currentRecurringHistory[recId]?.completedDates ? [...currentRecurringHistory[recId].completedDates] : (t.completedDates ? [...t.completedDates] : []));
 
             if (isCompleted && !recDates.includes(tLastActive)) {
               recDates.push(tLastActive);
@@ -1095,17 +1105,27 @@ export const AppProvider = ({ children }) => {
       });
     }
 
-  }, [loading, user, settings, goals, tasks, currentDate, recurringHistory]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, user, currentDate]);
 
   // ── Automatic Daily Summary Sync ─────────────────────────
   useEffect(() => {
     if (loading || !user) return;
     const today = TODAY();
+    // Compute task-specific counts (not habit counts)
+    const todayTasksForLog = (tasks || []).filter(t => {
+      const type = t.type || 'daily';
+      if (type === 'daily') return true;
+      if (type === 'single') return (t.targetDate || t.date) === today;
+      if (type === 'range') return t.startDate <= today && t.endDate >= today;
+      return false;
+    });
+    const completedTasksForLog = todayTasksForLog.filter(t => isTaskDone(t)).length;
     const summary = {
       date: today,
-      total_tasks: totalItems,
-      completed_tasks: completedItems,
-      time_spent: (todayTasks || []).reduce((acc, t) => acc + (t.timeSpent || 0), 0) + (allHabits || []).reduce((acc, h) => acc + (h.timeSpent || 0), 0),
+      total_tasks: todayTasksForLog.length,
+      completed_tasks: completedTasksForLog,
+      time_spent: (todayTasksForLog).reduce((acc, t) => acc + (t.timeSpent || 0), 0) + (allHabits || []).reduce((acc, h) => acc + (h.timeSpent || 0), 0),
       auto_completed: true
     };
 
@@ -1123,7 +1143,7 @@ export const AppProvider = ({ children }) => {
         console.error('[Realtime Sync] Failed to upsert task log summary:', err);
       });
     }
-  }, [completedItems, totalItems, loading, user]);
+  }, [tasks, allHabits, loading, user]);
 
   // ── AI Analysis Effect (Offloaded to Web Worker) ───────────────────────────────────
   const [workerReady, setWorkerReady] = useState(false);

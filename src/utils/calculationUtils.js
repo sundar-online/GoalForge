@@ -47,11 +47,41 @@ export const calculateGoalDailyProgress = (goal) => {
 
 export const isTaskDone = (t) => {
   const today = TODAY();
-  // Ensure the task was actually completed TODAY (especially relevant for daily tasks)
-  if (t.type === 'daily' && t.lastCompletedDate !== today) return false;
-  
-  const cType = t.completionType || t.type || 'check';
-  if (cType === 'check') return t.completed;
+  const tType = t.type || 'daily';
+  const cType = t.completionType || 'check';
+
+  if (tType === 'daily') {
+    // Daily tasks must have been completed TODAY
+    if (t.lastCompletedDate !== today) return false;
+    if (cType === 'check') return !!t.completed;
+    if (cType === 'count') return (t.currentCount ?? 0) >= (t.targetCount ?? 10);
+    return (t.timeSpent ?? 0) >= (t.targetTime ?? 30);
+  }
+
+  if (tType === 'single') {
+    // Single tasks: completed means done on their target date
+    const targetDate = t.targetDate || t.date;
+    if (cType === 'check') {
+      // Completed on/after their target date and lastCompletedDate is set
+      return !!t.completed && (t.lastCompletedDate === targetDate || (t.completedDates || []).includes(targetDate));
+    }
+    if (cType === 'count') return (t.currentCount ?? 0) >= (t.targetCount ?? 10);
+    return (t.timeSpent ?? 0) >= (t.targetTime ?? 30);
+  }
+
+  if (tType === 'range') {
+    // Range tasks: check if completed on today's date
+    if (cType === 'check') {
+      // For range tasks, use completedDates to check if done today, OR the current session's completed flag
+      const completedToday = (t.completedDates || []).includes(today);
+      return completedToday || (!!t.completed && t.lastCompletedDate === today);
+    }
+    if (cType === 'count') return (t.currentCount ?? 0) >= (t.targetCount ?? 10);
+    return (t.timeSpent ?? 0) >= (t.targetTime ?? 30);
+  }
+
+  // Fallback
+  if (cType === 'check') return !!t.completed;
   if (cType === 'count') return (t.currentCount ?? 0) >= (t.targetCount ?? 10);
   return (t.timeSpent ?? 0) >= (t.targetTime ?? 30);
 };
