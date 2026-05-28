@@ -25,6 +25,11 @@ import {
   calculateProductiveStreak,
   getTaskTrackingKey
 } from '../utils/calculationUtils';
+// ── Service modules (reset / analytics / recurring task orchestration) ────
+import { shouldRunReset, computeHabitResetPayload, computeGoalResetPayload, computeTaskResetPayload } from '../utils/resetManager';
+import { buildTaskLogSummary, hasTaskLogChanged } from '../utils/analyticsEngine';
+import { getOrBuildRecDates, buildRecurringPayload, getRecId } from '../utils/recurringTaskEngine';
+
 import { XP_SOURCES, getLevelFromXP, evaluateBadges, getNewlyEarnedBadges, getBadgeById } from '../utils/gamificationEngine';
 import { scheduleLocalNotification, scheduleReminder, cancelReminder } from '../utils/notificationUtils';
 import {
@@ -943,229 +948,90 @@ export const AppProvider = ({ children }) => {
     const currentGoals = goalsRef.current;
     const currentRecurringHistory = recurringHistoryRef.current;
 
-    // ── Idempotency guard: skip if this calendar day's reset already ran ──
-    // This protects against multi-tab sessions, slow network syncs,
-    // timezone changes, and midnight race conditions.
-    if (currentSettings.dailyResetProcessed === todayStr) {
-      return;
-    }
+    // ── Delegate: shouldRunReset handles idempotency guard + need detection ──
+    const { hasSettingsNeed, hasTaskNeed, hasHabitNeed, needsReset } =
+      shouldRunReset(currentSettings, currentTasks, currentGoals, todayStr);
 
-    // 1. Check if ANY reset needs to be performed
-    const hasSettingsNeed = currentSettings.lastActiveDate !== todayStr;
-    const hasTaskNeed = currentTasks.some(t =>
-      (t.schedule_type || t.type) === 'daily' && t.lastActiveDate !== todayStr
-    );
-    const hasHabitNeed = currentGoals.some(goal =>
-      (goal.habits || []).some(h => h.lastActiveDate !== todayStr)
-    );
+    if (!needsReset) return;
 
-    if (!hasSettingsNeed && !hasTaskNeed && !hasHabitNeed) return; // Nothing to reset
+    console.log('[Daily Reset] Reset sequence triggered todayStr:', todayStr,
+      'SettingsNeed:', hasSettingsNeed, 'TaskNeed:', hasTaskNeed, 'HabitNeed:', hasHabitNeed);
 
-    console.log('[Daily Reset] Reset sequence triggered todayStr:', todayStr, 'SettingsNeed:', hasSettingsNeed, 'TaskNeed:', hasTaskNeed, 'HabitNeed:', hasHabitNeed);
-
-    // 2. Perform settings reset if needed
+    // 1. Settings reset — also stamps dailyResetProcessed immediately
     if (hasSettingsNeed) {
       setSettings(prev => ({
         ...prev,
         focusTimeToday: 0,
         lastActiveDate: todayStr,
-        dailyResetProcessed: todayStr   // stamp here to prevent any future re-entry today
+        dailyResetProcessed: todayStr,
       }));
       db.upsertUserSettings(user.id, {
         theme,
         focusTimeToday: 0,
         lastReset: todayStr,
-        dailyResetProcessed: todayStr
+        dailyResetProcessed: todayStr,
       });
     }
 
-    // 3. Perform goals/habits reset if needed
+    // 2. Goals / habits reset
     if (hasHabitNeed) {
-      setGoals(prevGoals => {
-        return prevGoals.map(goal => {
-          let goalNeedsUpdate = false;
-          const updatedHabits = (goal.habits || []).map(h => {
-            const hLastActive = h.lastActiveDate || currentSettings.lastActiveDate || yesterdayStr;
-            if (hLastActive === todayStr) return h; // Already reset for today
-
-            goalNeedsUpdate = true;
-            let updatedH = { ...h };
-            const wasDone = updatedH.completed ||
-              (updatedH.type === 'time' && (updatedH.timeSpent ?? 0) >= (updatedH.targetTime ?? 15)) ||
-              (updatedH.type === 'count' && (updatedH.currentCount ?? 0) >= (updatedH.targetCount ?? 10));
-
-            // Check if yesterday (hLastActive) was a scheduled day for this habit
-            const lastActiveDay = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][parseLocalDate(hLastActive).getDay()];
-            const wasScheduled = !h.scheduleDays || h.scheduleDays.length === 0 || h.scheduleDays.includes(lastActiveDay);
-
-            let updatedDates = h.completedDates ? [...h.completedDates] : [];
-            if (wasDone && wasScheduled && !updatedDates.includes(hLastActive)) {
-              updatedDates.push(hLastActive);
-            }
-
-            // Calculate new missed days and streak dynamically using the simulation engine
-            const newMissed = calculateConsecutiveMissedDays(updatedDates, h.scheduleDays, h.createdAt);
-            const newStreak = calculateStreakFromHistory(updatedDates, h.scheduleDays, goal.completedDates, h.createdAt);
-
-            const finalHabit = {
-              ...h,
-              completedDates: updatedDates,
-              timeSpent: 0,
-              completed: false,
-              currentCount: 0,
-              streak: newStreak,
-              missedDays: newMissed,
-              lastActiveDate: todayStr,
-              lastActionTimestamp: new Date().toISOString()
-            };
-
-            // Restore original target if habit was in recovery mode
-            if (h.isRecovering && h.originalTarget !== undefined) {
-              const targetKey = h.type === 'count' ? 'targetCount' : 'targetTime';
-              finalHabit[targetKey] = h.originalTarget;
-              finalHabit.isRecovering = false;
-              delete finalHabit.originalTarget;
-            }
-
-            // Write habit reset to DB
-            db.upsertHabit(user.id, goal.id, finalHabit);
-            return finalHabit;
-          });
-
-          if (!goalNeedsUpdate) return goal;
-
-          // Recalculate goal completed dates, streak, and missed days dynamically from habits
-          const updatedGoalWithoutDates = { ...goal, habits: updatedHabits };
-          const updatedGoalDates = recalculateGoalCompletedDates(updatedGoalWithoutDates);
-          const goalSchedule = getGoalScheduledDays(updatedGoalWithoutDates);
-          const newGoalStreak = calculateGoalStreak(updatedGoalDates, goalSchedule);
-          const newGoalMissed = calculateGoalConsecutiveMissedDays(updatedGoalDates, goalSchedule, goal.startDate || goal.createdAt);
-
-          const finalGoal = {
-            ...goal,
-            habits: updatedHabits,
-            completedDates: updatedGoalDates,
-            missedDays: newGoalMissed,
-            streak: newGoalStreak,
-            lastActiveDate: todayStr,
-            lastActionTimestamp: new Date().toISOString()
-          };
-          finalGoal.progress = calculateOverallProgress(finalGoal);
-
-          // Write goal reset to DB
-          db.upsertGoal(user.id, finalGoal);
-          return finalGoal;
+      const fallbackLastActive = currentSettings.lastActiveDate || yesterdayStr;
+      setGoals(prevGoals => prevGoals.map(goal => {
+        let goalNeedsUpdate = false;
+        const updatedHabits = (goal.habits || []).map(h => {
+          const result = computeHabitResetPayload(h, goal, todayStr, fallbackLastActive);
+          if (!result) return h; // already reset for today
+          goalNeedsUpdate = true;
+          db.upsertHabit(user.id, goal.id, result.finalHabit);
+          return result.finalHabit;
         });
-      });
+
+        if (!goalNeedsUpdate) return goal;
+
+        const { finalGoal } = computeGoalResetPayload(goal, updatedHabits, todayStr);
+        db.upsertGoal(user.id, finalGoal);
+        return finalGoal;
+      }));
     }
 
-    // 4. Perform daily tasks reset if needed
+    // 3. Daily tasks reset
     if (hasTaskNeed) {
-      setTasks(prevTasks => {
-        return prevTasks.map(t => {
-          if ((t.schedule_type || t.type) === 'daily') {
-            const tLastActive = t.lastActiveDate || currentSettings.lastActiveDate || yesterdayStr;
-            if (tLastActive === todayStr) return t; // Already reset for today
-
-            const isCompleted = t.completed ||
-              (t.completionType === 'count' && (t.currentCount || 0) >= (t.targetCount || 10)) ||
-              (t.completionType === 'time' && (t.timeSpent ?? 0) >= (t.targetTime ?? 30));
-
-            const recId = t.recurringId || getTaskTrackingKey(t);
-            let recDates = (currentRecurringHistory[recId]?.completedDates ? [...currentRecurringHistory[recId].completedDates] : (t.completedDates ? [...t.completedDates] : []));
-
-            if (isCompleted && !recDates.includes(tLastActive)) {
-              recDates.push(tLastActive);
-            }
-
-            // Calculate new missed days and streak dynamically using calculations
-            const newMissed = calculateConsecutiveMissedDays(recDates, []);
-            const newStreak = calculateStreakFromHistory(recDates, []);
-
-            // Sync to recurring history
-            const recPayload = {
-              title: t.title,
-              type: t.type || 'daily',
-              completedDates: recDates,
-              streak: newStreak
-            };
-
-            setRecurringHistory(prev => ({
-              ...prev,
-              [recId]: { id: recId, ...recPayload }
-            }));
-            db.upsertRecurringHistory(user.id, recId, recPayload);
-
-            const finalTask = {
-              ...t,
-              completedDates: recDates,
-              timeSpent: 0,
-              currentCount: 0,
-              completed: false,
-              currentStreak: newStreak,
-              missedDays: newMissed,
-              lastActiveDate: todayStr,
-              lastActionTimestamp: new Date().toISOString()
-            };
-
-            // Restore original target if task was in recovery mode
-            if (t.isRecovering && t.originalTarget !== undefined) {
-              const targetKey = t.completionType === 'count' ? 'targetCount' : 'targetTime';
-              finalTask[targetKey] = t.originalTarget;
-              finalTask.isRecovering = false;
-              delete finalTask.originalTarget;
-            }
-
-            db.upsertTask(user.id, finalTask);
-            return finalTask;
-          }
-          return t;
-        });
-      });
+      const fallbackLastActive = currentSettings.lastActiveDate || yesterdayStr;
+      setTasks(prevTasks => prevTasks.map(t => {
+        const result = computeTaskResetPayload(t, todayStr, fallbackLastActive, currentRecurringHistory);
+        if (!result) return t; // non-daily or already reset
+        const { finalTask, recId, recPayload } = result;
+        setRecurringHistory(prev => ({ ...prev, [recId]: { id: recId, ...recPayload } }));
+        db.upsertRecurringHistory(user.id, recId, recPayload);
+        db.upsertTask(user.id, finalTask);
+        return finalTask;
+      }));
     }
 
-    // ── Stamp the reset as processed for today ──
-    // Write to both local state and Firestore so other tabs/sessions see it.
-    setSettings(prev => ({ ...prev, dailyResetProcessed: todayStr }));
-    db.upsertUserSettings(user.id, {
-      theme: currentSettings.theme,
-      focusTimeToday: currentSettings.focusTimeToday,
-      lastReset: currentSettings.lastActiveDate,
-      dailyResetProcessed: todayStr
-    });
+    // 4. Backstop stamp for task/habit-only reset days (!hasSettingsNeed)
+    if (!hasSettingsNeed) {
+      setSettings(prev => ({ ...prev, dailyResetProcessed: todayStr }));
+      db.upsertUserSettings(user.id, {
+        theme: currentSettings.theme,
+        focusTimeToday: currentSettings.focusTimeToday,
+        lastReset: currentSettings.lastActiveDate,
+        dailyResetProcessed: todayStr,
+      });
+    }
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, user, currentDate]);
+
 
   // ── Automatic Daily Summary Sync ─────────────────────────
   useEffect(() => {
     if (loading || !user) return;
     const today = TODAY();
-    // Compute task-specific counts (not habit counts)
-    const todayTasksForLog = (tasks || []).filter(t => {
-      const type = t.type || 'daily';
-      if (type === 'daily') return true;
-      if (type === 'single') return (t.targetDate || t.date) === today;
-      if (type === 'range') return t.startDate <= today && t.endDate >= today;
-      return false;
-    });
-    const completedTasksForLog = todayTasksForLog.filter(t => isTaskDone(t)).length;
-    const summary = {
-      date: today,
-      total_tasks: todayTasksForLog.length,
-      completed_tasks: completedTasksForLog,
-      time_spent: (todayTasksForLog).reduce((acc, t) => acc + (t.timeSpent || 0), 0) + (allHabits || []).reduce((acc, h) => acc + (h.timeSpent || 0), 0),
-      auto_completed: true
-    };
 
-    const last = lastSavedSummaryRef.current;
-    const isSame = last &&
-      last.date === summary.date &&
-      last.total_tasks === summary.total_tasks &&
-      last.completed_tasks === summary.completed_tasks &&
-      last.time_spent === summary.time_spent;
+    // Delegate to analyticsEngine — pure computation, no side effects
+    const summary = buildTaskLogSummary(tasks, allHabits, today);
 
-    if (!isSame) {
+    if (hasTaskLogChanged(lastSavedSummaryRef.current, summary)) {
       lastSavedSummaryRef.current = summary;
       setTaskLogs(prev => ({ ...prev, [today]: summary }));
       db.upsertTaskLog(user.id, summary).catch(err => {
@@ -1173,6 +1039,7 @@ export const AppProvider = ({ children }) => {
       });
     }
   }, [tasks, allHabits, loading, user]);
+
 
   // ── AI Analysis Effect (Offloaded to Web Worker) ───────────────────────────────────
   const [workerReady, setWorkerReady] = useState(false);
