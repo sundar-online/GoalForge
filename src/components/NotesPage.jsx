@@ -183,8 +183,10 @@ export const NotesPage = () => {
 
   // Filter notes by search query and folder
   const filtered = notes.filter(n => {
-    const matchesSearch = n.title.toLowerCase().includes(search.toLowerCase()) ||
-      (n.content || '').toLowerCase().includes(search.toLowerCase());
+    const title = n.title || '';
+    const content = n.content || '';
+    const matchesSearch = title.toLowerCase().includes(search.toLowerCase()) ||
+      content.toLowerCase().includes(search.toLowerCase());
     const matchesFolder = selectedFolder ? n.folder === selectedFolder : true;
     return matchesSearch && matchesFolder;
   });

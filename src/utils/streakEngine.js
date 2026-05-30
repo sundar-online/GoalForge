@@ -17,4 +17,6 @@ export {
   recalculateGoalCompletedDates,
   getGoalScheduledDays,
   calculateOverallProgress,
+  calculateTaskStreak,
+  sanitizeAndValidateCompletedDates,
 } from './calculationUtils';

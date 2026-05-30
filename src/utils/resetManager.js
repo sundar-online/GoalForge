@@ -20,6 +20,8 @@ import {
   recalculateGoalCompletedDates,
   getGoalScheduledDays,
   calculateOverallProgress,
+  calculateTaskStreak,
+  sanitizeAndValidateCompletedDates,
 } from './calculationUtils';
 import { getRecId, getOrBuildRecDates, buildRecurringPayload } from './recurringTaskEngine';
 
@@ -193,18 +195,27 @@ export function computeTaskResetPayload(task, todayStr, fallbackLastActive, curr
     recDates.push(tLastActive);
   }
 
-  const newMissed = calculateConsecutiveMissedDays(recDates, []);
-  const newStreak = calculateStreakFromHistory(recDates, []);
+  const { sanitizedDates } = sanitizeAndValidateCompletedDates(
+    recDates,
+    task.createdAt,
+    task.id,
+    task.title,
+    task.currentStreak ?? task.current_streak ?? 0
+  );
 
-  const recPayload = buildRecurringPayload(task, recDates, newStreak);
+  const newMissed = calculateConsecutiveMissedDays(sanitizedDates, []);
+  const { current: newStreak, best: newBestStreak } = calculateTaskStreak(sanitizedDates);
+
+  const recPayload = buildRecurringPayload(task, sanitizedDates, newStreak);
 
   const finalTask = {
     ...task,
-    completedDates: recDates,
+    completedDates: sanitizedDates,
     timeSpent: 0,
     currentCount: 0,
     completed: false,
     currentStreak: newStreak,
+    bestStreak: newBestStreak,
     missedDays: newMissed,
     lastActiveDate: todayStr,
     lastActionTimestamp: new Date().toISOString(),

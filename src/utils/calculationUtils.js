@@ -580,4 +580,163 @@ export const getTaskTrackingKey = (task) => {
   return `${titlePart}_${typePart}`;
 };
 
+export const calculateTaskStreak = (completedDates) => {
+  if (!completedDates || completedDates.length === 0) {
+    return { current: 0, best: 0 };
+  }
+
+  const completedSet = new Set(completedDates);
+  const todayStr = TODAY();
+  const sortedDates = [...completedSet].sort();
+
+  // 1. Calculate Best Streak
+  let best = 0;
+  let currentRun = 0;
+  let lastDate = null;
+
+  for (const dateStr of sortedDates) {
+    if (lastDate === null) {
+      currentRun = 1;
+    } else {
+      const expectedNext = addDays(lastDate, 1);
+      if (dateStr === expectedNext) {
+        currentRun++;
+      } else {
+        best = Math.max(best, currentRun);
+        currentRun = 1;
+      }
+    }
+    lastDate = dateStr;
+  }
+  best = Math.max(best, currentRun);
+
+  // 2. Calculate Current Streak
+  let current = 0;
+  let checkDate = todayStr;
+
+  if (completedSet.has(todayStr)) {
+    while (completedSet.has(checkDate)) {
+      current++;
+      checkDate = addDays(checkDate, -1);
+    }
+  } else {
+    const yesterdayStr = addDays(todayStr, -1);
+    checkDate = yesterdayStr;
+    while (completedSet.has(checkDate)) {
+      current++;
+      checkDate = addDays(checkDate, -1);
+    }
+  }
+
+  return { current, best };
+};
+
+export const sanitizeAndValidateCompletedDates = (dates, createdAt, taskId, taskTitle, storedStreak = 0) => {
+  const issues = [];
+  const rawDataStr = JSON.stringify(dates);
+
+  if (!Array.isArray(dates)) {
+    issues.push({ type: 'Non-array completion dates', raw: rawDataStr });
+    const result = { sanitizedDates: [], hasCorruptedData: true, issues };
+    _logStreakAnomaly(taskId, taskTitle, issues, rawDataStr, result.sanitizedDates);
+    return result;
+  }
+
+  const todayStr = TODAY();
+  const createdStr = createdAt ? (createdAt.includes('T') ? createdAt.split('T')[0] : createdAt) : null;
+  const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+  
+  const seen = new Set();
+  const validDates = [];
+  let hasCorruptedData = false;
+
+  for (let idx = 0; idx < dates.length; idx++) {
+    const rawDate = dates[idx];
+    
+    // Check type
+    if (typeof rawDate !== 'string') {
+      issues.push({ type: `Invalid date type at index ${idx}`, raw: String(rawDate) });
+      hasCorruptedData = true;
+      continue;
+    }
+
+    const trimmed = rawDate.trim();
+
+    // Check format
+    if (!dateRegex.test(trimmed)) {
+      issues.push({ type: `Invalid date format at index ${idx}`, raw: rawDate });
+      hasCorruptedData = true;
+      continue;
+    }
+
+    // Check parseability
+    const d = new Date(trimmed);
+    if (isNaN(d.getTime())) {
+      issues.push({ type: `Unparseable date at index ${idx}`, raw: rawDate });
+      hasCorruptedData = true;
+      continue;
+    }
+
+    // Check duplicate
+    if (seen.has(trimmed)) {
+      issues.push({ type: `Duplicate date`, raw: trimmed });
+      hasCorruptedData = true;
+      continue;
+    }
+
+    // Check future date
+    if (trimmed > todayStr) {
+      issues.push({ type: `Future date`, raw: trimmed });
+      hasCorruptedData = true;
+      continue;
+    }
+
+    // Check older than task creation date
+    if (createdStr && trimmed < createdStr) {
+      issues.push({ type: `Date older than creation date`, raw: trimmed });
+      hasCorruptedData = true;
+      continue;
+    }
+
+    seen.add(trimmed);
+    validDates.push(trimmed);
+  }
+
+  // Check out-of-order dates
+  const isSortedChronologically = dates.every((val, index) => index === 0 || val >= dates[index - 1]);
+  if (!isSortedChronologically && validDates.length > 0) {
+    issues.push({ type: 'Out-of-order dates', raw: rawDataStr });
+    hasCorruptedData = true;
+  }
+
+  // Chronological sort
+  const sortedDates = [...validDates].sort((a, b) => a.localeCompare(b));
+
+  // Check empty history with non-zero streak values
+  if (sortedDates.length === 0 && storedStreak > 0) {
+    issues.push({ type: 'Empty completion history with non-zero streak', raw: `Stored Streak: ${storedStreak}` });
+    hasCorruptedData = true;
+  }
+
+  if (hasCorruptedData) {
+    _logStreakAnomaly(taskId, taskTitle, issues, rawDataStr, sortedDates);
+  }
+
+  return { sanitizedDates: sortedDates, hasCorruptedData, issues };
+};
+
+const _logStreakAnomaly = (taskId, taskTitle, issues, rawData, sanitizedResult) => {
+  const issueTypes = issues.map(i => i.type).join(', ');
+  console.warn(
+    `[GoalForge Streak Validation]\n` +
+    `Task ID: ${taskId || 'unknown'}\n` +
+    `Task Name: ${taskTitle || 'unknown'}\n` +
+    `Issue Type: ${issueTypes}\n` +
+    `Raw Data: ${rawData}\n` +
+    `Sanitized Result: ${JSON.stringify(sanitizedResult)}`
+  );
+};
+
+
+
 

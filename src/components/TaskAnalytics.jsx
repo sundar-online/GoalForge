@@ -176,51 +176,14 @@ export const TaskAnalytics = ({ setView }) => {
 
   // Streak Consistency (Current task streak & Best task streak)
   const taskStreakData = useMemo(() => {
-    const completedDatesSet = new Set(tasks.flatMap(t => t.completedDates || []));
-    if (completedDatesSet.size === 0) return { current: 0, best: 0 };
+    const dailyTasks = tasks.filter(t => (t.type || 'daily') === 'daily');
+    if (dailyTasks.length === 0) return { current: 0, best: 0 };
 
-    let current = 0;
-    let checkDate = todayStr;
-
-    // Check if completed today
-    if (completedDatesSet.has(todayStr)) {
-      while (completedDatesSet.has(checkDate)) {
-        current++;
-        checkDate = addDays(checkDate, -1);
-      }
-    } else {
-      const yesterdayStr = addDays(todayStr, -1);
-      checkDate = yesterdayStr;
-      while (completedDatesSet.has(checkDate)) {
-        current++;
-        checkDate = addDays(checkDate, -1);
-      }
-    }
-
-    // Best streak
-    const sortedDates = Array.from(completedDatesSet).sort();
-    let best = 0;
-    let currentRun = 0;
-    let lastDate = null;
-
-    for (const dateStr of sortedDates) {
-      if (lastDate === null) {
-        currentRun = 1;
-      } else {
-        const expectedNext = addDays(lastDate, 1);
-        if (dateStr === expectedNext) {
-          currentRun++;
-        } else {
-          best = Math.max(best, currentRun);
-          currentRun = 1;
-        }
-      }
-      lastDate = dateStr;
-    }
-    best = Math.max(best, currentRun);
+    const current = Math.max(...dailyTasks.map(t => t.currentStreak || 0), 0);
+    const best = Math.max(...dailyTasks.map(t => t.bestStreak || 0), 0);
 
     return { current, best };
-  }, [tasks, todayStr]);
+  }, [tasks]);
 
   // Task Discipline Score (Aggregate score: 40% Daily Accuracy, 30% Weekly Completion, 30% Streak capped)
   const taskDisciplineScore = useMemo(() => {

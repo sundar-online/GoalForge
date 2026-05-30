@@ -3,6 +3,7 @@ import {
   doc, collection, getDocs, setDoc, deleteDoc,
   query, where, orderBy, writeBatch
 } from 'firebase/firestore';
+import { sanitizeAndValidateCompletedDates, calculateTaskStreak } from '../utils/calculationUtils';
 
 // ═══════════════════════════════════════════════════════
 // Firestore Database Helper — GoalForge
@@ -473,6 +474,10 @@ export async function fetchTasks(userId) {
       const pathKey = `users/${userId}/tasks/${d.id}`;
       writeCache.set(pathKey, cleanPayload(t)); // Prime values in cache
 
+      const rawDates = t.completed_dates || [];
+      const { sanitizedDates } = sanitizeAndValidateCompletedDates(rawDates, t.created_at, d.id, t.title, t.current_streak);
+      const { current: currentStreak, best: bestStreak } = calculateTaskStreak(sanitizedDates);
+
       return {
         id: d.id,
         title: t.title,
@@ -484,16 +489,18 @@ export async function fetchTasks(userId) {
         targetDate: t.target_date || null,
         startDate: t.start_date || null,
         endDate: t.end_date || null,
-        currentStreak: t.current_streak ?? 0,
+        currentStreak,
+        bestStreak,
         missedDays: t.missed_days ?? 0,
         lastCompletedDate: t.last_completed_date || null,
-        completedDates: t.completed_dates || [],
+        completedDates: sanitizedDates,
         lastActiveDate: t.last_active_date || null,
         priority: t.priority ?? 'Medium',
         targetCount: t.target_count ?? 10,
         currentCount: t.current_count ?? 0,
         isRecovering: t.is_recovering ?? false,
         originalTarget: t.original_target || null,
+        createdAt: t.created_at || null,
       };
     });
   } catch (err) {
@@ -649,9 +656,8 @@ export async function upsertUserSettings(userId, settings) {
 // ── Notes ──────────────────────────────────────────────
 export async function fetchNotes(userId) {
   try {
-    const q = query(userCol(userId, 'notes'), orderBy('created_at', 'desc'));
-    const snap = await getDocs(q);
-    return snap.docs.map(d => {
+    const snap = await getDocs(userCol(userId, 'notes'));
+    const notes = snap.docs.map(d => {
       const n = d.data();
       const pathKey = `users/${userId}/notes/${d.id}`;
       writeCache.set(pathKey, cleanPayload(n)); // Prime value in cache
@@ -665,10 +671,13 @@ export async function fetchNotes(userId) {
         checklist: n.checklist || null,
         pinned: n.pinned || false,
         folder: n.folder || '',
-        created_at: n.created_at,
-        updated_at: n.updated_at,
+        created_at: n.created_at || n.createdAt || new Date().toISOString(),
+        updated_at: n.updated_at || n.updatedAt || n.created_at || new Date().toISOString(),
       };
     });
+
+    notes.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    return notes;
   } catch (err) {
     log('fetchNotes', err);
     return null;

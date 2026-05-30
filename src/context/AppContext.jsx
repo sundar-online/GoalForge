@@ -23,7 +23,9 @@ import {
   getGoalScheduledDays,
   calculateOverallProgress,
   calculateProductiveStreak,
-  getTaskTrackingKey
+  getTaskTrackingKey,
+  calculateTaskStreak,
+  sanitizeAndValidateCompletedDates
 } from '../utils/calculationUtils';
 // ── Service modules (reset / analytics / recurring task orchestration) ────
 import { shouldRunReset, computeHabitResetPayload, computeGoalResetPayload, computeTaskResetPayload } from '../utils/resetManager';
@@ -419,9 +421,71 @@ export const AppProvider = ({ children }) => {
 
   useEffect(() => {
     if (!user) {
+      setGoals([]);
+      setTasks([]);
+      setTaskLogs({});
+      setRecurringHistory({});
+      setNotes([]);
+      setMemories([]);
+      setQuickThoughts([]);
+      setXpData(DEFAULT_XP_DATA);
+      setSettings({
+        theme: 'dark',
+        focusTimeToday: 0,
+        lastActiveDate: '',
+        focusHistory: {},
+        dismissedInsights: [],
+        weeklyIntentions: {},
+        lastPushDate: '',
+        dailyResetProcessed: ''
+      });
+      setAiInsights([]);
+      setRecoveryStrategies([]);
+      setSmartSuggestions(null);
+      setDeletedGoalIds([]);
+      setDeletedHabitIds([]);
+
+      // Clear local storage keys on user logout to prevent data leakage between sessions
+      localStorage.removeItem(STORAGE_KEYS.GOALS);
+      localStorage.removeItem(STORAGE_KEYS.TASKS);
+      localStorage.removeItem(STORAGE_KEYS.LOGS);
+      localStorage.removeItem(STORAGE_KEYS.SETTINGS);
+      localStorage.removeItem(STORAGE_KEYS.NOTES);
+      localStorage.removeItem(STORAGE_KEYS.XP);
+      localStorage.removeItem(STORAGE_KEYS.MEMORIES);
+      localStorage.removeItem(STORAGE_KEYS.QUICK_THOUGHTS);
+      localStorage.removeItem('gf_recurring_history');
+      localStorage.removeItem('gf_deleted_goal_ids');
+      localStorage.removeItem('gf_deleted_habit_ids');
+
       setLoading(false);
       return;
     }
+
+    // Reset states to default to prevent stale previous user's data rendering during new load
+    setGoals([]);
+    setTasks([]);
+    setTaskLogs({});
+    setRecurringHistory({});
+    setNotes([]);
+    setMemories([]);
+    setQuickThoughts([]);
+    setXpData(DEFAULT_XP_DATA);
+    setSettings({
+      theme: 'dark',
+      focusTimeToday: 0,
+      lastActiveDate: '',
+      focusHistory: {},
+      dismissedInsights: [],
+      weeklyIntentions: {},
+      lastPushDate: '',
+      dailyResetProcessed: ''
+    });
+    setAiInsights([]);
+    setRecoveryStrategies([]);
+    setSmartSuggestions(null);
+    setDeletedGoalIds([]);
+    setDeletedHabitIds([]);
 
     setLoading(true);
     setSyncError(null);
@@ -442,6 +506,9 @@ export const AppProvider = ({ children }) => {
         const updatedTasks = snapshot.docs.map(doc => {
           const t = doc.data();
           db.updateCache(`users/${user.id}/tasks/${doc.id}`, t);
+          const rawDates = t.completed_dates || [];
+          const { sanitizedDates } = sanitizeAndValidateCompletedDates(rawDates, t.created_at, doc.id, t.title, t.current_streak);
+          const { current: currentStreak, best: bestStreak } = calculateTaskStreak(sanitizedDates);
           return {
             id: doc.id,
             title: t.title,
@@ -453,8 +520,9 @@ export const AppProvider = ({ children }) => {
             targetDate: t.target_date || null,
             startDate: t.start_date || null,
             endDate: t.end_date || null,
-            currentStreak: t.current_streak ?? 0,
-            completedDates: t.completed_dates || [],
+            currentStreak,
+            bestStreak,
+            completedDates: sanitizedDates,
             missedDays: t.missed_days ?? 0,
             lastCompletedDate: t.last_completed_date || null,
             lastActiveDate: t.last_active_date || null,
@@ -494,7 +562,7 @@ export const AppProvider = ({ children }) => {
       unsubscribes.push(unsubTasks);
 
       // 2. Subscribe to Notes Collection
-      const notesQuery = query(collection(fireDb, 'users', user.id, 'notes'), orderBy('created_at', 'desc'));
+      const notesQuery = collection(fireDb, 'users', user.id, 'notes');
       const unsubNotes = onSnapshot(notesQuery, { includeMetadataChanges: true }, (snapshot) => {
         const updatedNotes = snapshot.docs.map(doc => {
           const n = doc.data();
@@ -508,11 +576,14 @@ export const AppProvider = ({ children }) => {
             checklist: n.checklist || null,
             pinned: n.pinned || false,
             folder: n.folder || '',
-            created_at: n.created_at,
-            updated_at: n.updated_at,
+            created_at: n.created_at || n.createdAt || new Date().toISOString(),
+            updated_at: n.updated_at || n.updatedAt || n.created_at || new Date().toISOString(),
             syncPending: doc.metadata.hasPendingWrites,
           };
         });
+
+        // Sort in memory by created_at desc (or fallbacks)
+        updatedNotes.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
         if (!isInitialNotesLoad.current) {
           const prevIds = new Set(notesRef.current.map(n => n.id));
@@ -782,12 +853,16 @@ export const AppProvider = ({ children }) => {
         snapshot.docs.forEach(doc => {
           const data = doc.data();
           db.updateCache(`users/${user.id}/recurring_task_history/${doc.id}`, data);
+          const rawDates = data.completed_dates || data.completedDates || [];
+          const { sanitizedDates } = sanitizeAndValidateCompletedDates(rawDates, null, doc.id, data.title, data.streak);
+          const { current: currentStreak, best: bestStreak } = calculateTaskStreak(sanitizedDates);
           history[doc.id] = {
             id: doc.id,
-            completedDates: data.completed_dates || data.completedDates || [],
+            completedDates: sanitizedDates,
             title: data.title || '',
             type: data.type || 'daily',
-            streak: data.streak || 0,
+            streak: currentStreak,
+            bestStreak: bestStreak,
           };
         });
         setRecurringHistory(history);
@@ -824,6 +899,18 @@ export const AppProvider = ({ children }) => {
             lastActiveDate: s.last_reset || prev.lastActiveDate,
             dailyResetProcessed: s.daily_reset_processed || prev.dailyResetProcessed,
           }));
+        } else {
+          // New user has no preferences in DB yet, initialize local settings state to safe default values
+          setSettings({
+            theme: 'dark',
+            focusTimeToday: 0,
+            lastActiveDate: '',
+            focusHistory: {},
+            dismissedInsights: [],
+            weeklyIntentions: {},
+            lastPushDate: '',
+            dailyResetProcessed: ''
+          });
         }
       }, (error) => {
         console.error('[Realtime Sync] Error in Settings subscription:', error);
@@ -838,7 +925,7 @@ export const AppProvider = ({ children }) => {
           db.updateCache(`users/${user.id}/xp/profile`, x);
           const serverXP = x.total_xp || 0;
           lastSyncedXpRef.current = serverXP; // Shield against echo write loops
-          setXpData({
+          const profile = {
             totalXP: serverXP,
             level: x.level || 1,
             earnedBadges: x.earned_badges || [],
@@ -849,7 +936,33 @@ export const AppProvider = ({ children }) => {
             lastXPDate: x.last_xp_date || '',
             xpHistory: x.xp_history || [],
             notifiedBadges: x.notified_badges || [],
-          });
+          };
+          console.log("Current UID:", user.id);
+          console.log("Loaded Profile:", profile);
+          console.log("Profile Source:", docSnap.metadata.fromCache ? "Local Cache" : "Server");
+          console.log("XP:", profile.totalXP);
+          console.log("Level:", profile.level);
+          setXpData(profile);
+        } else {
+          // Document does not exist in DB yet (brand-new user), initialize local state to zero
+          const defaultProfile = {
+            totalXP: 0,
+            level: 1,
+            earnedBadges: [],
+            badgeUnlockDates: {},
+            perfectDays: 0,
+            comebackCount: 0,
+            totalCompletions: 0,
+            lastXPDate: '',
+            xpHistory: [],
+            notifiedBadges: [],
+          };
+          console.log("Current UID:", user.id);
+          console.log("Loaded Profile:", defaultProfile);
+          console.log("Profile Source:", "None (Initializing Defaults)");
+          console.log("XP:", defaultProfile.totalXP);
+          console.log("Level:", defaultProfile.level);
+          setXpData(defaultProfile);
         }
       }, (error) => {
         console.error('[Realtime Sync] Error in XP subscription:', error);
@@ -2003,7 +2116,9 @@ export const AppProvider = ({ children }) => {
     const recDates = existingRec ? existingRec.completedDates : [];
     const today = TODAY();
     const isCompletedToday = recDates.includes(today);
-    const sortedDates = [...recDates].sort((a, b) => b.localeCompare(a));
+    const { sanitizedDates } = sanitizeAndValidateCompletedDates(recDates, task.createdAt, 'new_task', task.title, existingRec ? existingRec.streak : 0);
+    const { current: currentStreak, best: bestStreak } = calculateTaskStreak(sanitizedDates);
+    const sortedDates = [...sanitizedDates].sort((a, b) => b.localeCompare(a));
     const newLastCompleted = sortedDates.length > 0 ? sortedDates[0] : null;
 
     const newT = {
@@ -2013,10 +2128,11 @@ export const AppProvider = ({ children }) => {
       timeSpent: isCompletedToday && task.completionType === 'time' ? (task.targetTime || 30) : 0,
       currentCount: isCompletedToday && task.completionType === 'count' ? (task.targetCount || 10) : 0,
       completed: isCompletedToday,
-      currentStreak: existingRec ? existingRec.streak : 0,
-      completedDates: recDates,
+      currentStreak,
+      bestStreak,
+      completedDates: sanitizedDates,
       lastCompletedDate: newLastCompleted,
-      missedDays: calculateConsecutiveMissedDays(recDates, []),
+      missedDays: calculateConsecutiveMissedDays(sanitizedDates, []),
       lastActiveDate: today
     };
     setTasks(prev => [newT, ...prev]);
@@ -2110,12 +2226,14 @@ export const AppProvider = ({ children }) => {
       recDates = recDates.filter(d => d !== today);
     }
 
-    const newStreak = isDaily ? calculateStreakFromHistory(recDates, []) : 0;
-    const sortedDates = [...recDates].sort((a, b) => b.localeCompare(a));
+    const { sanitizedDates } = sanitizeAndValidateCompletedDates(recDates, updated.createdAt, updated.id, updated.title, updated.currentStreak);
+    const { current: newStreak, best: newBestStreak } = calculateTaskStreak(sanitizedDates);
+    const sortedDates = [...sanitizedDates].sort((a, b) => b.localeCompare(a));
     const newLastCompleted = sortedDates.length > 0 ? sortedDates[0] : null;
 
-    updated.completedDates = recDates;
+    updated.completedDates = sanitizedDates;
     updated.currentStreak = newStreak;
+    updated.bestStreak = newBestStreak;
     updated.lastCompletedDate = newLastCompleted;
     updated.lastActiveDate = today;
     if (isDone) {
@@ -2126,7 +2244,7 @@ export const AppProvider = ({ children }) => {
       const recPayload = {
         title: updated.title,
         type: updated.type || 'daily',
-        completedDates: recDates,
+        completedDates: sanitizedDates,
         streak: newStreak
       };
       setRecurringHistory(prev => ({ ...prev, [recId]: { id: recId, ...recPayload } }));
@@ -2198,12 +2316,14 @@ export const AppProvider = ({ children }) => {
       recDates = recDates.filter(d => d !== today);
     }
 
-    const newStreak = isDaily ? calculateStreakFromHistory(recDates, []) : 0;
-    const sortedDates = [...recDates].sort((a, b) => b.localeCompare(a));
+    const { sanitizedDates } = sanitizeAndValidateCompletedDates(recDates, updated.createdAt, updated.id, updated.title, updated.currentStreak);
+    const { current: newStreak, best: newBestStreak } = calculateTaskStreak(sanitizedDates);
+    const sortedDates = [...sanitizedDates].sort((a, b) => b.localeCompare(a));
     const newLastCompleted = sortedDates.length > 0 ? sortedDates[0] : null;
 
-    updated.completedDates = recDates;
+    updated.completedDates = sanitizedDates;
     updated.currentStreak = newStreak;
+    updated.bestStreak = newBestStreak;
     updated.lastCompletedDate = newLastCompleted;
     updated.lastActiveDate = today;
     if (isDone) {
@@ -2214,7 +2334,7 @@ export const AppProvider = ({ children }) => {
       const recPayload = {
         title: updated.title,
         type: updated.type || 'daily',
-        completedDates: recDates,
+        completedDates: sanitizedDates,
         streak: newStreak
       };
       setRecurringHistory(prev => ({ ...prev, [recId]: { id: recId, ...recPayload } }));
@@ -2285,12 +2405,14 @@ export const AppProvider = ({ children }) => {
       recDates = recDates.filter(d => d !== today);
     }
 
-    const newStreak = isDaily ? calculateStreakFromHistory(recDates, []) : 0;
-    const sortedDates = [...recDates].sort((a, b) => b.localeCompare(a));
+    const { sanitizedDates } = sanitizeAndValidateCompletedDates(recDates, updated.createdAt, updated.id, updated.title, updated.currentStreak);
+    const { current: newStreak, best: newBestStreak } = calculateTaskStreak(sanitizedDates);
+    const sortedDates = [...sanitizedDates].sort((a, b) => b.localeCompare(a));
     const newLastCompleted = sortedDates.length > 0 ? sortedDates[0] : null;
 
-    updated.completedDates = recDates;
+    updated.completedDates = sanitizedDates;
     updated.currentStreak = newStreak;
+    updated.bestStreak = newBestStreak;
     updated.lastCompletedDate = newLastCompleted;
     updated.lastActiveDate = today;
     if (isDone) {
@@ -2301,7 +2423,7 @@ export const AppProvider = ({ children }) => {
       const recPayload = {
         title: updated.title,
         type: updated.type || 'daily',
-        completedDates: recDates,
+        completedDates: sanitizedDates,
         streak: newStreak
       };
       setRecurringHistory(prev => ({ ...prev, [recId]: { id: recId, ...recPayload } }));

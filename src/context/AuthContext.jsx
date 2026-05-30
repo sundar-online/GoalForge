@@ -137,6 +137,10 @@ export const AuthProvider = ({ children }) => {
       if (fullName) await updateProfile(cred.user, { displayName: fullName });
       return { data: cred, error: null };
     } catch (err) {
+      console.log("Project ID:", auth.app.options.projectId);
+      console.log("Auth User:", auth.currentUser);
+      console.log("Registration Email:", email);
+      console.log("Firebase Error:", err);
       const msg = firebaseMsg(err.code);
       setAuthError(msg);
       return { data: null, error: { message: msg } };
