@@ -1,7 +1,7 @@
 import { fireDb } from './firebase';
 import {
   doc, collection, getDocs, setDoc, deleteDoc,
-  query, where, orderBy, writeBatch
+  query, orderBy, writeBatch
 } from 'firebase/firestore';
 import { sanitizeAndValidateCompletedDates, calculateTaskStreak } from '../utils/calculationUtils';
 
@@ -345,6 +345,10 @@ export async function fetchGoals(userId) {
         createdAt: g.created_at,
         extensions: g.extensions || [],
         isMissingDream: g.is_missing_dream ?? false,
+        order: g.order ?? 1,
+        isFocusGoal: g.is_focus_goal ?? false,
+        status: g.status ?? 'active',
+        dependencies: g.dependencies || [],
         habits,
       });
     }
@@ -373,6 +377,10 @@ export async function upsertGoal(userId, goal) {
     start_date: goal.startDate || null,
     extensions: goal.extensions || [],
     is_missing_dream: goal.isMissingDream ?? false,
+    order: goal.order ?? 1,
+    is_focus_goal: !!goal.isFocusGoal,
+    status: goal.status ?? 'active',
+    dependencies: goal.dependencies || [],
     created_at: goal.createdAt || new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Home, Target, CalendarCheck, Timer, StickyNote, Award } from 'lucide-react';
+import { useAppContext } from '../context/AppContext';
 
 const NAV = [
   { id: 'dashboard', icon: Home, label: 'Home' },
@@ -10,6 +11,9 @@ const NAV = [
 ];
 
 export const Layout = ({ children, currentView, setView }) => {
+  const { goals } = useAppContext();
+  const focusGoal = goals.find(g => g.isFocusGoal && !g.isMissingDream);
+
   return (
     <div className="min-h-screen bg-bg-app font-sans transition-colors duration-300 flex flex-col lg:flex-row">
       {/* Desktop Sidebar */}
@@ -48,12 +52,30 @@ export const Layout = ({ children, currentView, setView }) => {
           })}
         </nav>
 
-        <div className="mt-auto p-4 rounded-2xl bg-bg-input/50 border border-border-light">
-          <p className="text-[10px] font-black text-text-muted uppercase tracking-widest mb-1">Consistency</p>
-          <div className="h-1.5 w-full bg-bg-app rounded-full overflow-hidden">
-            <div className="h-full bg-accent-blue w-3/4 rounded-full" />
+        {focusGoal ? (
+          <div className="mt-auto p-4 rounded-2xl bg-accent-blue/10 border border-accent-blue/20 hover:border-accent-blue/30 transition-all cursor-pointer" onClick={() => setView('goals')}>
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+              <p className="text-[9px] font-black text-accent-blue uppercase tracking-widest leading-none">Focus Goal</p>
+            </div>
+            <p className="text-xs font-black text-text-main truncate mb-2">{focusGoal.title}</p>
+            <div className="flex justify-between items-center text-[9px] font-bold text-text-muted mb-1">
+              <span>Mastery</span>
+              <span>{focusGoal.progress || 0}%</span>
+            </div>
+            <div className="h-1.5 w-full bg-bg-input rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-accent-blue rounded-full transition-all duration-500" 
+                style={{ width: `${focusGoal.progress || 0}%` }}
+              />
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="mt-auto p-4 rounded-2xl bg-bg-input/50 border border-border-light hover:border-border-med transition-all cursor-pointer" onClick={() => setView('goals')}>
+            <p className="text-[9px] font-black text-text-muted uppercase tracking-widest mb-1">Forge Focus</p>
+            <p className="text-[11px] font-bold text-text-muted leading-relaxed">No Focus Goal set. Toggle star on any goal card to focus.</p>
+          </div>
+        )}
       </aside>
 
       {/* Main Content Area */}

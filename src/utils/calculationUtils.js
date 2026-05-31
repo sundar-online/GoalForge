@@ -299,7 +299,7 @@ export const getSmartAlerts = (accuracy, goals = [], tasks = [], weeklyReport = 
   return alerts;
 };
 
-export const calculateStreakFromHistory = (completedDates, scheduleDays = [], parentGoalCompletedDates = [], habitCreatedAt = null) => {
+export const calculateStreakFromHistory = (completedDates, scheduleDays = []) => {
   // Area 2 & 3: New habits must start at 0d streak until genuinely completed.
   if (!completedDates || completedDates.length === 0) return 0;
 
@@ -736,6 +736,62 @@ const _logStreakAnomaly = (taskId, taskTitle, issues, rawData, sanitizedResult) 
     `Sanitized Result: ${JSON.stringify(sanitizedResult)}`
   );
 };
+
+export const isGoalBlocked = (goal, goals) => {
+  if (!goal.dependencies || goal.dependencies.length === 0) return false;
+  return goal.dependencies.some(depId => {
+    const depGoal = goals.find(g => g.id === depId);
+    if (!depGoal) return false;
+    const progress = calculateOverallProgress(depGoal);
+    return progress < 100;
+  });
+};
+
+export const getRecommendedNextGoal = (goals) => {
+  const activeIncompleteGoals = goals.filter(g => 
+    !g.isMissingDream && 
+    !g.deleted && 
+    !g.isDeleted && 
+    calculateOverallProgress(g) < 100
+  );
+
+  if (activeIncompleteGoals.length === 0) return null;
+
+  let recommended = null;
+  let highestScore = -Infinity;
+
+  activeIncompleteGoals.forEach(g => {
+    if (isGoalBlocked(g, goals)) {
+      return;
+    }
+
+    let score = 100;
+
+    const order = g.order ?? 1;
+    score -= order * 10;
+
+    const progress = calculateOverallProgress(g);
+    score += progress * 0.5;
+
+    if (g.deadline) {
+      const todayStr = TODAY();
+      const daysRemaining = diffDays(todayStr, g.deadline);
+      if (daysRemaining < 0) {
+        score += 50;
+      } else if (daysRemaining <= 7) {
+        score += (7 - daysRemaining) * 10;
+      }
+    }
+
+    if (score > highestScore) {
+      highestScore = score;
+      recommended = g;
+    }
+  });
+
+  return recommended;
+};
+
 
 
 

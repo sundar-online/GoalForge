@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { calculateGoalDailyProgress, isHabitDoneToday, calculateOverallProgress, isGoalDoneToday, calculateGoalStreak, recalculateGoalCompletedDates, getGoalScheduledDays, calculateGoalConsecutiveMissedDays, isTaskDone } from '../utils/calculationUtils';
+import { calculateGoalDailyProgress, isHabitDoneToday, calculateOverallProgress, isGoalDoneToday, calculateGoalStreak, recalculateGoalCompletedDates, getGoalScheduledDays, calculateGoalConsecutiveMissedDays, isTaskDone, getRecommendedNextGoal, isHabitScheduledToday } from '../utils/calculationUtils';
 import { TODAY } from '../utils/dateUtils';
 import { BADGE_DEFINITIONS } from '../utils/gamificationEngine';
 import { useAuth } from '../context/AuthContext';
-import { AlertTriangle, AlertCircle, TrendingUp, TrendingDown, CheckCircle2, Clock, Zap, LogOut, Moon, Sun, Sparkles, Trophy, ChevronRight, Target, Award, CalendarDays, Brain, Plus, Trash2, ChevronDown, ChevronUp, Flame } from 'lucide-react';
+import { AlertTriangle, AlertCircle, TrendingUp, TrendingDown, CheckCircle2, Clock, Zap, LogOut, Moon, Sun, Sparkles, Trophy, ChevronRight, Target, Award, CalendarDays, Brain, Plus, Trash2, ChevronDown, ChevronUp, Flame, Star } from 'lucide-react';
+// eslint-disable-next-line no-unused-vars
 import { motion, AnimatePresence } from 'framer-motion';
 import { WeeklyHeatmap } from './WeeklyHeatmap';
 import { WeeklyReportCard } from './WeeklyReportCard';
@@ -117,7 +118,7 @@ const QuickThoughtsWidget = () => {
                     No thoughts saved yet. Write one below!
                   </p>
                 ) : (
-                  quickThoughts.map((thought, index) => (
+                  quickThoughts.map((thought) => (
                     <div 
                       key={thought.id}
                       className="group flex items-center justify-between gap-3 p-3 rounded-2xl bg-bg-input/40 border border-border-light/50 hover:border-border-light transition-all duration-200"
@@ -237,14 +238,28 @@ const QuickThoughtsWidget = () => {
 export const Dashboard = ({ setView }) => {
   const {
     goals, accuracy, alerts,
-    totalItems, completedItems,
     todayTasks, allHabits,
     focusTime, focusHistory, taskLogs,
-    disciplineScore, userLevel, insights,
+    disciplineScore, insights,
     theme, toggleTheme, loading, weeklyReport, syncError, retrySync,
-    xpData: rawXpData, currentLevelInfo: rawLevelInfo, taskStreak,
-    tasks
+    xpData: rawXpData, currentLevelInfo: rawLevelInfo,
+    tasks,
+    setFocusGoal
   } = useAppContext();
+
+  const focusGoal = goals.find(g => g.isFocusGoal && !g.isMissingDream);
+  const activeCalculatedGoals = goals.map(g => {
+    const liveProgress = calculateOverallProgress(g);
+    const isFinished = liveProgress === 100;
+    return { ...g, progress: liveProgress, isFinished };
+  }).filter(g => !g.isMissingDream && !g.isFinished);
+  
+  const fallbackActiveGoal = activeCalculatedGoals[0];
+  const todayMainTarget = focusGoal || fallbackActiveGoal;
+
+  const targetHabitsTotal = todayMainTarget ? (todayMainTarget.habits || []).filter(isHabitScheduledToday).length : 0;
+  const targetHabitsDone = todayMainTarget ? (todayMainTarget.habits || []).filter(h => isHabitScheduledToday(h) && isHabitDoneToday(h)).length : 0;
+  const targetHabitsRemaining = targetHabitsTotal - targetHabitsDone;
 
   const xpData = rawXpData || { totalXP: 0, earnedBadges: [], xpHistory: [] };
   const currentLevelInfo = rawLevelInfo || { level: 1, title: 'Recruit', progress: 0, xpForNext: 100, isMaxLevel: false };
@@ -304,7 +319,6 @@ export const Dashboard = ({ setView }) => {
     .filter(g => g.streak > 0 || g.missed > 0)
     .sort((a, b) => b.streak - a.streak).slice(0, 3);
 
-  const activeStreakSystems = topStreaks.filter(s => s.streak > 0);
 
   const activeTasksCount = React.useMemo(() => {
     return (todayTasks || []).filter(t => !isTaskDone(t)).length;
@@ -487,6 +501,64 @@ export const Dashboard = ({ setView }) => {
         {/* Left/Main Column */}
         <div className="lg:col-span-8 flex flex-col gap-6 lg:gap-8">
           
+          {/* Today's Main Target Hero Banner */}
+          {todayMainTarget && (
+            <div className="relative overflow-hidden bg-gradient-to-r from-accent-blue/15 via-indigo-500/10 to-transparent border border-accent-blue/30 rounded-[32px] p-6 sm:p-8 shadow-xl hover:shadow-2xl transition-all duration-300 group">
+              {/* Background decorative target icon */}
+              <div className="absolute right-6 top-1/2 -translate-y-1/2 opacity-10 pointer-events-none group-hover:scale-110 transition-transform duration-700">
+                <Target size={180} className="text-accent-blue" />
+              </div>
+              <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                <div className="space-y-3 flex-1 min-w-0 w-full">
+                  <div className="flex items-center gap-2">
+                    <span className="bg-accent-blue/20 text-accent-blue text-[9px] font-black px-2.5 py-1 rounded-md uppercase tracking-widest flex items-center gap-1">
+                      <Target size={10} /> {focusGoal ? "Focus Goal" : "Active Target"}
+                    </span>
+                    <span className="text-[10px] font-bold text-text-muted">
+                      #{todayMainTarget.order} Queue Order
+                    </span>
+                  </div>
+                  <h3 className="text-xl sm:text-2xl font-black text-text-main tracking-tight leading-tight whitespace-normal">
+                    {todayMainTarget.title}
+                  </h3>
+                  <div className="flex items-center gap-4 text-xs text-text-muted flex-wrap">
+                    {todayMainTarget.deadline && (
+                      <span className="flex items-center gap-1.5 bg-bg-input px-2.5 py-1 rounded-lg">
+                        <CalendarDays size={12} /> Target: {todayMainTarget.deadline}
+                      </span>
+                    )}
+                    <span className="flex items-center gap-1.5 bg-bg-input px-2.5 py-1 rounded-lg">
+                      <Clock size={12} /> {targetHabitsRemaining > 0 ? `${targetHabitsRemaining} habits left today` : "All habits done today! 🎉"}
+                    </span>
+                  </div>
+                  
+                  {/* Progress bar */}
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between text-[10px] font-black text-text-muted uppercase tracking-widest">
+                      <span>Goal Mastery</span>
+                      <span>{todayMainTarget.progress || 0}%</span>
+                    </div>
+                    <div className="w-full bg-bg-input h-2 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-accent-blue rounded-full transition-all duration-1000 ease-out"
+                        style={{ width: `${todayMainTarget.progress || 0}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="shrink-0 w-full md:w-auto">
+                  <button 
+                    onClick={() => setView('focus')}
+                    className="w-full md:w-auto px-6 py-4 rounded-2xl bg-accent-blue text-white font-black text-sm shadow-lg shadow-accent-blue/30 hover:opacity-90 active:scale-95 transition-all flex items-center justify-center gap-2"
+                  >
+                    Continue Goal <ChevronRight size={16} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Discipline + XP Hero Card */}
           <section className="bg-gradient-to-br from-bg-dark-elem to-[#1e1e2e] rounded-[32px] p-4 sm:p-6 md:p-8 shadow-2xl relative overflow-hidden group">
             <div className="absolute -top-10 -right-10 opacity-10 group-hover:scale-110 group-hover:rotate-12 transition-transform duration-700">
@@ -704,6 +776,34 @@ export const Dashboard = ({ setView }) => {
               <button onClick={() => setView('goals')} className="text-xs font-black text-accent-blue hover:underline underline-offset-4">View All Systems</button>
             </div>
             {renderGoalsList()}
+            {(() => {
+              const recommended = getRecommendedNextGoal(goals);
+              if (!recommended || recommended.id === todayMainTarget?.id) return null;
+              return (
+                <div className="bg-gradient-to-r from-accent-blue/10 to-indigo-500/10 border border-accent-blue/20 rounded-3xl p-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shadow-sm transition-all hover:scale-[1.01] duration-300 mt-4">
+                  <div className="space-y-1 flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <Star size={14} className="text-accent-blue animate-pulse" />
+                      <span className="text-[10px] font-black text-accent-blue uppercase tracking-widest">Recommended Next Goal</span>
+                    </div>
+                    <h4 className="text-base font-black text-text-main tracking-tight truncate">
+                      #{recommended.order} {recommended.title}
+                    </h4>
+                    <p className="text-xs text-text-muted">
+                      Ranked by order, due dates, progress, and dependencies.
+                    </p>
+                  </div>
+                  <div className="flex gap-2 w-full sm:w-auto shrink-0">
+                    <button 
+                      onClick={() => setFocusGoal(recommended.id)}
+                      className="flex-1 sm:flex-initial px-4 py-2.5 rounded-xl bg-accent-blue text-xs font-black text-white hover:opacity-90 transition-all shadow-sm active:scale-95 flex items-center justify-center gap-1.5"
+                    >
+                      <Star size={12} fill="currentColor" /> Set as Focus Goal
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
           </section>
         </div>
 
@@ -816,6 +916,34 @@ export const Dashboard = ({ setView }) => {
               <button onClick={() => setView('goals')} className="text-xs font-black text-accent-blue hover:underline underline-offset-4">View All Systems</button>
             </div>
             {renderGoalsList()}
+            {(() => {
+              const recommended = getRecommendedNextGoal(goals);
+              if (!recommended || recommended.id === todayMainTarget?.id) return null;
+              return (
+                <div className="bg-gradient-to-r from-accent-blue/10 to-indigo-500/10 border border-accent-blue/20 rounded-3xl p-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shadow-sm transition-all hover:scale-[1.01] duration-300 mt-4">
+                  <div className="space-y-1 flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <Star size={14} className="text-accent-blue animate-pulse" />
+                      <span className="text-[10px] font-black text-accent-blue uppercase tracking-widest">Recommended Next Goal</span>
+                    </div>
+                    <h4 className="text-base font-black text-text-main tracking-tight truncate">
+                      #{recommended.order} {recommended.title}
+                    </h4>
+                    <p className="text-xs text-text-muted">
+                      Ranked by order, due dates, progress, and dependencies.
+                    </p>
+                  </div>
+                  <div className="flex gap-2 w-full sm:w-auto shrink-0">
+                    <button 
+                      onClick={() => setFocusGoal(recommended.id)}
+                      className="flex-1 sm:flex-initial px-4 py-2.5 rounded-xl bg-accent-blue text-xs font-black text-white hover:opacity-90 transition-all shadow-sm active:scale-95 flex items-center justify-center gap-1.5"
+                    >
+                      <Star size={12} fill="currentColor" /> Set as Focus Goal
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
           </section>
 
           {/* Footer Quote / Branding */}

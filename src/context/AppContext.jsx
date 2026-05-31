@@ -306,23 +306,32 @@ export const AppProvider = ({ children }) => {
     return false;
   }), [tasks, todayStr]);
 
-  const allHabits = useMemo(() => (goals || []).filter(g => !g.isMissingDream).flatMap(g => g.habits || []), [goals]);
-  const todayGoals = useMemo(() => (goals || []).filter(g => {
+  const sortedGoals = useMemo(() => {
+    return [...goals].sort((a, b) => {
+      if ((a.order ?? 1) !== (b.order ?? 1)) {
+        return (a.order ?? 1) - (b.order ?? 1);
+      }
+      return (b.createdAt || '').localeCompare(a.createdAt || '');
+    });
+  }, [goals]);
+
+  const allHabits = useMemo(() => (sortedGoals || []).filter(g => !g.isMissingDream).flatMap(g => g.habits || []), [sortedGoals]);
+  const todayGoals = useMemo(() => (sortedGoals || []).filter(g => {
     if (g.isMissingDream) return false;
     const habits = g.habits || [];
     if (habits.length === 0) return false;
     return habits.some(isHabitScheduledToday);
-  }), [goals]);
+  }), [sortedGoals]);
 
   const goalsDone = useMemo(() => (todayGoals || []).filter(g => isGoalDoneToday(g)).length, [todayGoals]);
   const tasksDone = useMemo(() => (todayTasks || []).filter(t => isTaskDone(t)).length, [todayTasks]);
 
   const todayHabits = useMemo(() => {
-    return (goals || [])
+    return (sortedGoals || [])
       .filter(g => !g.isMissingDream)
       .flatMap(g => g.habits || [])
       .filter(isHabitScheduledToday);
-  }, [goals]);
+  }, [sortedGoals]);
 
   const completedTodayHabitsCount = useMemo(() => {
     return todayHabits.filter(isHabitDoneToday).length;
@@ -337,7 +346,7 @@ export const AppProvider = ({ children }) => {
   }, [completedItems, totalItems]);
 
   const avgStreak = useMemo(() => {
-    const activeGoals = (goals || []).filter(g => !g.isMissingDream);
+    const activeGoals = (sortedGoals || []).filter(g => !g.isMissingDream);
     if (activeGoals.length === 0) return 0;
     const totalBestStreaks = activeGoals.reduce((acc, goal) => {
       const habits = goal.habits || [];
@@ -345,7 +354,7 @@ export const AppProvider = ({ children }) => {
       return acc + bestHabitStreak;
     }, 0);
     return totalBestStreaks / activeGoals.length;
-  }, [goals]);
+  }, [sortedGoals]);
 
   const disciplineScore = calculateDisciplineScore(accuracy, avgStreak, focusTime);
   const userLevel = getUserLevel(disciplineScore);
@@ -358,8 +367,8 @@ export const AppProvider = ({ children }) => {
   }, [taskLogs]);
 
   const smartAlerts = useMemo(() =>
-    getSmartAlerts(accuracy, goals, tasks, weeklyReport, settings.dismissedInsights || []),
-    [accuracy, goals, tasks, weeklyReport, settings.dismissedInsights]
+    getSmartAlerts(accuracy, sortedGoals, tasks, weeklyReport, settings.dismissedInsights || []),
+    [accuracy, sortedGoals, tasks, weeklyReport, settings.dismissedInsights]
   );
 
   const alerts = useMemo(() => {
@@ -648,6 +657,14 @@ export const AppProvider = ({ children }) => {
           if (g.deleted || g.isDeleted || deletedGoalIdsRef.current.includes(String(docSnap.id))) {
             return null;
           }
+          let orderVal = g.order;
+          if (orderVal === undefined || orderVal === null) {
+            const p = (g.priority || '').toLowerCase();
+            if (p === 'high') orderVal = 1;
+            else if (p === 'medium') orderVal = 2;
+            else if (p === 'low') orderVal = 3;
+            else orderVal = 4;
+          }
           return {
             id: docSnap.id,
             title: g.title,
@@ -667,6 +684,10 @@ export const AppProvider = ({ children }) => {
             createdAt: g.created_at,
             extensions: g.extensions || [],
             isMissingDream: g.is_missing_dream ?? false,
+            order: orderVal,
+            isFocusGoal: g.is_focus_goal ?? false,
+            status: g.status ?? 'active',
+            dependencies: g.dependencies || [],
             syncPending: docSnap.metadata.hasPendingWrites,
             habits: [] // Will be populated in real-time by nested listeners below
           };
@@ -1330,6 +1351,7 @@ export const AppProvider = ({ children }) => {
   // ── Actions ──────────────────────────────────────────────
   const addGoal = async (goal) => {
     const goalId = Date.now().toString();
+    const nextOrder = goals.length > 0 ? Math.max(...goals.map(g => g.order ?? 0)) + 1 : 1;
     const initialHabits = (goal.habits || []).map(h => ({
       ...h,
       id: String(h.id || (Date.now() + Math.random())),
@@ -1353,8 +1375,23 @@ export const AppProvider = ({ children }) => {
       isMissingDream: false,
       createdAt: TODAY(),
       lastActiveDate: TODAY(),
+      order: goal.order ?? nextOrder,
+      isFocusGoal: !!goal.isFocusGoal,
+      status: 'active',
+      dependencies: goal.dependencies || [],
       habits: initialHabits
     };
+
+    if (newG.isFocusGoal) {
+      setGoals(prev => prev.map(g => {
+        if (g.isFocusGoal) {
+          const updated = { ...g, isFocusGoal: false };
+          if (user) db.upsertGoal(user.id, updated);
+          return updated;
+        }
+        return g;
+      }));
+    }
 
     setGoals(prev => [newG, ...prev]);
 
@@ -1390,6 +1427,16 @@ export const AppProvider = ({ children }) => {
             .catch(err => {
               console.error(`%c[Diagnostic Log] WRITE FAILURE: updateGoal [id=${id}]`, 'color: #ef4444; font-weight: bold;', err);
             });
+        }
+        return updated;
+      } else if (updates.isFocusGoal && g.isFocusGoal) {
+        const updated = {
+          ...g,
+          isFocusGoal: false,
+          lastActionTimestamp: new Date().toISOString()
+        };
+        if (user) {
+          db.upsertGoal(user.id, updated);
         }
         return updated;
       }
@@ -1509,7 +1556,20 @@ export const AppProvider = ({ children }) => {
     updatedGoal.progress = calculateOverallProgress(updatedGoal);
 
     // Save locally
-    setGoals(prev => prev.map(g => g.id === goalId ? updatedGoal : g));
+    if (updatedGoal.isFocusGoal) {
+      setGoals(prev => prev.map(g => {
+        if (g.id === goalId) {
+          return updatedGoal;
+        } else if (g.isFocusGoal) {
+          const updated = { ...g, isFocusGoal: false };
+          if (user) db.upsertGoal(user.id, updated);
+          return updated;
+        }
+        return g;
+      }));
+    } else {
+      setGoals(prev => prev.map(g => g.id === goalId ? updatedGoal : g));
+    }
 
     // Save in Firestore
     if (user) {
@@ -1538,6 +1598,69 @@ export const AppProvider = ({ children }) => {
 
     if (user) {
       db.upsertGoal(user.id, updated).catch(err => console.error('[Firestore Sync] Extend deadline failed:', err));
+    }
+  };
+
+  const setFocusGoal = async (goalId) => {
+    setGoals(prev => prev.map(g => {
+      const isNowFocus = g.id === goalId;
+      if (g.isFocusGoal !== isNowFocus) {
+        const updated = { ...g, isFocusGoal: isNowFocus };
+        if (user) db.upsertGoal(user.id, updated);
+        return updated;
+      }
+      return g;
+    }));
+  };
+
+  const reorderGoals = async (startIndex, endIndex) => {
+    const list = [...sortedGoals];
+    const [removed] = list.splice(startIndex, 1);
+    list.splice(endIndex, 0, removed);
+
+    const updated = list.map((g, idx) => ({
+      ...g,
+      order: idx + 1
+    }));
+
+    setGoals(updated);
+
+    if (user) {
+      try {
+        const promises = updated.map(g => db.upsertGoal(user.id, g));
+        await Promise.all(promises);
+      } catch (err) {
+        console.error('[Realtime Sync] Failed to save reordered goals:', err);
+      }
+    }
+  };
+
+  const moveGoal = async (goalId, direction) => {
+    const index = sortedGoals.findIndex(g => g.id === goalId);
+    if (index === -1) return;
+
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= sortedGoals.length) return;
+
+    const list = [...sortedGoals];
+    const temp = list[index];
+    list[index] = list[targetIndex];
+    list[targetIndex] = temp;
+
+    const updated = list.map((g, idx) => ({
+      ...g,
+      order: idx + 1
+    }));
+
+    setGoals(updated);
+
+    if (user) {
+      try {
+        const promises = updated.map(g => db.upsertGoal(user.id, g));
+        await Promise.all(promises);
+      } catch (err) {
+        console.error('[Realtime Sync] Failed to move goal:', err);
+      }
     }
   };
 
@@ -2868,7 +2991,8 @@ export const AppProvider = ({ children }) => {
   }, []);
 
   const goalsValue = {
-    goals, addGoal, updateGoal, editGoalSystem, deleteGoal, extendGoalDeadline,
+    goals: sortedGoals, addGoal, updateGoal, editGoalSystem, deleteGoal, extendGoalDeadline,
+    setFocusGoal, reorderGoals, moveGoal,
     addHabit, deleteHabit, logHabitTime, toggleHabitCheck, updateHabitCount, updateHabitReminder,
     allHabits, completedGoalForCelebration, setCompletedGoalForCelebration,
     loading, syncError, retrySync: syncFromCloud, clearProfileData
@@ -2908,7 +3032,8 @@ export const AppProvider = ({ children }) => {
   };
 
   const value = {
-    goals, addGoal, updateGoal, editGoalSystem, deleteGoal, extendGoalDeadline,
+    goals: sortedGoals, addGoal, updateGoal, editGoalSystem, deleteGoal, extendGoalDeadline,
+    setFocusGoal, reorderGoals, moveGoal,
     addHabit, deleteHabit, logHabitTime, toggleHabitCheck, updateHabitCount, updateHabitReminder,
     tasks, addTask, updateTask, deleteTask, logTaskTime, toggleTaskComplete, updateTaskCount,
     focusTime, focusHistory, addFocusTime, addFocusTimeToHabit,

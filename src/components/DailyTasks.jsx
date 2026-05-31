@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+// eslint-disable-next-line no-unused-vars
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTasks } from '../context/AppContext';
 import { CalendarCheck, Plus, Clock, Trash2, Check, CalendarRange, Calendar, Cloud } from 'lucide-react';
@@ -145,6 +146,7 @@ export const DailyTasks = () => {
           </div>
         ))}
       </div>
+
 
       {/* Add Form */}
       <AnimatePresence>
@@ -362,9 +364,7 @@ export const DailyTasks = () => {
             const todayStr = TODAY();
             const isDaily = (task.schedule_type || task.type) === 'daily';
             const hasBeenActiveToday = task.lastActiveDate === todayStr;
-            const tDone = true;
             const cType = task.completionType || task.type || 'check';
-            const isTime = cType === 'time';
             const isCount = cType === 'count';
             const isCheck = cType === 'check';
 
