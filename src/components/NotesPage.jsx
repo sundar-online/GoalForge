@@ -83,6 +83,7 @@ export const NotesPage = () => {
   const { notes, addNote, updateNote, deleteNote } = useNotes();
   const [view, setView] = useState('list');          // 'list' | 'detail' | 'new'
   const [activeNote, setActiveNote] = useState(null);
+  const [isCreating, setIsCreating] = useState(false);
   const [search, setSearch] = useState('');
   const [menuId, setMenuId] = useState(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null); // 2-step delete confirmation
@@ -195,19 +196,26 @@ export const NotesPage = () => {
 
   // ── Handlers ──────────────────────────────────────────
   const handleCreateNote = async () => {
-    if (!newTitle.trim()) return;
-    const note = {
-      title: newTitle.trim(),
-      content: '',
-      checklist: newType === 'checklist' ? [] : null,
-      folder: newNoteFolder.trim() || '',
-    };
-    const created = await addNote(note);
-    setNewTitle('');
-    setNewType('text');
-    setNewNoteFolder('');
-    setActiveNote(created);
-    setView('detail');
+    if (!newTitle.trim() || isCreating) return;
+    setIsCreating(true);
+    try {
+      const note = {
+        title: newTitle.trim(),
+        content: '',
+        checklist: newType === 'checklist' ? [] : null,
+        folder: newNoteFolder.trim() || '',
+      };
+      const created = await addNote(note);
+      setNewTitle('');
+      setNewType('text');
+      setNewNoteFolder('');
+      setActiveNote(created);
+      setView('detail');
+    } catch (err) {
+      console.error('[Create Note] Failed to create note:', err);
+    } finally {
+      setIsCreating(false);
+    }
   };
 
   const openNote = (note) => {
@@ -385,9 +393,10 @@ export const NotesPage = () => {
               ref={titleRef}
               value={newTitle}
               onChange={e => setNewTitle(e.target.value)}
+              disabled={isCreating}
               placeholder="Give your note a title..."
-              className="w-full bg-bg-input border border-border-med rounded-xl px-4 py-3 text-sm font-bold text-text-main outline-hidden focus:border-accent-blue transition-colors"
-              onKeyDown={e => e.key === 'Enter' && handleCreateNote()}
+              className="w-full bg-bg-input border border-border-med rounded-xl px-4 py-3 text-sm font-bold text-text-main outline-hidden focus:border-accent-blue transition-colors disabled:opacity-50"
+              onKeyDown={e => e.key === 'Enter' && !isCreating && handleCreateNote()}
             />
           </div>
 
@@ -459,9 +468,10 @@ export const NotesPage = () => {
 
           <button
             onClick={handleCreateNote}
-            className="w-full py-4 rounded-2xl bg-accent-blue text-white font-black text-sm hover:opacity-90 transition-opacity"
+            disabled={isCreating}
+            className="w-full py-4 rounded-2xl bg-accent-blue text-white font-black text-sm hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
           >
-            Create Note
+            {isCreating ? 'Creating...' : 'Create Note'}
           </button>
         </div>
       </div>
