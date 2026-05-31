@@ -514,9 +514,6 @@ export const Dashboard = ({ setView }) => {
                     <span className="bg-accent-blue/20 text-accent-blue text-[9px] font-black px-2.5 py-1 rounded-md uppercase tracking-widest flex items-center gap-1">
                       <Target size={10} /> {focusGoal ? "Focus Goal" : "Active Target"}
                     </span>
-                    <span className="text-[10px] font-bold text-text-muted">
-                      #{todayMainTarget.order} Queue Order
-                    </span>
                   </div>
                   <h3 className="text-xl sm:text-2xl font-black text-text-main tracking-tight leading-tight whitespace-normal">
                     {todayMainTarget.title}
@@ -524,7 +521,11 @@ export const Dashboard = ({ setView }) => {
                   <div className="flex items-center gap-4 text-xs text-text-muted flex-wrap">
                     {todayMainTarget.deadline && (
                       <span className="flex items-center gap-1.5 bg-bg-input px-2.5 py-1 rounded-lg">
-                        <CalendarDays size={12} /> Target: {todayMainTarget.deadline}
+                        {(() => {
+                          const [y, m, d] = todayMainTarget.deadline.split('-');
+                          const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                          return `Due: ${parseInt(d, 10)} ${months[parseInt(m, 10) - 1]} ${y}`;
+                        })()}
                       </span>
                     )}
                     <span className="flex items-center gap-1.5 bg-bg-input px-2.5 py-1 rounded-lg">
@@ -787,7 +788,7 @@ export const Dashboard = ({ setView }) => {
                       <span className="text-[10px] font-black text-accent-blue uppercase tracking-widest">Recommended Next Goal</span>
                     </div>
                     <h4 className="text-base font-black text-text-main tracking-tight truncate">
-                      #{recommended.order} {recommended.title}
+                      {recommended.title}
                     </h4>
                     <p className="text-xs text-text-muted">
                       Ranked by order, due dates, progress, and dependencies.
@@ -927,7 +928,7 @@ export const Dashboard = ({ setView }) => {
                       <span className="text-[10px] font-black text-accent-blue uppercase tracking-widest">Recommended Next Goal</span>
                     </div>
                     <h4 className="text-base font-black text-text-main tracking-tight truncate">
-                      #{recommended.order} {recommended.title}
+                      {recommended.title}
                     </h4>
                     <p className="text-xs text-text-muted">
                       Ranked by order, due dates, progress, and dependencies.

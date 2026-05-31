@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useGoals } from '../context/AppContext';
-import { Target, Plus, ChevronDown, ChevronUp, Trash2, Clock, Check, Layers, Calendar, History, Edit3, Maximize2, Minimize2, Moon, Star, ArrowUp, ArrowDown, GripVertical, Settings, MoreVertical } from 'lucide-react';
+import { Target, Plus, ChevronDown, ChevronUp, Trash2, Clock, Check, Layers, Calendar, History, Edit3, Maximize2, Minimize2, Moon, Star, ArrowUp, ArrowDown, GripVertical, Settings, MoreVertical, Copy, Archive } from 'lucide-react';
 import { isGoalDoneToday, calculateGoalDailyProgress, isHabitScheduledToday, calculateOverallProgress } from '../utils/calculationUtils';
 import { addDays, TODAY } from '../utils/dateUtils';
 import { DeleteConfirmationModal } from './DeleteConfirmationModal';
@@ -35,11 +35,10 @@ const DayPicker = ({ value, onChange }) => {
             <button
               key={day} type="button"
               onClick={() => toggle(day)}
-              className={`px-2.5 py-1.5 rounded-lg text-[11px] font-black transition-all border ${
-                active
+              className={`px-2.5 py-1.5 rounded-lg text-[11px] font-black transition-all border ${active
                   ? 'bg-accent-blue border-accent-blue text-white shadow-sm'
                   : 'bg-bg-input border-border-light text-text-muted hover:border-border-med'
-              }`}
+                }`}
             >
               {day}
             </button>
@@ -55,11 +54,11 @@ const DayPicker = ({ value, onChange }) => {
 
 const TAG_COLORS = {
   Engineering: { bg: 'bg-accent-blue-light', color: 'text-accent-blue' },
-  Learning:    { bg: 'bg-orange-500/10 dark:bg-orange-500/20',     color: 'text-orange-600 dark:text-orange-400' },
-  Fitness:     { bg: 'bg-emerald-500/10 dark:bg-emerald-500/20',    color: 'text-emerald-600 dark:text-emerald-400' },
-  Creative:    { bg: 'bg-purple-500/10 dark:bg-purple-500/20',     color: 'text-purple-600 dark:text-purple-400' },
-  Business:    { bg: 'bg-amber-500/10 dark:bg-amber-500/20',      color: 'text-amber-600 dark:text-amber-400' },
-  General:     { bg: 'bg-bg-input',          color: 'text-text-muted' },
+  Learning: { bg: 'bg-orange-500/10 dark:bg-orange-500/20', color: 'text-orange-600 dark:text-orange-400' },
+  Fitness: { bg: 'bg-emerald-500/10 dark:bg-emerald-500/20', color: 'text-emerald-600 dark:text-emerald-400' },
+  Creative: { bg: 'bg-purple-500/10 dark:bg-purple-500/20', color: 'text-purple-600 dark:text-purple-400' },
+  Business: { bg: 'bg-amber-500/10 dark:bg-amber-500/20', color: 'text-amber-600 dark:text-amber-400' },
+  General: { bg: 'bg-bg-input', color: 'text-text-muted' },
 };
 
 // ── Extend Deadline Modal ──────────────────────────────────
@@ -73,7 +72,7 @@ const ExtendDeadlineModal = ({ goal, onClose, onExtend }) => {
       <div className="bg-bg-card rounded-[32px] p-8 w-full max-w-md shadow-float border border-border-light animate-in fade-in zoom-in-95" onClick={e => e.stopPropagation()}>
         <h3 className="text-xl font-black text-text-main tracking-tight mb-2">Extend Deadline</h3>
         <p className="text-sm text-text-muted font-medium leading-relaxed mb-6">Push back the deadline for "<b>{goal.title}</b>" without losing your progress.</p>
-        
+
         <div className="space-y-3 mb-6">
           <p className="text-[10px] font-black text-text-muted uppercase tracking-widest">Duration</p>
           <div className="grid grid-cols-3 gap-3">
@@ -91,14 +90,14 @@ const ExtendDeadlineModal = ({ goal, onClose, onExtend }) => {
         </div>
 
         <div className="bg-bg-input/50 rounded-[22px] p-5 space-y-3 mb-8 border border-border-light">
-           <div className="flex justify-between items-center">
-             <span className="text-xs font-bold text-text-muted">Current</span>
-             <span className="text-sm font-black text-text-main">{goal.deadline || 'None'}</span>
-           </div>
-           <div className="flex justify-between items-center pt-3 border-t border-border-light/50">
-             <span className="text-xs font-bold text-text-muted">New Target</span>
-             <span className="text-sm font-black text-accent-blue">{newDeadline}</span>
-           </div>
+          <div className="flex justify-between items-center">
+            <span className="text-xs font-bold text-text-muted">Current</span>
+            <span className="text-sm font-black text-text-main">{goal.deadline || 'None'}</span>
+          </div>
+          <div className="flex justify-between items-center pt-3 border-t border-border-light/50">
+            <span className="text-xs font-bold text-text-muted">New Target</span>
+            <span className="text-sm font-black text-accent-blue">{newDeadline}</span>
+          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
@@ -235,9 +234,8 @@ const EditGoalSystemModal = ({ goal, onClose, onSave, allGoals }) => {
                         setDependencies([...dependencies, g.id]);
                       }
                     }}
-                    className={`px-2.5 py-1 rounded-lg text-[10px] font-black transition-all border ${
-                      isDep ? 'bg-accent-blue border-accent-blue text-white' : 'bg-bg-card border-border-light text-text-muted hover:border-border-med'
-                    }`}
+                    className={`px-2.5 py-1 rounded-lg text-[10px] font-black transition-all border ${isDep ? 'bg-accent-blue border-accent-blue text-white' : 'bg-bg-card border-border-light text-text-muted hover:border-border-med'
+                      }`}
                   >
                     {g.title}
                   </button>
@@ -265,78 +263,78 @@ const EditGoalSystemModal = ({ goal, onClose, onSave, allGoals }) => {
                 ))}
               </div>
             </div>
-            
+
             {mode === 'CUSTOM' && (
               <div className="bg-bg-card rounded-xl p-3.5 border border-border-light flex items-center justify-between animate-in fade-in zoom-in-95">
                 <span className="text-xs font-black text-text-main">Min required habits:</span>
                 <div className="flex items-center bg-bg-input rounded-xl border border-border-light overflow-hidden">
-                    <button type="button" onClick={() => setMinHabits(prev => Math.max(1, parseInt(prev) - 1))} className="w-9 h-9 flex items-center justify-center font-black text-text-main hover:bg-border-light">−</button>
-                    <span className="w-8 text-center text-xs font-black text-accent-blue">{minHabits}</span>
-                    <button type="button" onClick={() => setMinHabits(prev => Math.min(habits.length, parseInt(prev) + 1))} className="w-9 h-9 flex items-center justify-center font-black text-accent-blue border-l border-border-light hover:bg-border-light">+</button>
+                  <button type="button" onClick={() => setMinHabits(prev => Math.max(1, parseInt(prev) - 1))} className="w-9 h-9 flex items-center justify-center font-black text-text-main hover:bg-border-light">−</button>
+                  <span className="w-8 text-center text-xs font-black text-accent-blue">{minHabits}</span>
+                  <button type="button" onClick={() => setMinHabits(prev => Math.min(habits.length, parseInt(prev) + 1))} className="w-9 h-9 flex items-center justify-center font-black text-accent-blue border-l border-border-light hover:bg-border-light">+</button>
                 </div>
               </div>
             )}
-            
+
             <p className="text-[11px] font-bold text-text-muted italic px-1">
-              {mode === 'ALL' ? '⚡ Mastery increases only when EVERY habit in the system is finished today.' : 
-               mode === 'ANY' ? '🚀 Completing ANY one habit counts as a full day of progress.' : 
-               `🎯 You must finish at least ${minHabits} habit${minHabits > 1 ? 's' : ''} daily to progress.`}
+              {mode === 'ALL' ? '⚡ Mastery increases only when EVERY habit in the system is finished today.' :
+                mode === 'ANY' ? '🚀 Completing ANY one habit counts as a full day of progress.' :
+                  `🎯 You must finish at least ${minHabits} habit${minHabits > 1 ? 's' : ''} daily to progress.`}
             </p>
           </div>
 
           <div className="space-y-4 max-h-[320px] overflow-y-auto pr-2">
             <div className="flex justify-between items-end px-1 sticky top-0 bg-bg-card py-2 z-10 border-b border-border-light/40 mb-2">
-               <p className="text-[10px] font-black text-text-muted uppercase tracking-[0.2em]">Daily Systems & Habits</p>
-               <button type="button" onClick={handleAddStagingHabit} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent-blue/10 text-accent-blue font-black text-[10px] hover:bg-accent-blue/20 transition-all">
-                 <Plus size={12} strokeWidth={3} /> Add Habit
-               </button>
+              <p className="text-[10px] font-black text-text-muted uppercase tracking-[0.2em]">Daily Systems & Habits</p>
+              <button type="button" onClick={handleAddStagingHabit} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent-blue/10 text-accent-blue font-black text-[10px] hover:bg-accent-blue/20 transition-all">
+                <Plus size={12} strokeWidth={3} /> Add Habit
+              </button>
             </div>
-            
+
             <div className="grid grid-cols-1 gap-3">
               {habits.map((h, idx) => (
                 <div key={h.id} className="bg-bg-input/60 rounded-xl p-4 border border-border-light space-y-3 relative">
-                   <div className="flex gap-3">
-                      <input required type="text" value={h.title} onChange={e => handleUpdateStagingHabit(h.id, { title: e.target.value })} placeholder={`Habit #${idx + 1}...`} className="flex-1 bg-transparent border-b border-border-light p-1.5 text-sm font-bold text-text-main outline-none focus:border-accent-blue transition-colors" />
-                      <button type="button" onClick={() => handleRemoveStagingHabit(h.id)} className="p-1.5 text-text-muted hover:text-rose-500 transition-colors"><Trash2 size={16} /></button>
-                   </div>
-                   <div className="flex flex-wrap gap-2">
-                      <select value={h.type} onChange={e => handleUpdateStagingHabit(h.id, { type: e.target.value })} className="flex-1 min-w-[100px] bg-bg-card rounded-lg px-3 py-2 text-[11px] font-black text-text-main border-none shadow-sm">
-                        <option value="time">⏱️ Time-Based</option>
-                        <option value="check">✅ Simple Check</option>
-                        <option value="count">🔢 Count-Based</option>
-                      </select>
-                      {h.type !== 'check' && (
-                        <div className="flex items-center gap-1.5 bg-bg-card px-3 py-1.5 rounded-lg shadow-sm border border-border-light/50">
-                           <input type="number" min="1" value={h.type === 'count' ? h.targetCount : h.targetTime} 
-                             onChange={e => {
-                               const val = parseInt(e.target.value, 10) || 1;
-                               handleUpdateStagingHabit(h.id, { [h.type === 'count' ? 'targetCount' : 'targetTime']: val });
-                             }} 
-                             className="w-10 bg-transparent text-center font-black text-accent-blue outline-none text-xs" 
-                           />
-                           <span className="text-[9px] font-black text-text-muted uppercase tracking-widest">{h.type === 'count' ? 'units' : 'mins'}</span>
-                        </div>
+                  <div className="flex gap-3">
+                    <input required type="text" value={h.title} onChange={e => handleUpdateStagingHabit(h.id, { title: e.target.value })} placeholder={`Habit #${idx + 1}...`} className="flex-1 bg-transparent border-b border-border-light p-1.5 text-sm font-bold text-text-main outline-none focus:border-accent-blue transition-colors" />
+                    <button type="button" onClick={() => handleRemoveStagingHabit(h.id)} className="p-1.5 text-text-muted hover:text-rose-500 transition-colors"><Trash2 size={16} /></button>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <select value={h.type} onChange={e => handleUpdateStagingHabit(h.id, { type: e.target.value })} className="flex-1 min-w-[100px] bg-bg-card rounded-lg px-3 py-2 text-[11px] font-black text-text-main border-none shadow-sm">
+                      <option value="time">⏱️ Time-Based</option>
+                      <option value="check">✅ Simple Check</option>
+                      <option value="count">🔢 Count-Based</option>
+                    </select>
+                    {h.type !== 'check' && (
+                      <div className="flex items-center gap-1.5 bg-bg-card px-3 py-1.5 rounded-lg shadow-sm border border-border-light/50">
+                        <input type="number" min="1" value={h.type === 'count' ? h.targetCount : h.targetTime}
+                          onChange={e => {
+                            const val = parseInt(e.target.value, 10) || 1;
+                            handleUpdateStagingHabit(h.id, { [h.type === 'count' ? 'targetCount' : 'targetTime']: val });
+                          }}
+                          className="w-10 bg-transparent text-center font-black text-accent-blue outline-none text-xs"
+                        />
+                        <span className="text-[9px] font-black text-text-muted uppercase tracking-widest">{h.type === 'count' ? 'units' : 'mins'}</span>
+                      </div>
+                    )}
+                  </div>
+                  <DayPicker
+                    value={h.scheduleDays || []}
+                    onChange={days => handleUpdateStagingHabit(h.id, { scheduleDays: days })}
+                  />
+                  <div className="flex items-center justify-between gap-3 bg-bg-card rounded-xl px-4 py-2 border border-border-light/40">
+                    <div className="flex items-center gap-2">
+                      <Clock size={12} className="text-text-muted" />
+                      <span className="text-[10px] font-black text-text-muted uppercase tracking-widest">Reminder</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      {h.reminderEnabled && (
+                        <input type="time" value={h.reminderTime} onChange={e => handleUpdateStagingHabit(h.id, { reminderTime: e.target.value })} className="bg-transparent border-none text-[11px] font-black text-accent-blue outline-none" />
                       )}
-                   </div>
-                   <DayPicker
-                     value={h.scheduleDays || []}
-                     onChange={days => handleUpdateStagingHabit(h.id, { scheduleDays: days })}
-                   />
-                   <div className="flex items-center justify-between gap-3 bg-bg-card rounded-xl px-4 py-2 border border-border-light/40">
-                      <div className="flex items-center gap-2">
-                         <Clock size={12} className="text-text-muted" />
-                         <span className="text-[10px] font-black text-text-muted uppercase tracking-widest">Reminder</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                         {h.reminderEnabled && (
-                            <input type="time" value={h.reminderTime} onChange={e => handleUpdateStagingHabit(h.id, { reminderTime: e.target.value })} className="bg-transparent border-none text-[11px] font-black text-accent-blue outline-none" />
-                         )}
-                         <button type="button" onClick={() => handleUpdateStagingHabit(h.id, { reminderEnabled: !h.reminderEnabled })}
-                           className={`w-9 h-5 rounded-full relative transition-colors ${h.reminderEnabled ? 'bg-accent-blue' : 'bg-bg-input-hover'}`}>
-                           <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${h.reminderEnabled ? 'left-4.5' : 'left-0.5'}`} />
-                         </button>
-                      </div>
-                   </div>
+                      <button type="button" onClick={() => handleUpdateStagingHabit(h.id, { reminderEnabled: !h.reminderEnabled })}
+                        className={`w-9 h-5 rounded-full relative transition-colors ${h.reminderEnabled ? 'bg-accent-blue' : 'bg-bg-input-hover'}`}>
+                        <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${h.reminderEnabled ? 'left-4.5' : 'left-0.5'}`} />
+                      </button>
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>
@@ -437,15 +435,15 @@ const HabitRow = ({ habit, goalId, logHabitTime, deleteHabit, toggleHabitCheck, 
         <div className="flex items-center justify-between gap-1.5 w-full">
           <div className="flex items-center gap-2 flex-1 min-w-0">
             <button
-               onClick={() => toggleHabitCheck(goalId, habit.id)}
-               className={`
+              onClick={() => toggleHabitCheck(goalId, habit.id)}
+              className={`
                  w-8 h-8 shrink-0 rounded-lg border-2 flex items-center justify-center transition-all duration-200
                  ${done ? 'bg-emerald-500 border-emerald-500 scale-95' : 'bg-bg-card border-border-med cursor-pointer hover:border-accent-blue'}
                `}
             >
               {done ? <Check size={14} className="text-white animate-in zoom-in-50" strokeWidth={3} /> : (isCheck ? null : <Icon size={12} className="text-text-muted" />)}
             </button>
-            
+
             <div className="flex-1 min-w-0">
               <p className={`text-xs font-black tracking-tight truncate leading-snug ${done ? 'text-emerald-600 line-through' : 'text-text-main'}`}>{habit.title}</p>
               <div className="flex flex-wrap items-center gap-1 sm:gap-1.5 mt-0.5">
@@ -460,8 +458,8 @@ const HabitRow = ({ habit, goalId, logHabitTime, deleteHabit, toggleHabitCheck, 
           <div className="flex items-center gap-1 shrink-0">
             {isCount ? (
               <div className="flex bg-bg-card rounded-lg border border-border-light overflow-hidden shadow-sm h-7">
-                 <button onClick={() => updateHabitCount(goalId, habit.id, -1)} className="px-2 py-0.5 text-text-main font-black hover:bg-bg-input transition-colors text-xs">−</button>
-                 <button onClick={() => updateHabitCount(goalId, habit.id, 1)} className="px-2 py-0.5 text-accent-blue font-black border-l border-border-light hover:bg-bg-input transition-colors text-xs">+</button>
+                <button onClick={() => updateHabitCount(goalId, habit.id, -1)} className="px-2 py-0.5 text-text-main font-black hover:bg-bg-input transition-colors text-xs">−</button>
+                <button onClick={() => updateHabitCount(goalId, habit.id, 1)} className="px-2 py-0.5 text-accent-blue font-black border-l border-border-light hover:bg-bg-input transition-colors text-xs">+</button>
               </div>
             ) : (!isCheck && !done) && (
               <button onClick={() => setShowLog(true)} className="h-7 px-2.5 rounded-lg bg-accent-blue text-white text-[9px] font-black shadow-sm active:scale-95 transition-all">+ Log</button>
@@ -484,7 +482,7 @@ const HabitRow = ({ habit, goalId, logHabitTime, deleteHabit, toggleHabitCheck, 
               <Clock size={9} className="text-text-muted" />
               <span className="text-[8px] font-black text-text-muted uppercase tracking-wider">Reminder</span>
             </div>
-            <button 
+            <button
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
@@ -497,9 +495,9 @@ const HabitRow = ({ habit, goalId, logHabitTime, deleteHabit, toggleHabitCheck, 
           </div>
           {habit.reminderEnabled && (
             <div className="flex items-center animate-in fade-in slide-in-from-right-2 duration-300">
-              <input 
-                type="time" 
-                value={habit.reminderTime || '08:00'} 
+              <input
+                type="time"
+                value={habit.reminderTime || '08:00'}
                 onClick={e => e.stopPropagation()}
                 onChange={e => updateHabitReminder(goalId, habit.id, true, e.target.value)}
                 className="bg-transparent border-none text-[9px] font-black text-accent-blue outline-none cursor-pointer"
@@ -514,9 +512,60 @@ const HabitRow = ({ habit, goalId, logHabitTime, deleteHabit, toggleHabitCheck, 
 };
 
 export const GoalsPage = () => {
-  const { goals, addGoal, updateGoal, deleteGoal, addHabit, deleteHabit, logHabitTime, toggleHabitCheck, updateHabitCount, updateHabitReminder, extendGoalDeadline, editGoalSystem, setCompletedGoalForCelebration, reorderGoals, moveGoal } = useGoals();
+  const { goals, addGoal, updateGoal, deleteGoal, addHabit, deleteHabit, logHabitTime, toggleHabitCheck, updateHabitCount, updateHabitReminder, extendGoalDeadline, editGoalSystem, setCompletedGoalForCelebration, reorderGoals, moveGoal, setFocusGoal } = useGoals();
 
   const [activeTab, setActiveTab] = useState('active'); // 'active' or 'missing'
+  const [archivingGoalItem, setArchivingGoalItem] = useState(null);
+
+  // Prevent emoji orphan wrapping
+  const preventOrphan = (str) => {
+    if (!str) return '';
+    const lastSpaceIndex = str.lastIndexOf(' ');
+    if (lastSpaceIndex === -1) return str;
+    return str.substring(0, lastSpaceIndex) + '\u00a0' + str.substring(lastSpaceIndex + 1);
+  };
+
+  // Smart duplication logic
+  const duplicateGoal = (goal) => {
+    let baseTitle = goal.title;
+    const match = goal.title.match(/(.+) \(Copy \d+\)$/);
+    if (match) {
+      baseTitle = match[1];
+    } else if (goal.title.endsWith(' (Copy)')) {
+      baseTitle = goal.title.substring(0, goal.title.length - 7);
+    }
+
+    const existingTitles = goals.map(g => g.title);
+    let nextNum = 1;
+    while (true) {
+      const candidateTitle = `${baseTitle} (Copy ${nextNum})`;
+      if (!existingTitles.includes(candidateTitle)) {
+        break;
+      }
+      nextNum++;
+    }
+
+    const newTitle = `${baseTitle} (Copy ${nextNum})`;
+
+    const duplicatedHabits = (goal.habits || []).map(h => ({
+      title: h.title,
+      type: h.type,
+      targetTime: h.targetTime,
+      targetCount: h.targetCount,
+      scheduleDays: h.scheduleDays || [],
+      reminderEnabled: h.reminderEnabled || false,
+      reminderTime: h.reminderTime || '08:00'
+    }));
+
+    addGoal({
+      title: newTitle,
+      tag: goal.tag || 'General',
+      mode: goal.mode || 'ALL',
+      minHabits: goal.minHabits || 1,
+      deadline: goal.deadline || null,
+      habits: duplicatedHabits
+    });
+  };
 
   const calculatedGoals = goals.map(g => {
     const liveProgress = calculateOverallProgress(g);
@@ -528,8 +577,8 @@ export const GoalsPage = () => {
     };
   });
 
-  const activeCalculatedGoals = calculatedGoals.filter(g => !g.isMissingDream);
-  const missingCalculatedGoals = calculatedGoals.filter(g => g.isMissingDream);
+  const activeCalculatedGoals = calculatedGoals.filter(g => !g.isMissingDream && g.status !== 'archived');
+  const missingCalculatedGoals = calculatedGoals.filter(g => g.isMissingDream && g.status !== 'archived');
 
   const doneGoals = activeCalculatedGoals.filter(g => g.isFinished).length;
   const activeGoals = activeCalculatedGoals.filter(g => !g.isFinished).length;
@@ -544,7 +593,7 @@ export const GoalsPage = () => {
   useEffect(() => {
     const handleResize = () => {
       const width = window.innerWidth;
-      
+
       if (width < 768) {
         setColsCount(1);
       } else if (width < 1024) {
@@ -567,7 +616,7 @@ export const GoalsPage = () => {
       if (isCurrentlyOpen) {
         return prev.filter(id => id !== goalId);
       }
-      
+
       const isMobileScreen = window.innerWidth < 1024;
       if (isMobileScreen) {
         return [goalId];
@@ -595,12 +644,12 @@ export const GoalsPage = () => {
   const [editingGoal, setEditingGoal] = useState(null);
   const [deletingGoalItem, setDeletingGoalItem] = useState(null);
 
-  const [newGoal, setNewGoal] = useState({ 
-    title: '', 
-    tag: 'General', 
-    deadline: '', 
-    mode: 'ANY', 
-    minHabits: 1, 
+  const [newGoal, setNewGoal] = useState({
+    title: '',
+    tag: 'General',
+    deadline: '',
+    mode: 'ANY',
+    minHabits: 1,
     order: 1,
     isFocusGoal: false,
     dependencies: [],
@@ -656,7 +705,7 @@ export const GoalsPage = () => {
       dependencies: [],
       habits: [{ id: Date.now(), title: '', type: 'time', targetTime: 15, targetCount: 10, scheduleDays: [], reminderEnabled: false, reminderTime: '08:00' }]
     });
-    
+
     setShowAddGoal(false);
     setShowAdvanced(false);
   };
@@ -753,9 +802,8 @@ export const GoalsPage = () => {
                 type="button"
                 onClick={() => setIsReorderMode(!isReorderMode)}
                 title={isReorderMode ? "Exit Reorder Mode" : "Reorder Queue"}
-                className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
-                  isReorderMode ? 'text-accent-blue bg-accent-blue/10 border border-accent-blue/20' : 'text-white/40 hover:text-white hover:bg-white/5'
-                }`}
+                className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer ${isReorderMode ? 'text-accent-blue bg-accent-blue/10 border border-accent-blue/20' : 'text-white/40 hover:text-white hover:bg-white/5'
+                  }`}
               >
                 <GripVertical size={16} strokeWidth={2.5} />
               </button>
@@ -786,7 +834,7 @@ export const GoalsPage = () => {
               >
                 <MoreVertical size={18} />
               </button>
-              
+
               {showOverflowMenu && (
                 <>
                   <div className="fixed inset-0 z-[100]" onClick={() => setShowOverflowMenu(false)} />
@@ -797,9 +845,8 @@ export const GoalsPage = () => {
                         setIsReorderMode(!isReorderMode);
                         setShowOverflowMenu(false);
                       }}
-                      className={`w-full px-3 py-2 rounded-lg text-xs font-black flex items-center gap-2 transition-all ${
-                        isReorderMode ? 'bg-accent-blue/10 text-accent-blue' : 'text-text-main hover:bg-bg-input'
-                      }`}
+                      className={`w-full px-3 py-2 rounded-lg text-xs font-black flex items-center gap-2 transition-all ${isReorderMode ? 'bg-accent-blue/10 text-accent-blue' : 'text-text-main hover:bg-bg-input'
+                        }`}
                     >
                       <GripVertical size={14} />
                       <span>{isReorderMode ? "Exit Reorder" : "Reorder Queue"}</span>
@@ -836,24 +883,19 @@ export const GoalsPage = () => {
 
       {/* Add Goal Form */}
       {showAddGoal && (
-        <form onSubmit={submitGoal} className="bg-bg-card rounded-2xl sm:rounded-[32px] p-5 sm:p-8 flex flex-col gap-5 sm:gap-8 border border-border-light shadow-float animate-in fade-in slide-in-from-top-4 duration-500">
-          <div className="space-y-2">
-             <p className="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] ml-1">Core Vision</p>
-             <input autoFocus required type="text" value={newGoal.title} onChange={e => setNewGoal({ ...newGoal, title: e.target.value })}
-               placeholder="What major milestone are we hitting?"
-               className="w-full text-base sm:text-xl md:text-2xl font-black text-text-main border-none bg-bg-input p-4 sm:p-6 rounded-xl sm:rounded-2xl outline-none placeholder:text-text-muted/50 focus:ring-2 ring-accent-blue/20 transition-all" />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-            <div className="space-y-2">
-              <p className="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] ml-1">Category</p>
-              <select value={newGoal.tag} onChange={e => setNewGoal({ ...newGoal, tag: e.target.value })} className="w-full bg-bg-input border-none rounded-xl p-3.5 sm:p-4 font-bold text-text-main outline-none appearance-none hover:bg-bg-input/80 transition-colors">
-                {Object.keys(TAG_COLORS).map(t => <option key={t}>{t}</option>)}
-              </select>
+        <form onSubmit={submitGoal} className="bg-bg-card rounded-2xl p-4 sm:p-6 flex flex-col gap-4 border border-border-light shadow-float animate-in fade-in slide-in-from-top-4 duration-500 max-w-3xl mx-auto w-full">
+          {/* Quick Creation Row: Goal Name + Target Date (Optional) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <p className="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] ml-1">Goal Name</p>
+              <input autoFocus required type="text" value={newGoal.title} onChange={e => setNewGoal({ ...newGoal, title: e.target.value })}
+                placeholder="Goal Name"
+                className="w-full text-sm font-black text-text-main border-none bg-bg-input p-3 rounded-xl outline-none placeholder:text-text-muted/40 focus:ring-2 ring-accent-blue/20 transition-all" />
             </div>
-            <div className="space-y-2">
-              <p className="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] ml-1">Target Date</p>
-              <input type="date" value={newGoal.deadline} onChange={e => setNewGoal({ ...newGoal, deadline: e.target.value })} className="w-full bg-bg-input border-none rounded-xl p-3.5 sm:p-4 font-bold text-text-main outline-none hover:bg-bg-input/80 transition-colors" />
+            <div className="space-y-1.5">
+              <p className="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] ml-1">Target Date (Optional)</p>
+              <input type="date" value={newGoal.deadline} onChange={e => setNewGoal({ ...newGoal, deadline: e.target.value })}
+                className="w-full bg-bg-input border-none rounded-xl p-3 font-bold text-text-main outline-none hover:bg-bg-input/80 transition-colors text-sm" />
             </div>
           </div>
 
@@ -861,26 +903,36 @@ export const GoalsPage = () => {
           <button
             type="button"
             onClick={() => setShowAdvanced(!showAdvanced)}
-            className="flex items-center gap-2 text-xs font-black text-text-muted hover:text-accent-blue transition-all py-1.5 px-1 self-start active:scale-95"
+            className="flex items-center gap-1.5 text-xs font-black text-text-muted hover:text-accent-blue transition-all py-1 px-1 self-start active:scale-95 cursor-pointer"
           >
-            <Settings size={14} className={showAdvanced ? "rotate-90 text-accent-blue transition-transform" : "transition-transform"} />
-            <span>{showAdvanced ? "Hide Advanced Settings" : "Configure Goal (Advanced Settings)"}</span>
+            <Settings size={13} className={showAdvanced ? "rotate-90 text-accent-blue transition-transform" : "transition-transform"} />
+            <span>⚙ Advanced Settings</span>
           </button>
 
           {showAdvanced && (
-            <div className="space-y-5 border-t border-border-light/40 pt-4 animate-in fade-in slide-in-from-top-2 duration-300">
+            <div className="space-y-4 border-t border-border-light/40 pt-4 animate-in fade-in slide-in-from-top-2 duration-300">
+              {/* Category + Execution Order */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <p className="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] ml-1">Execution Order</p>
-                  <input type="number" min="1" value={newGoal.order} onChange={e => setNewGoal({ ...newGoal, order: parseInt(e.target.value, 10) || 1 })} className="w-full bg-bg-input border-none rounded-xl p-3 font-bold text-text-main outline-none focus:ring-2 ring-accent-blue/20 transition-all" />
+                <div className="space-y-1.5">
+                  <p className="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] ml-1">Category</p>
+                  <select value={newGoal.tag} onChange={e => setNewGoal({ ...newGoal, tag: e.target.value })} className="w-full bg-bg-input border-none rounded-xl p-3 font-bold text-text-main outline-none appearance-none hover:bg-bg-input/80 transition-colors text-sm">
+                    {Object.keys(TAG_COLORS).map(t => <option key={t}>{t}</option>)}
+                  </select>
                 </div>
-                <div className="flex items-center gap-3 bg-bg-input/50 p-4 rounded-xl border border-border-light/50 self-end h-[50px]">
-                  <input type="checkbox" id="add-focus-goal" checked={newGoal.isFocusGoal} onChange={e => setNewGoal({ ...newGoal, isFocusGoal: e.target.checked })} className="w-4 h-4 rounded text-accent-blue focus:ring-accent-blue/20" />
-                  <label htmlFor="add-focus-goal" className="text-xs font-black text-text-main cursor-pointer select-none">Set as Focus Goal</label>
+                <div className="space-y-1.5">
+                  <p className="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] ml-1">Execution Order</p>
+                  <input type="number" min="1" value={newGoal.order} onChange={e => setNewGoal({ ...newGoal, order: parseInt(e.target.value, 10) || 1 })} className="w-full bg-bg-input border-none rounded-xl p-3 font-bold text-text-main outline-none focus:ring-2 ring-accent-blue/20 transition-all text-sm" />
                 </div>
               </div>
 
-              <div className="space-y-2">
+              {/* Focus Goal Checkbox */}
+              <div className="flex items-center gap-3 bg-bg-input/50 p-3 rounded-xl border border-border-light/50 h-[46px] w-full max-w-xs">
+                <input type="checkbox" id="add-focus-goal" checked={newGoal.isFocusGoal} onChange={e => setNewGoal({ ...newGoal, isFocusGoal: e.target.checked })} className="w-4 h-4 rounded text-accent-blue focus:ring-accent-blue/20 cursor-pointer" />
+                <label htmlFor="add-focus-goal" className="text-xs font-black text-text-main cursor-pointer select-none">Set as Focus Goal</label>
+              </div>
+
+              {/* Dependencies Selection */}
+              <div className="space-y-1.5">
                 <p className="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] ml-1">Dependencies (Blocked By)</p>
                 <div className="flex flex-wrap gap-1.5 p-2 bg-bg-input/50 rounded-xl border border-border-light/50 max-h-32 overflow-y-auto">
                   {goals.map(g => {
@@ -895,9 +947,8 @@ export const GoalsPage = () => {
                             setNewGoal(prev => ({ ...prev, dependencies: [...prev.dependencies, g.id] }));
                           }
                         }}
-                        className={`px-2.5 py-1.5 rounded-lg text-[10px] font-black transition-all border ${
-                          isDep ? 'bg-accent-blue border-accent-blue text-white' : 'bg-bg-card border-border-light text-text-muted hover:border-border-med'
-                        }`}
+                        className={`px-2.5 py-1.5 rounded-lg text-[10px] font-black transition-all border ${isDep ? 'bg-accent-blue border-accent-blue text-white' : 'bg-bg-card border-border-light text-text-muted hover:border-border-med'
+                          }`}
                       >
                         {g.title}
                       </button>
@@ -909,14 +960,15 @@ export const GoalsPage = () => {
                 </div>
               </div>
 
-              <div className="bg-bg-input/50 rounded-[28px] p-6 border border-border-light space-y-6">
+              {/* Strategy Logic */}
+              <div className="bg-bg-input/50 rounded-2xl p-4 border border-border-light space-y-4">
                 <div>
-                  <p className="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] mb-4">Forge Logic (Strategy)</p>
-                  <div className="grid grid-cols-1 min-[480px]:grid-cols-3 gap-2 sm:gap-3">
+                  <p className="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] mb-3">Strategy Logic</p>
+                  <div className="grid grid-cols-1 min-[480px]:grid-cols-3 gap-2">
                     {['ALL', 'ANY', 'CUSTOM'].map(m => (
                       <button key={m} type="button" onClick={() => setNewGoal({ ...newGoal, mode: m })}
                         className={`
-                          py-4 rounded-2xl font-black text-xs transition-all border-2
+                          py-3 rounded-xl font-black text-xs transition-all border-2
                           ${newGoal.mode === m ? 'border-accent-blue bg-white text-accent-blue shadow-lg shadow-accent-blue/10' : 'border-transparent bg-bg-card text-text-muted hover:border-border-med'}
                         `}
                       >
@@ -925,72 +977,73 @@ export const GoalsPage = () => {
                     ))}
                   </div>
                 </div>
-                
+
                 {newGoal.mode === 'CUSTOM' && (
-                  <div className="bg-bg-card rounded-2xl p-4 border border-border-light flex items-center justify-between animate-in fade-in zoom-in-95">
+                  <div className="bg-bg-card rounded-xl p-3 border border-border-light flex items-center justify-between animate-in fade-in zoom-in-95">
                     <span className="text-xs font-black text-text-main">Min required habits:</span>
                     <div className="flex items-center bg-bg-input rounded-xl border border-border-light overflow-hidden">
-                        <button type="button" onClick={() => setNewGoal(prev => ({ ...prev, minHabits: Math.max(1, parseInt(prev.minHabits) - 1) }))} className="w-10 h-10 flex items-center justify-center font-black text-text-main hover:bg-border-light">−</button>
-                        <span className="w-8 text-center text-sm font-black text-accent-blue">{newGoal.minHabits}</span>
-                        <button type="button" onClick={() => setNewGoal(prev => ({ ...prev, minHabits: Math.min(prev.habits.length, parseInt(prev.minHabits) + 1) }))} className="w-10 h-10 flex items-center justify-center font-black text-accent-blue border-l border-border-light hover:bg-border-light">+</button>
+                      <button type="button" onClick={() => setNewGoal(prev => ({ ...prev, minHabits: Math.max(1, parseInt(prev.minHabits) - 1) }))} className="w-8 h-8 flex items-center justify-center font-black text-text-main hover:bg-border-light">−</button>
+                      <span className="w-8 text-center text-xs font-black text-accent-blue">{newGoal.minHabits}</span>
+                      <button type="button" onClick={() => setNewGoal(prev => ({ ...prev, minHabits: Math.min(prev.habits.length, parseInt(prev.minHabits) + 1) }))} className="w-8 h-8 flex items-center justify-center font-black text-accent-blue border-l border-border-light hover:bg-border-light">+</button>
                     </div>
                   </div>
                 )}
               </div>
 
-              <div className="space-y-4">
-                <div className="flex justify-between items-end px-1">
-                   <p className="text-[10px] font-black text-text-muted uppercase tracking-[0.2em]">Daily Systems & Habits</p>
-                   <button type="button" onClick={addStagingHabit} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-accent-blue/10 text-accent-blue font-black text-[11px] hover:bg-accent-blue/20 transition-all">
-                     <Plus size={14} strokeWidth={3} /> Add Habit
-                   </button>
+              {/* Habits Staging Area */}
+              <div className="space-y-3">
+                <div className="flex justify-between items-center px-1">
+                  <p className="text-[10px] font-black text-text-muted uppercase tracking-[0.2em]">Daily Systems & Habits</p>
+                  <button type="button" onClick={addStagingHabit} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent-blue/10 text-accent-blue font-black text-[10px] hover:bg-accent-blue/20 transition-all cursor-pointer">
+                    <Plus size={12} strokeWidth={3} /> Add Habit
+                  </button>
                 </div>
-                
-                <div className="grid grid-cols-1 gap-4">
+
+                <div className="grid grid-cols-1 gap-3 max-h-60 overflow-y-auto pr-1">
                   {newGoal.habits.map((h, idx) => (
-                    <div key={h.id} className="bg-bg-input/80 rounded-2xl p-5 border border-border-light space-y-4 relative group hover:border-border-med transition-colors">
-                       <div className="flex gap-4">
-                          <input required={showAdvanced} type="text" value={h.title} onChange={e => updateStagingHabit(h.id, { title: e.target.value })} placeholder={`Habit #${idx + 1}...`} className="flex-1 bg-transparent border-b-2 border-border-light p-2 font-bold text-text-main outline-none focus:border-accent-blue transition-colors" />
-                          <button type="button" onClick={() => removeStagingHabit(h.id)} className="p-2 text-text-muted hover:text-rose-500 transition-colors"><Trash2 size={18} /></button>
-                       </div>
-                       <div className="flex flex-wrap gap-3">
-                          <select value={h.type} onChange={e => updateStagingHabit(h.id, { type: e.target.value })} className="flex-1 min-w-[120px] bg-bg-card rounded-xl px-4 py-2.5 text-xs font-black text-text-main border-none shadow-sm">
-                            <option value="time">⏱️ Time-Based</option>
-                            <option value="check">✅ Simple Check</option>
-                            <option value="count">🔢 Count-Based</option>
-                          </select>
-                          {h.type !== 'check' && (
-                            <div className="flex items-center gap-2 bg-bg-card px-4 py-2 rounded-xl shadow-sm border border-border-light/50">
-                               <input type="number" min="1" value={h.type === 'count' ? h.targetCount : h.targetTime} 
-                                 onChange={e => {
-                                   const val = parseInt(e.target.value, 10) || 1;
-                                   updateStagingHabit(h.id, { [h.type === 'count' ? 'targetCount' : 'targetTime']: val });
-                                 }} 
-                                 className="w-12 bg-transparent text-center font-black text-accent-blue outline-none" 
-                               />
-                               <span className="text-[10px] font-black text-text-muted uppercase tracking-widest">{h.type === 'count' ? 'units' : 'mins'}</span>
-                            </div>
+                    <div key={h.id} className="bg-bg-input/80 rounded-xl p-4 border border-border-light space-y-3 relative group hover:border-border-med transition-colors">
+                      <div className="flex gap-3">
+                        <input required={showAdvanced} type="text" value={h.title} onChange={e => updateStagingHabit(h.id, { title: e.target.value })} placeholder={`Habit #${idx + 1}...`} className="flex-1 bg-transparent border-b border-border-light p-1 font-bold text-text-main outline-none focus:border-accent-blue transition-colors text-xs" />
+                        <button type="button" onClick={() => removeStagingHabit(h.id)} className="p-1 text-text-muted hover:text-rose-500 transition-colors"><Trash2 size={15} /></button>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <select value={h.type} onChange={e => updateStagingHabit(h.id, { type: e.target.value })} className="flex-1 min-w-[100px] bg-bg-card rounded-lg px-3 py-2 text-xs font-black text-text-main border-none shadow-sm">
+                          <option value="time">⏱️ Time-Based</option>
+                          <option value="check">✅ Simple Check</option>
+                          <option value="count">🔢 Count-Based</option>
+                        </select>
+                        {h.type !== 'check' && (
+                          <div className="flex items-center gap-1.5 bg-bg-card px-3 py-1 rounded-lg shadow-sm border border-border-light/50">
+                            <input type="number" min="1" value={h.type === 'count' ? h.targetCount : h.targetTime}
+                              onChange={e => {
+                                const val = parseInt(e.target.value, 10) || 1;
+                                updateStagingHabit(h.id, { [h.type === 'count' ? 'targetCount' : 'targetTime']: val });
+                              }}
+                              className="w-10 bg-transparent text-center font-black text-accent-blue outline-none text-xs"
+                            />
+                            <span className="text-[9px] font-black text-text-muted uppercase tracking-widest">{h.type === 'count' ? 'units' : 'mins'}</span>
+                          </div>
+                        )}
+                      </div>
+                      <DayPicker
+                        value={h.scheduleDays || []}
+                        onChange={days => updateStagingHabit(h.id, { scheduleDays: days })}
+                      />
+                      <div className="flex items-center justify-between gap-3 bg-bg-card rounded-xl px-3 py-2 border border-border-light/40">
+                        <div className="flex items-center gap-1.5">
+                          <Clock size={12} className="text-text-muted" />
+                          <span className="text-[9px] font-black text-text-muted uppercase tracking-widest">Daily Reminder</span>
+                        </div>
+                        <div className="flex items-center gap-3.5">
+                          {h.reminderEnabled && (
+                            <input type="time" value={h.reminderTime} onChange={e => updateStagingHabit(h.id, { reminderTime: e.target.value })} className="bg-transparent border-none text-xs font-black text-accent-blue outline-none" />
                           )}
-                       </div>
-                       <DayPicker
-                         value={h.scheduleDays || []}
-                         onChange={days => updateStagingHabit(h.id, { scheduleDays: days })}
-                       />
-                       <div className="flex items-center justify-between gap-3 bg-bg-card rounded-xl px-4 py-2.5 border border-border-light/40">
-                          <div className="flex items-center gap-2">
-                             <Clock size={14} className="text-text-muted" />
-                             <span className="text-[10px] font-black text-text-muted uppercase tracking-widest">Daily Reminder</span>
-                          </div>
-                          <div className="flex items-center gap-3">
-                             {h.reminderEnabled && (
-                                <input type="time" value={h.reminderTime} onChange={e => updateStagingHabit(h.id, { reminderTime: e.target.value })} className="bg-transparent border-none text-xs font-black text-accent-blue outline-none" />
-                             )}
-                             <button type="button" onClick={() => updateStagingHabit(h.id, { reminderEnabled: !h.reminderEnabled })}
-                               className={`w-10 h-6 rounded-full relative transition-colors ${h.reminderEnabled ? 'bg-accent-blue' : 'bg-bg-input-hover'}`}>
-                               <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${h.reminderEnabled ? 'left-5' : 'left-1'}`} />
-                             </button>
-                          </div>
-                       </div>
+                          <button type="button" onClick={() => updateStagingHabit(h.id, { reminderEnabled: !h.reminderEnabled })}
+                            className={`w-9 h-5 rounded-full relative transition-colors ${h.reminderEnabled ? 'bg-accent-blue' : 'bg-bg-input-hover'}`}>
+                            <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${h.reminderEnabled ? 'left-4.5' : 'left-0.5'}`} />
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -998,11 +1051,13 @@ export const GoalsPage = () => {
             </div>
           )}
 
-          <button type="submit" className="w-full bg-accent-blue text-white rounded-2xl py-4 sm:py-5 font-black text-base sm:text-lg shadow-xl shadow-accent-blue/30 hover:shadow-2xl hover:opacity-90 active:scale-[0.98] transition-all">
+          {/* Submit/Create Button */}
+          <button type="submit" className="w-full bg-accent-blue text-white rounded-xl py-3.5 font-black text-sm shadow-md shadow-accent-blue/20 hover:opacity-90 active:scale-[0.98] transition-all cursor-pointer">
             {showAdvanced ? "Forge Goal System" : "Create Goal"}
           </button>
         </form>
       )}
+
 
       {/* Segmented Tab Selector */}
       {calculatedGoals.length > 0 && (
@@ -1010,22 +1065,20 @@ export const GoalsPage = () => {
           <button
             type="button"
             onClick={() => setActiveTab('active')}
-            className={`flex-1 py-2 rounded-xl font-black text-xs transition-all flex items-center justify-center gap-1.5 active:scale-[0.98] ${
-              activeTab === 'active' 
-                ? 'bg-accent-blue text-white shadow-md' 
+            className={`flex-1 py-2 rounded-xl font-black text-xs transition-all flex items-center justify-center gap-1.5 active:scale-[0.98] ${activeTab === 'active'
+                ? 'bg-accent-blue text-white shadow-md'
                 : 'text-text-muted hover:text-text-main hover:bg-bg-input'
-            }`}
+              }`}
           >
             <Target size={13} /> Active Targets ({activeCalculatedGoals.length})
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('missing')}
-            className={`flex-1 py-2 rounded-xl font-black text-xs transition-all flex items-center justify-center gap-1.5 active:scale-[0.98] ${
-              activeTab === 'missing' 
-                ? 'bg-purple-500 text-white shadow-md' 
+            className={`flex-1 py-2 rounded-xl font-black text-xs transition-all flex items-center justify-center gap-1.5 active:scale-[0.98] ${activeTab === 'missing'
+                ? 'bg-purple-500 text-white shadow-md'
                 : 'text-text-muted hover:text-text-main hover:bg-bg-input'
-            }`}
+              }`}
           >
             <Moon size={13} /> Missing Dreams ({missingDreamGoalsCount})
           </button>
@@ -1035,7 +1088,7 @@ export const GoalsPage = () => {
       {/* Goal Cards Masonry Grid / Accordion List */}
       {(() => {
         const goalsToRender = activeTab === 'active' ? activeCalculatedGoals : missingCalculatedGoals;
-        
+
         if (isReorderMode) {
           return (
             <DragDropContext onDragEnd={(result) => {
@@ -1150,93 +1203,160 @@ export const GoalsPage = () => {
                   const doneToday = isGoalDoneToday(goal);
                   const isFirstIncomplete = firstIncompleteGoal && firstIncompleteGoal.id === goal.id;
 
+                  // Format deadline as "Due: 31 Dec 2026"
+                  const formatDeadline = (dateStr) => {
+                    if (!dateStr) return null;
+                    const [y, m, d] = dateStr.split('-');
+                    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                    return `Due: ${parseInt(d, 10)} ${months[parseInt(m, 10) - 1]} ${y}`;
+                  };
+                  const formattedDeadline = formatDeadline(goal.deadline);
+                  const totalHabits = (goal.habits || []).length;
+                  const doneHabits = (goal.habits || []).filter(h => {
+                    const todayStr = new Date().toISOString().split('T')[0];
+                    if (h.lastActiveDate !== todayStr) return false;
+                    if (h.type === 'check') return h.completed;
+                    if (h.type === 'count') return (h.currentCount || 0) >= (h.targetCount || 10);
+                    return (h.timeSpent || 0) >= (h.targetTime || 15);
+                  }).length;
+
+                  const completedDays = goal.completedDates?.length || 0;
+                  const getGoalTotalDays = () => {
+                    const startStr = goal.startDate || goal.createdAt;
+                    const deadlineStr = goal.deadline;
+                    if (!startStr || !deadlineStr) return 90;
+                    const start = new Date(startStr);
+                    const end = new Date(deadlineStr);
+                    const diffTime = end.getTime() - start.getTime();
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    return diffDays > 0 ? diffDays : 90;
+                  };
+                  const totalGoalDays = getGoalTotalDays();
+
                   return (
                     <div key={goal.id} className={`
-                      bg-bg-card rounded-2xl sm:rounded-[32px] overflow-hidden border-2 h-fit w-full transition-all duration-300
+                      relative bg-bg-card rounded-2xl sm:rounded-[32px] overflow-hidden border-2 h-fit w-full transition-all duration-300
                       ${doneToday ? 'border-emerald-500 shadow-lg shadow-emerald-500/5' : 'border-border-light hover:border-border-med shadow-sm'}
                     `}>
                       <div className="px-3.5 py-3 sm:p-5 cursor-pointer group" onClick={() => toggleGoalExpanded(goal.id)}>
-                        <div className="flex items-center justify-between gap-2.5 sm:gap-5">
-                          
-                          {/* Inner Content: Progress circle + details */}
-                          <div className="flex items-center gap-3 sm:gap-4.5 flex-1 min-w-0 w-full">
-                            {/* Circular Progress Ring */}
-                            <div className="relative w-12 h-12 sm:w-20 sm:h-20 shrink-0">
-                              <svg className="w-full h-full -rotate-90" viewBox="0 0 68 68">
-                                <circle cx="34" cy="34" r={R} fill="none" className="stroke-bg-input" strokeWidth="6" />
-                                <circle 
-                                  cx="34" cy="34" r={R} fill="none" className="stroke-accent-blue" strokeWidth="6" 
-                                  strokeDasharray={CIRC} strokeDashoffset={CIRC - (CIRC * (goal.progress || 0)) / 100} 
-                                  strokeLinecap="round"
-                                />
-                              </svg>
-                              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                                <span className="text-[9px] sm:text-base font-black text-text-main tracking-tighter leading-none">{goal.progress || 0}%</span>
-                                <span className="hidden sm:block text-[5px] sm:text-[7px] font-black text-text-muted uppercase tracking-widest mt-0.5">Mastery</span>
-                              </div>
-                            </div>
+                        {/* 1. Top Row: Category badge on Left + Action Icons on Right */}
+                        <div className="flex justify-between items-center w-full mb-3.5">
+                          <span className={`text-[8px] sm:text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md ${tc.bg} ${tc.color} shrink-0`}>
+                            {goal.tag}
+                          </span>
 
-                            {/* Main descriptive block */}
-                            <div className="flex-1 min-w-0">
-                              <div className="flex flex-wrap items-center gap-1 mb-1.5 sm:mb-2">
-                                <span className={`text-[7px] sm:text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md ${tc.bg} ${tc.color}`}>{goal.tag}</span>
-                                <span className="text-[7px] sm:text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md bg-accent-blue-light text-accent-blue">Today: {dailyProgress}%</span>
-                                {isFirstIncomplete && (
-                                  <span className="hidden sm:inline-block text-[7px] sm:text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md bg-accent-blue text-white shadow-sm shadow-accent-blue/15 animate-pulse">
-                                    Active
-                                  </span>
-                                )}
-                                {goal.isFocusGoal && (
-                                  <span className="hidden sm:inline-flex text-[7px] sm:text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md bg-amber-500 text-white items-center gap-0.5 shadow-sm shadow-amber-500/15">
-                                    <Star size={8} fill="currentColor" /> Focus
-                                  </span>
-                                )}
-                                {goal.progress >= 100 && (
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setCompletedGoalForCelebration(goal);
-                                    }}
-                                    className="hidden sm:inline-flex text-[7px] sm:text-[8px] font-black bg-amber-400/15 text-amber-500 border border-amber-400/20 px-1.5 py-0.5 rounded-md hover:scale-105 active:scale-95 transition-all items-center gap-0.5"
-                                    title="Click to trigger Celebration Memory modal!"
-                                  >
-                                    ✨ Mastered
-                                  </button>
-                                )}
-                              </div>
-                              <p className="text-[14px] sm:text-[18px] md:text-[20px] font-black text-text-main tracking-tight leading-tight mb-2 sm:mb-3 group-hover:text-accent-blue transition-colors whitespace-normal">{goal.title}</p>
-                              
-                              <div className="w-full bg-bg-input h-1 rounded-full overflow-hidden mb-2 sm:mb-3">
-                                <div className={`h-full ${dailyProgress === 100 ? 'bg-emerald-500' : 'bg-accent-blue'}`} style={{ width: `${dailyProgress}%` }} />
-                              </div>
-
-                              <div className="flex items-center gap-1.5 sm:gap-3">
-                                <button onClick={(e) => { e.stopPropagation(); setExtendingGoal(goal); }} className="px-1.5 py-0.5 rounded-md bg-bg-input text-[8px] sm:text-[10px] font-bold text-text-muted hover:bg-border-med transition-colors flex items-center gap-1">
-                                  <Calendar size={10} /> {goal.deadline || 'No deadline'}
-                                </button>
-                                {goal.extensions?.length > 0 && <History size={10} className="text-accent-blue opacity-50" />}
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Action icons and controls */}
-                          <div className="flex sm:flex-col items-center gap-1 shrink-0">
-                            <button 
-                              onClick={e => { 
-                                e.stopPropagation(); 
-                                updateGoal(goal.id, { isMissingDream: !goal.isMissingDream }); 
-                              }} 
-                              className="w-6 h-6 sm:w-8 sm:h-8 rounded-lg text-text-muted hover:text-purple-400 hover:bg-purple-400/10 transition-all flex items-center justify-center shrink-0"
-                              title={goal.isMissingDream ? "Restore to Main Targets" : "Move to Missing Dreams"}
+                          <div className="flex items-center gap-0.5 shrink-0" onClick={e => e.stopPropagation()}>
+                            {/* ⭐ Focus Toggle */}
+                            <button
+                                onClick={e => { e.stopPropagation(); setFocusGoal(goal.isFocusGoal ? null : goal.id); }}
+                                className="w-7 h-7 rounded-lg text-text-muted hover:text-amber-400 hover:bg-amber-400/10 transition-all flex items-center justify-center"
+                                title={goal.isFocusGoal ? 'Remove Focus' : 'Set as Focus Goal'}
                             >
-                              <Moon size={11} fill={goal.isMissingDream ? "currentColor" : "none"} className={goal.isMissingDream ? "text-purple-400" : ""} />
+                              <Star size={12} fill={goal.isFocusGoal ? 'currentColor' : 'none'} className={goal.isFocusGoal ? 'text-amber-400' : ''} />
                             </button>
-                            <button onClick={e => { e.stopPropagation(); setEditingGoal(goal); }} className="w-6 h-6 sm:w-8 sm:h-8 rounded-lg text-text-muted hover:text-accent-blue hover:bg-accent-blue/10 transition-all flex items-center justify-center shrink-0" title="Edit Goal System"><Edit3 size={11} /></button>
-                            <button onClick={e => { e.stopPropagation(); setDeletingGoalItem(goal); }} className="w-6 h-6 sm:w-8 sm:h-8 rounded-lg text-text-muted hover:text-rose-500 hover:bg-rose-500/10 transition-all flex items-center justify-center shrink-0" title="Delete Goal System"><Trash2 size={11} /></button>
-                            {isOpen ? <ChevronUp className="text-text-muted shrink-0 w-3.5 h-3.5" /> : <ChevronDown className="text-text-muted shrink-0 w-3.5 h-3.5" />}
+
+                            {/* 🌙 Move to Missing Dreams / Restore */}
+                            <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  updateGoal(goal.id, { isMissingDream: !goal.isMissingDream });
+                                }}
+                                className="w-7 h-7 rounded-lg text-text-muted hover:text-purple-400 hover:bg-purple-400/10 transition-all flex items-center justify-center"
+                                title={goal.isMissingDream ? 'Restore to Main Targets' : 'Move to Missing Dreams'}
+                            >
+                              <Moon size={12} fill={goal.isMissingDream ? 'currentColor' : 'none'} className={goal.isMissingDream ? 'text-purple-400' : ''} />
+                            </button>
+
+                            {/* ✏️ Edit */}
+                            <button onClick={e => { e.stopPropagation(); setEditingGoal(goal); }} className="w-7 h-7 rounded-lg text-text-muted hover:text-accent-blue hover:bg-accent-blue/10 transition-all flex items-center justify-center" title="Edit Goal System">
+                              <Edit3 size={12} />
+                            </button>
+
+                            {/* 🗑️ Delete */}
+                            <button onClick={e => { e.stopPropagation(); setDeletingGoalItem(goal); }} className="w-7 h-7 rounded-lg text-text-muted hover:text-rose-500 hover:bg-rose-500/10 transition-all flex items-center justify-center" title="Delete Goal System">
+                              <Trash2 size={12} />
+                            </button>
+
+                            {/* ⌄ Expand Chevron */}
+                            <div className="w-7 h-7 flex items-center justify-center cursor-pointer" onClick={e => { e.stopPropagation(); toggleGoalExpanded(goal.id); }}>
+                              {isOpen ? <ChevronUp className="text-text-muted w-3.5 h-3.5" /> : <ChevronDown className="text-text-muted w-3.5 h-3.5" />}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* 2. Main Content Row: Mastery Ring on Left + Title/Progress Bar stack on Right */}
+                        <div className="flex items-center gap-3 sm:gap-4 w-full">
+                          {/* Circular Mastery Ring (+10% size) */}
+                          <div className="relative w-[48px] h-[48px] sm:w-[70px] sm:h-[70px] shrink-0">
+                            <svg className="w-full h-full -rotate-90" viewBox="0 0 68 68">
+                              <circle cx="34" cy="34" r={R} fill="none" className="stroke-bg-input" strokeWidth="6" />
+                              <circle
+                                cx="34" cy="34" r={R} fill="none" className="stroke-accent-blue" strokeWidth="6"
+                                strokeDasharray={CIRC} strokeDashoffset={CIRC - (CIRC * (goal.progress || 0)) / 100}
+                                strokeLinecap="round"
+                              />
+                            </svg>
+                            <div className="absolute inset-0 flex flex-col items-center justify-center">
+                              <span className="text-[10px] sm:text-[13px] font-black text-text-main tracking-tighter leading-none">{goal.progress || 0}%</span>
+                              <span className="hidden sm:block text-[6px] sm:text-[7px] font-black text-text-muted uppercase tracking-widest mt-0.5">Mastery</span>
+                            </div>
                           </div>
 
+                          {/* Right Side Stack: Title + Progress Bar */}
+                          <div className="flex-1 min-w-0 space-y-1.5">
+                            {/* Goal Title */}
+                            <h3 className="text-[16px] sm:text-[20px] font-black text-text-main tracking-tight leading-tight group-hover:text-accent-blue transition-colors line-clamp-2 w-full break-words" title={goal.title}>
+                              {preventOrphan(goal.title)}
+                            </h3>
+
+                            {/* Progress Bar (directly below Goal Title) */}
+                            <div className="w-full bg-bg-input h-1.5 rounded-full overflow-hidden">
+                              <div
+                                className={`h-full transition-all duration-700 ${dailyProgress === 100 ? 'bg-emerald-500' : 'bg-accent-blue'}`}
+                                style={{ width: `${dailyProgress}%` }}
+                              />
+                            </div>
+                          </div>
                         </div>
+
+                        {/* 3. Bottom Meta Row (Compact, Single line, Centered) */}
+                        <div className="flex flex-wrap items-center justify-center gap-x-5 sm:gap-x-8 gap-y-2 mt-4 pt-1.5 border-t border-border-light/20 text-text-muted text-[10px] sm:text-[11px] font-bold w-full">
+                          {/* Due Date */}
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setExtendingGoal(goal); }}
+                            className="flex items-center gap-1 hover:text-accent-blue transition-colors cursor-pointer shrink-0"
+                          >
+                            📅 {formattedDeadline ? formattedDeadline.replace('Due: ', '') : 'No Deadline'}
+                          </button>
+                          {goal.extensions?.length > 0 && <History size={11} className="text-accent-blue opacity-50 -ml-2.5 sm:-ml-5 shrink-0" />}
+
+                          {/* Goal Duration Days progress */}
+                          <span className="flex items-center gap-1 shrink-0">
+                            🔥 {completedDays}/{totalGoalDays}
+                          </span>
+
+                          {/* Today Progress */}
+                          <span className="flex items-center gap-1 shrink-0">
+                            📋 {doneHabits}/{totalHabits}
+                          </span>
+
+                          {dailyProgress === 100 && (
+                            <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-500 flex items-center gap-1 shrink-0">
+                              ✅ DONE
+                            </span>
+                          )}
+                          
+                          {goal.progress >= 100 && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setCompletedGoalForCelebration(goal); }}
+                              className="text-[8px] sm:text-[9px] font-black bg-amber-400/15 text-amber-500 border border-amber-400/20 px-1.5 py-0.5 rounded hover:scale-105 active:scale-[0.98] transition-all flex items-center gap-0.5 shrink-0"
+                              title="Click to trigger Celebration Memory modal!"
+                            >
+                              ✨ Mastered
+                            </button>
+                          )}
+                        </div>
+
                       </div>
 
                       {isOpen && (
@@ -1259,7 +1379,7 @@ export const GoalsPage = () => {
                               })
                               .map(h => <HabitRow key={h.id} habit={h} goalId={goal.id} logHabitTime={logHabitTime} deleteHabit={deleteHabit} toggleHabitCheck={toggleHabitCheck} updateHabitCount={updateHabitCount} updateHabitReminder={updateHabitReminder} />)}
                           </div>
-                          
+
                           {showAddHabit === goal.id ? (
                             <form onSubmit={e => submitHabit(e, goal.id)} className="bg-bg-input/50 p-4 rounded-xl border border-border-light space-y-3 animate-in zoom-in-95">
                               <input autoFocus required type="text" value={newHabit.title} onChange={e => setNewHabit({ ...newHabit, title: e.target.value })} placeholder="New habit name..." className="w-full bg-transparent border-b border-accent-blue py-1.5 font-bold text-text-main outline-none placeholder:text-text-muted/40 text-xs" />
@@ -1270,12 +1390,12 @@ export const GoalsPage = () => {
                                   <option value="count">🔢 Count</option>
                                 </select>
                                 {newHabit.type !== 'check' && (
-                                  <input type="number" min="1" value={newHabit.type === 'count' ? newHabit.targetCount : newHabit.targetTime} 
+                                  <input type="number" min="1" value={newHabit.type === 'count' ? newHabit.targetCount : newHabit.targetTime}
                                     onChange={e => {
                                       const val = parseInt(e.target.value, 10) || 1;
                                       setNewHabit(h => ({ ...h, [h.type === 'count' ? 'targetCount' : 'targetTime']: val }));
-                                    }} 
-                                    className="w-16 bg-bg-card rounded-lg px-3 py-2 text-xs font-black text-accent-blue shadow-sm border-none" 
+                                    }}
+                                    className="w-16 bg-bg-card rounded-lg px-3 py-2 text-xs font-black text-accent-blue shadow-sm border-none"
                                   />
                                 )}
                               </div>
@@ -1321,6 +1441,34 @@ export const GoalsPage = () => {
 
       {extendingGoal && <ExtendDeadlineModal goal={extendingGoal} onClose={() => setExtendingGoal(null)} onExtend={extendGoalDeadline} />}
       {editingGoal && <EditGoalSystemModal goal={editingGoal} onClose={() => setEditingGoal(null)} onSave={editGoalSystem} allGoals={goals} />}
+
+      {archivingGoalItem && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-[9999] animate-in fade-in duration-200" onClick={() => setArchivingGoalItem(null)}>
+          <div className="bg-bg-card border-2 border-border-light rounded-[32px] p-6 max-w-md w-full shadow-2xl space-y-4 animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-black text-text-main tracking-tight">Archive Goal?</h3>
+            <p className="text-sm font-semibold text-text-muted leading-relaxed">
+              Are you sure you want to archive <strong className="text-text-main">"{archivingGoalItem.title}"</strong>? This goal will be hidden from Active Targets and Missing Dreams.
+            </p>
+            <div className="flex gap-3 justify-end pt-2">
+              <button
+                onClick={() => setArchivingGoalItem(null)}
+                className="px-4 py-2.5 rounded-xl text-xs font-black bg-bg-input text-text-muted hover:bg-border-med transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  updateGoal(archivingGoalItem.id, { status: 'archived' });
+                  setArchivingGoalItem(null);
+                }}
+                className="px-5 py-2.5 rounded-xl text-xs font-black bg-amber-500 text-white shadow-lg shadow-amber-500/10 hover:opacity-90 transition-all"
+              >
+                Archive
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <DeleteConfirmationModal
         isOpen={!!deletingGoalItem}
