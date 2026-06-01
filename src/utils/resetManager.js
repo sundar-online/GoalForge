@@ -96,10 +96,10 @@ export function computeHabitResetPayload(habit, goal, todayStr, fallbackLastActi
   }
 
   const newMissed = calculateConsecutiveMissedDays(updatedDates, habit.scheduleDays, habit.createdAt);
+  // Bug 1 fix: pass habit.createdAt as 3rd arg (was incorrectly passed as 4th, silently ignored)
   const newStreak = calculateStreakFromHistory(
     updatedDates,
     habit.scheduleDays,
-    goal.completedDates,
     habit.createdAt
   );
 

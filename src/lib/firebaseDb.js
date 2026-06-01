@@ -369,6 +369,7 @@ export async function upsertGoal(userId, goal) {
     deadline: goal.deadline || null,
     progress: goal.progress ?? 0,
     streak: goal.streak ?? 0,
+    best_streak: goal.bestStreak ?? 0,              // G5 fix: persist best streak to Firestore
     completed_dates: goal.completedDates || [],
     missed_days: goal.missedDays ?? 0,
     last_active_date: goal.lastActiveDate || null,
@@ -529,6 +530,7 @@ export async function upsertTask(userId, task) {
     start_date: task.startDate || null,
     end_date: task.endDate || null,
     current_streak: task.currentStreak ?? 0,
+    best_streak: task.bestStreak ?? 0,          // Bug 2 fix: persist bestStreak to Firestore
     missed_days: task.missedDays ?? 0,
     last_completed_date: task.lastCompletedDate || null,
     completed_dates: task.completedDates || [],

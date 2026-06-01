@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { isTaskDone } from '../utils/calculationUtils';
+import { isTaskDone, calculateTaskStreak } from '../utils/calculationUtils';
 import { TODAY, addDays } from '../utils/dateUtils';
 import {
   AreaChart,
@@ -174,14 +174,24 @@ export const TaskAnalytics = ({ setView }) => {
     });
   }, [tasks, todayStr]);
 
-  // Streak Consistency (Current task streak & Best task streak)
+  // Streak Consistency — aligned with Dashboard's cross-task productive streak.
+  // Bug 3 fix: was previously Math.max(individual task streaks), which diverged from Dashboard.
+  // Now builds a union of all completedDates across daily tasks and computes the consecutive streak,
+  // so Dashboard and TaskAnalytics show identical "Current Streak" and "Best Streak" values.
   const taskStreakData = useMemo(() => {
     const dailyTasks = tasks.filter(t => (t.type || 'daily') === 'daily');
     if (dailyTasks.length === 0) return { current: 0, best: 0 };
 
-    const current = Math.max(...dailyTasks.map(t => t.currentStreak || 0), 0);
-    const best = Math.max(...dailyTasks.map(t => t.bestStreak || 0), 0);
+    // Build a union of all completion dates across all daily tasks
+    const allDatesSet = new Set();
+    dailyTasks.forEach(t => {
+      (t.completedDates || []).forEach(d => allDatesSet.add(d));
+    });
+    const allDates = [...allDatesSet].sort();
 
+    if (allDates.length === 0) return { current: 0, best: 0 };
+
+    const { current, best } = calculateTaskStreak(allDates);
     return { current, best };
   }, [tasks]);
 

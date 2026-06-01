@@ -25,7 +25,8 @@ import {
   calculateProductiveStreak,
   getTaskTrackingKey,
   calculateTaskStreak,
-  sanitizeAndValidateCompletedDates
+  sanitizeAndValidateCompletedDates,
+  logStreakDebug
 } from '../utils/calculationUtils';
 // ── Service modules (reset / analytics / recurring task orchestration) ────
 import { shouldRunReset, computeHabitResetPayload, computeGoalResetPayload, computeTaskResetPayload } from '../utils/resetManager';
@@ -675,6 +676,7 @@ export const AppProvider = ({ children }) => {
             deadline: g.deadline || null,
             progress: g.progress ?? 0,
             streak: g.streak ?? 0,
+            bestStreak: g.best_streak ?? 0,
             completedDates: g.completed_dates || [],
             missedDays: g.missed_days ?? 0,
             lastActiveDate: g.last_active_date || null,
@@ -1511,7 +1513,8 @@ export const AppProvider = ({ children }) => {
           }
         }
 
-        const newStreak = calculateStreakFromHistory(completedDates, h.scheduleDays || [], targetGoal.completedDates || [], existing.createdAt);
+        // Bug 1 fix: pass createdAt as 3rd arg (was incorrectly passed as 4th, silently ignored)
+        const newStreak = calculateStreakFromHistory(completedDates, h.scheduleDays || [], existing.createdAt);
         const newMissed = calculateConsecutiveMissedDays(completedDates, h.scheduleDays || [], existing.createdAt);
 
         return {
@@ -1542,13 +1545,15 @@ export const AppProvider = ({ children }) => {
     const today = TODAY();
     const updatedGoalDates = recalculateGoalCompletedDates(updatedGoal);
     const goalSchedule = getGoalScheduledDays(updatedGoal);
-    const newGoalStreak = calculateGoalStreak(updatedGoalDates, goalSchedule);
+    // G5 fix: calculateGoalStreak now returns { current, best }
+    const { current: newGoalStreak, best: newGoalBestStreak } = calculateGoalStreak(updatedGoalDates, goalSchedule);
     const newGoalMissed = calculateGoalConsecutiveMissedDays(updatedGoalDates, goalSchedule, targetGoal.startDate || targetGoal.createdAt);
     const sortedGoalDates = [...updatedGoalDates].sort((a, b) => b.localeCompare(a));
     const newGoalLastCompleted = sortedGoalDates.length > 0 ? sortedGoalDates[0] : null;
 
     updatedGoal.completedDates = updatedGoalDates;
     updatedGoal.streak = newGoalStreak;
+    updatedGoal.bestStreak = Math.max(newGoalBestStreak, targetGoal.bestStreak || 0);
     updatedGoal.missedDays = newGoalMissed;
     updatedGoal.lastCompletedDate = newGoalLastCompleted;
     updatedGoal.lastActionTimestamp = new Date().toISOString();
@@ -1755,17 +1760,21 @@ export const AppProvider = ({ children }) => {
 
     const updatedGoalDates = recalculateGoalCompletedDates(updatedGoal);
     const goalSchedule = getGoalScheduledDays(updatedGoal);
-    const newGoalStreak = calculateGoalStreak(updatedGoalDates, goalSchedule);
-    const newGoalMissed = calculateGoalConsecutiveMissedDays(updatedGoalDates, goalSchedule, targetGoal.startDate || targetGoal.createdAt);
-    const sortedGoalDates = [...updatedGoalDates].sort((a, b) => b.localeCompare(a));
-    const newGoalLastCompleted = sortedGoalDates.length > 0 ? sortedGoalDates[0] : null;
+    const updatedGoalDates2 = recalculateGoalCompletedDates({ ...goal, habits: updatedHabits });
+    const goalSchedule2 = getGoalScheduledDays({ ...goal, habits: updatedHabits });
+    // G5 fix: calculateGoalStreak now returns { current, best }
+    const { current: newGoalStreak2, best: newGoalBestStreak2 } = calculateGoalStreak(updatedGoalDates2, goalSchedule2);
+    const newGoalMissed2 = calculateGoalConsecutiveMissedDays(updatedGoalDates2, goalSchedule2, goal.startDate || goal.createdAt);
+    const sortedGoalDates2 = [...updatedGoalDates2].sort((a, b) => b.localeCompare(a));
+    const newGoalLastCompleted2 = sortedGoalDates2.length > 0 ? sortedGoalDates2[0] : null;
 
     const finalGoal = {
       ...updatedGoal,
-      completedDates: updatedGoalDates,
-      streak: newGoalStreak,
-      missedDays: newGoalMissed,
-      lastCompletedDate: newGoalLastCompleted,
+      completedDates: updatedGoalDates2,
+      streak: newGoalStreak2,
+      bestStreak: Math.max(newGoalBestStreak2, goal.bestStreak || 0),
+      missedDays: newGoalMissed2,
+      lastCompletedDate: newGoalLastCompleted2,
       lastActionTimestamp: new Date().toISOString()
     };
     finalGoal.progress = calculateOverallProgress(finalGoal);
@@ -1791,7 +1800,8 @@ export const AppProvider = ({ children }) => {
 
     const updatedGoalDates = recalculateGoalCompletedDates(updatedGoal);
     const goalSchedule = getGoalScheduledDays(updatedGoal);
-    const newGoalStreak = calculateGoalStreak(updatedGoalDates, goalSchedule);
+    // G5 fix: calculateGoalStreak now returns { current, best }
+    const { current: newGoalStreak, best: newGoalBestStreak } = calculateGoalStreak(updatedGoalDates, goalSchedule);
     const newGoalMissed = calculateGoalConsecutiveMissedDays(updatedGoalDates, goalSchedule, goal.startDate || goal.createdAt);
     const sortedGoalDates = [...updatedGoalDates].sort((a, b) => b.localeCompare(a));
     const newGoalLastCompleted = sortedGoalDates.length > 0 ? sortedGoalDates[0] : null;
@@ -1800,6 +1810,7 @@ export const AppProvider = ({ children }) => {
       ...updatedGoal,
       completedDates: updatedGoalDates,
       streak: newGoalStreak,
+      bestStreak: Math.max(newGoalBestStreak, goal.bestStreak || 0),
       missedDays: newGoalMissed,
       lastCompletedDate: newGoalLastCompleted,
       lastActionTimestamp: new Date().toISOString()
@@ -1862,7 +1873,8 @@ export const AppProvider = ({ children }) => {
           updatedDates = updatedDates.filter(d => d !== today);
         }
 
-        const newStreak = calculateStreakFromHistory(updatedDates, updatedH.scheduleDays || [], goal.completedDates || [], updatedH.createdAt);
+        // Bug 1 fix: pass createdAt as 3rd arg (was incorrectly passed as 4th, silently ignored)
+        const newStreak = calculateStreakFromHistory(updatedDates, updatedH.scheduleDays || [], updatedH.createdAt);
         const newMissed = calculateConsecutiveMissedDays(updatedDates, updatedH.scheduleDays || [], updatedH.createdAt);
         const sortedDates = [...updatedDates].sort((a, b) => b.localeCompare(a));
         const newLastCompleted = sortedDates.length > 0 ? sortedDates[0] : null;
@@ -1896,7 +1908,8 @@ export const AppProvider = ({ children }) => {
     const updatedGoalWithoutDates = { ...goal, habits: updatedHabits };
     const updatedGoalDates = recalculateGoalCompletedDates(updatedGoalWithoutDates);
     const goalSchedule = getGoalScheduledDays(updatedGoalWithoutDates);
-    const newGoalStreak = calculateGoalStreak(updatedGoalDates, goalSchedule);
+    // G5 fix: calculateGoalStreak now returns { current, best }
+    const { current: newGoalStreak, best: newGoalBestStreak } = calculateGoalStreak(updatedGoalDates, goalSchedule);
     const newGoalMissed = calculateGoalConsecutiveMissedDays(updatedGoalDates, goalSchedule, goal.startDate || goal.createdAt);
     const sortedGoalDates = [...updatedGoalDates].sort((a, b) => b.localeCompare(a));
     const newGoalLastCompleted = sortedGoalDates.length > 0 ? sortedGoalDates[0] : null;
@@ -1906,6 +1919,7 @@ export const AppProvider = ({ children }) => {
       habits: updatedHabits,
       completedDates: updatedGoalDates,
       streak: newGoalStreak,
+      bestStreak: Math.max(newGoalBestStreak, goal.bestStreak || 0),
       missedDays: newGoalMissed,
       lastCompletedDate: newGoalLastCompleted,
       lastActiveDate: today,
@@ -2029,7 +2043,8 @@ export const AppProvider = ({ children }) => {
           updatedDates = updatedDates.filter(d => d !== today);
         }
 
-        const newStreak = calculateStreakFromHistory(updatedDates, updatedH.scheduleDays || [], goal.completedDates || [], updatedH.createdAt);
+        // Bug 1 fix: pass createdAt as 3rd arg (was incorrectly passed as 4th, silently ignored)
+        const newStreak = calculateStreakFromHistory(updatedDates, updatedH.scheduleDays || [], updatedH.createdAt);
         const newMissed = calculateConsecutiveMissedDays(updatedDates, updatedH.scheduleDays || [], updatedH.createdAt);
         const sortedDates = [...updatedDates].sort((a, b) => b.localeCompare(a));
         const newLastCompleted = sortedDates.length > 0 ? sortedDates[0] : null;
@@ -2061,7 +2076,8 @@ export const AppProvider = ({ children }) => {
     const updatedGoalWithoutDates = { ...goal, habits: updatedHabits };
     const updatedGoalDates = recalculateGoalCompletedDates(updatedGoalWithoutDates);
     const goalSchedule = getGoalScheduledDays(updatedGoalWithoutDates);
-    const newGoalStreak = calculateGoalStreak(updatedGoalDates, goalSchedule);
+    // G5 fix: calculateGoalStreak now returns { current, best }
+    const { current: newGoalStreak, best: newGoalBestStreak } = calculateGoalStreak(updatedGoalDates, goalSchedule);
     const newGoalMissed = calculateGoalConsecutiveMissedDays(updatedGoalDates, goalSchedule, goal.startDate || goal.createdAt);
     const sortedGoalDates = [...updatedGoalDates].sort((a, b) => b.localeCompare(a));
     const newGoalLastCompleted = sortedGoalDates.length > 0 ? sortedGoalDates[0] : null;
@@ -2071,6 +2087,7 @@ export const AppProvider = ({ children }) => {
       habits: updatedHabits,
       completedDates: updatedGoalDates,
       streak: newGoalStreak,
+      bestStreak: Math.max(newGoalBestStreak, goal.bestStreak || 0),
       missedDays: newGoalMissed,
       lastCompletedDate: newGoalLastCompleted,
       lastActiveDate: today,
@@ -2154,7 +2171,8 @@ export const AppProvider = ({ children }) => {
           updatedDates = updatedDates.filter(d => d !== today);
         }
 
-        const newStreak = calculateStreakFromHistory(updatedDates, updatedH.scheduleDays || [], goal.completedDates || [], updatedH.createdAt);
+        // Bug 1 fix: pass createdAt as 3rd arg (was incorrectly passed as 4th, silently ignored)
+        const newStreak = calculateStreakFromHistory(updatedDates, updatedH.scheduleDays || [], updatedH.createdAt);
         const newMissed = calculateConsecutiveMissedDays(updatedDates, updatedH.scheduleDays || [], updatedH.createdAt);
         const sortedDates = [...updatedDates].sort((a, b) => b.localeCompare(a));
         const newLastCompleted = sortedDates.length > 0 ? sortedDates[0] : null;
@@ -2186,7 +2204,8 @@ export const AppProvider = ({ children }) => {
     const updatedGoalWithoutDates = { ...goal, habits: updatedHabits };
     const updatedGoalDates = recalculateGoalCompletedDates(updatedGoalWithoutDates);
     const goalSchedule = getGoalScheduledDays(updatedGoalWithoutDates);
-    const newGoalStreak = calculateGoalStreak(updatedGoalDates, goalSchedule);
+    // G5 fix: calculateGoalStreak now returns { current, best }
+    const { current: newGoalStreak, best: newGoalBestStreak } = calculateGoalStreak(updatedGoalDates, goalSchedule);
     const newGoalMissed = calculateGoalConsecutiveMissedDays(updatedGoalDates, goalSchedule, goal.startDate || goal.createdAt);
     const sortedGoalDates = [...updatedGoalDates].sort((a, b) => b.localeCompare(a));
     const newGoalLastCompleted = sortedGoalDates.length > 0 ? sortedGoalDates[0] : null;
@@ -2196,6 +2215,7 @@ export const AppProvider = ({ children }) => {
       habits: updatedHabits,
       completedDates: updatedGoalDates,
       streak: newGoalStreak,
+      bestStreak: Math.max(newGoalBestStreak, goal.bestStreak || 0),
       missedDays: newGoalMissed,
       lastCompletedDate: newGoalLastCompleted,
       lastActiveDate: today,
@@ -2339,7 +2359,9 @@ export const AppProvider = ({ children }) => {
     }
 
     const recId = updated.recurringId || getTaskTrackingKey(updated);
-    let recDates = (recurringHistory[recId]?.completedDates ? [...recurringHistory[recId].completedDates] : (updated.completedDates ? [...updated.completedDates] : []));
+    // Bug 4 fix: always use task.completedDates as authoritative source (already sanitized from
+    // Firestore on load). recurringHistory can diverge and cause stale streak calculations.
+    let recDates = updated.completedDates ? [...updated.completedDates] : [];
 
     if (isDone) {
       if (!recDates.includes(today)) {
@@ -2429,7 +2451,8 @@ export const AppProvider = ({ children }) => {
     updated.completed = isDone;
 
     const recId = updated.recurringId || getTaskTrackingKey(updated);
-    let recDates = (recurringHistory[recId]?.completedDates ? [...recurringHistory[recId].completedDates] : (updated.completedDates ? [...updated.completedDates] : []));
+    // Bug 4 fix: always use task.completedDates as authoritative source (already sanitized from Firestore).
+    let recDates = updated.completedDates ? [...updated.completedDates] : [];
 
     if (isDone) {
       if (!recDates.includes(today)) {
@@ -2452,6 +2475,9 @@ export const AppProvider = ({ children }) => {
     if (isDone) {
       updated.missedDays = 0;
     }
+
+    // Debug logging for streak audit
+    logStreakDebug(updated.title, sanitizedDates, newStreak, newBestStreak, t.currentStreak);
 
     if (isDaily) {
       const recPayload = {
@@ -2518,7 +2544,8 @@ export const AppProvider = ({ children }) => {
     updated.completed = isDone;
 
     const recId = updated.recurringId || getTaskTrackingKey(updated);
-    let recDates = (recurringHistory[recId]?.completedDates ? [...recurringHistory[recId].completedDates] : (updated.completedDates ? [...updated.completedDates] : []));
+    // Bug 4 fix: always use task.completedDates as authoritative source (already sanitized from Firestore).
+    let recDates = updated.completedDates ? [...updated.completedDates] : [];
 
     if (isDone) {
       if (!recDates.includes(today)) {
@@ -2541,6 +2568,9 @@ export const AppProvider = ({ children }) => {
     if (isDone) {
       updated.missedDays = 0;
     }
+
+    // Debug logging for streak audit
+    logStreakDebug(updated.title, sanitizedDates, newStreak, newBestStreak, t.currentStreak);
 
     if (isDaily) {
       const recPayload = {

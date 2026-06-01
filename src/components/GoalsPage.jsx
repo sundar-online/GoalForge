@@ -1213,7 +1213,8 @@ export const GoalsPage = () => {
                   const formattedDeadline = formatDeadline(goal.deadline);
                   const totalHabits = (goal.habits || []).length;
                   const doneHabits = (goal.habits || []).filter(h => {
-                    const todayStr = new Date().toISOString().split('T')[0];
+                    // Bug G4 fix: use TODAY() instead of new Date().toISOString() for timezone safety
+                    const todayStr = TODAY();
                     if (h.lastActiveDate !== todayStr) return false;
                     if (h.type === 'check') return h.completed;
                     if (h.type === 'count') return (h.currentCount || 0) >= (h.targetCount || 10);

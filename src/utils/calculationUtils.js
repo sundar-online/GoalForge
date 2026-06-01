@@ -299,7 +299,7 @@ export const getSmartAlerts = (accuracy, goals = [], tasks = [], weeklyReport = 
   return alerts;
 };
 
-export const calculateStreakFromHistory = (completedDates, scheduleDays = []) => {
+export const calculateStreakFromHistory = (completedDates, scheduleDays = [], createdAt = null) => {
   // Area 2 & 3: New habits must start at 0d streak until genuinely completed.
   if (!completedDates || completedDates.length === 0) return 0;
 
@@ -312,7 +312,15 @@ export const calculateStreakFromHistory = (completedDates, scheduleDays = []) =>
   const sorted = [...completedSet].sort();
   const earliestDate = sorted[0];
   const diff = diffDays(todayStr, earliestDate);
-  const startDaysAgo = Math.min(1000, Math.max(365, diff));
+
+  // Clamp startDaysAgo to the habit's creation date to prevent inflated streaks
+  // from before the habit existed. createdAt bounds the earliest evaluation point.
+  let createdDateStr = null;
+  if (createdAt) {
+    createdDateStr = String(createdAt).includes('T') ? String(createdAt).split('T')[0] : String(createdAt);
+  }
+  const createdDiff = createdDateStr ? diffDays(todayStr, createdDateStr) : diff;
+  const startDaysAgo = Math.min(1000, Math.max(365, diff, createdDiff));
 
   let streak = 0;
   let consecutiveMissedDays = 0;
@@ -520,10 +528,10 @@ export const getGoalScheduledDays = (goal) => {
 
 /**
  * Calculates the exact goal streak (consecutive scheduled days fully completed).
- * Standard streak rules: resets to 0 if a scheduled day is missed.
+ * Bug G5 fix: now returns { current, best } matching calculateTaskStreak shape.
  */
 export const calculateGoalStreak = (completedDates, scheduleDays = []) => {
-  if (!completedDates || completedDates.length === 0) return 0;
+  if (!completedDates || completedDates.length === 0) return { current: 0, best: 0 };
 
   const completedSet = new Set(completedDates);
   const todayStr = TODAY();
@@ -534,28 +542,49 @@ export const calculateGoalStreak = (completedDates, scheduleDays = []) => {
   const diff = diffDays(todayStr, earliestDate);
   const startDaysAgo = Math.min(1000, Math.max(30, diff));
 
-  let streak = 0;
+  // 1. Current streak (forward pass, reset on missed scheduled day)
+  let current = 0;
 
   for (let i = startDaysAgo; i >= 0; i--) {
     const currentDateStr = addDays(todayStr, -i);
     const isCompleted = completedSet.has(currentDateStr);
-    
-    // Check if scheduled
+
     const dateObj = parseLocalDate(currentDateStr);
     const dayName = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dateObj.getDay()];
     const isScheduled = scheduleDays.length === 0 || scheduleDays.includes(dayName);
 
     if (isCompleted) {
-      streak++;
+      current++;
     } else if (isScheduled) {
-      // Today itself (TODAY()) does not count as missed if not completed yet (since it's ongoing)
       if (currentDateStr !== todayStr) {
-        streak = 0; // standard streak resets on missed scheduled day
+        current = 0; // reset on missed scheduled day (excluding today which is still in progress)
       }
     }
   }
 
-  return streak;
+  // 2. Best streak: scan sorted completed dates for longest consecutive run
+  let best = 0;
+  let currentRun = 0;
+  let lastDate = null;
+
+  for (const dateStr of sorted) {
+    if (lastDate === null) {
+      currentRun = 1;
+    } else {
+      const expectedNext = addDays(lastDate, 1);
+      if (dateStr === expectedNext) {
+        currentRun++;
+      } else {
+        best = Math.max(best, currentRun);
+        currentRun = 1;
+      }
+    }
+    lastDate = dateStr;
+  }
+  best = Math.max(best, currentRun);
+  best = Math.max(best, current); // ensure best >= current
+
+  return { current, best };
 };
 
 /**
@@ -789,10 +818,41 @@ export const getRecommendedNextGoal = (goals) => {
     }
   });
 
+
   return recommended;
 };
 
+/**
+ * Temporary debug logging utility for streak audit.
+ * Logs: Task Name, Completed Dates, Calculated Current Streak,
+ * Calculated Best Streak, Displayed Streak.
+ *
+ * Call this wherever streak values are computed or displayed.
+ * Remove after audit is complete.
+ */
+export const logStreakDebug = (taskName, completedDates, currentStreak, bestStreak, displayedStreak = null) => {
+  const label = `[StreakDebug] Task: "${taskName}"`;
+  const dates = Array.isArray(completedDates) ? completedDates : [];
+  const displayedVal = displayedStreak !== null ? displayedStreak : currentStreak;
+  const mismatch = displayedStreak !== null && displayedStreak !== currentStreak;
 
-
-
+  if (mismatch) {
+    console.warn(
+      `${label}\n` +
+      `  Completed Dates (${dates.length}): [${dates.slice(-5).join(', ')}${dates.length > 5 ? ' ...' : ''}]\n` +
+      `  Calculated Current Streak: ${currentStreak}\n` +
+      `  Calculated Best Streak:    ${bestStreak}\n` +
+      `  Displayed Streak:          ${displayedVal}\n` +
+      `  ⚠ MISMATCH DETECTED: Calculated=${currentStreak} vs Displayed=${displayedVal}`
+    );
+  } else {
+    console.log(
+      `${label}\n` +
+      `  Completed Dates (${dates.length}): [${dates.slice(-5).join(', ')}${dates.length > 5 ? ' ...' : ''}]\n` +
+      `  Calculated Current Streak: ${currentStreak}\n` +
+      `  Calculated Best Streak:    ${bestStreak}\n` +
+      `  Displayed Streak:          ${displayedVal}`
+    );
+  }
+};
 

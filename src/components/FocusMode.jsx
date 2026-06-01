@@ -495,8 +495,8 @@ export const FocusMode = () => {
                       ease: 'linear'
                     }}
                     className={`absolute w-3 h-3 rounded-full ${i % 3 === 0 ? 'bg-accent-blue shadow-[0_0_8px_rgba(77,124,255,0.6)]' :
-                        i % 3 === 1 ? 'bg-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.6)]' :
-                          'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]'
+                      i % 3 === 1 ? 'bg-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.6)]' :
+                        'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]'
                       }`}
                   />
                 ))}
@@ -758,10 +758,10 @@ export const FocusMode = () => {
                   onClick={timerState === 'running' ? handlePause : handleStart}
                   disabled={time === 0}
                   className={`flex-1 py-4 rounded-2xl font-black text-xs sm:text-sm uppercase tracking-widest transition-all active:scale-[0.98] shadow-lg flex items-center justify-center gap-2 select-none ${time === 0
-                      ? 'bg-emerald-500 shadow-emerald-500/20 text-white cursor-default'
-                      : timerState === 'running'
-                        ? 'bg-amber-500 shadow-amber-500/20 text-white hover:opacity-95'
-                        : 'bg-accent-blue shadow-accent-blue/20 text-white hover:opacity-95'
+                    ? 'bg-emerald-500 shadow-emerald-500/20 text-white cursor-default'
+                    : timerState === 'running'
+                      ? 'bg-amber-500 shadow-amber-500/20 text-white hover:opacity-95'
+                      : 'bg-accent-blue shadow-accent-blue/20 text-white hover:opacity-95'
                     }`}
                 >
                   {time === 0 ? (
@@ -829,8 +829,8 @@ export const FocusMode = () => {
                 <button
                   onClick={() => setIsMuted(!isMuted)}
                   className={`p-2 rounded-xl border transition-all active:scale-90 ${isMuted
-                      ? 'bg-red-500/10 border-red-500/20 text-red-500'
-                      : 'bg-bg-input border-border-med text-text-muted hover:text-text-main'
+                    ? 'bg-red-500/10 border-red-500/20 text-red-500'
+                    : 'bg-bg-input border-border-med text-text-muted hover:text-text-main'
                     }`}
                 >
                   {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
@@ -851,8 +851,8 @@ export const FocusMode = () => {
                       playSynthesizedSound(theme.id, volume, false);
                     }}
                     className={`py-2 rounded-xl text-[10px] font-black uppercase border transition-all ${audioTheme === theme.id
-                        ? 'bg-accent-blue/10 border-accent-blue text-accent-blue'
-                        : 'bg-bg-input border-border-med text-text-muted hover:border-border-light hover:text-text-main'
+                      ? 'bg-accent-blue/10 border-accent-blue text-accent-blue'
+                      : 'bg-bg-input border-border-med text-text-muted hover:border-border-light hover:text-text-main'
                       }`}
                   >
                     {theme.name}
