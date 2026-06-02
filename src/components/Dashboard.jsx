@@ -419,13 +419,13 @@ export const Dashboard = ({ setView }) => {
       // Always derive streak live from completedDates so we never show stale cached values
       const liveCompletedDates = recalculateGoalCompletedDates(g);
       const goalSchedule = getGoalScheduledDays(g);
-      const liveStreak = calculateGoalStreak(liveCompletedDates, goalSchedule);
+      const { current: liveStreak } = calculateGoalStreak(liveCompletedDates, goalSchedule) || {};
       const liveMissed = calculateGoalConsecutiveMissedDays(liveCompletedDates, goalSchedule, g.startDate || g.createdAt);
       return { 
         name: g.title, 
         tag: g.tag, 
-        streak: liveStreak, 
-        missed: liveMissed 
+        streak: liveStreak || 0, 
+        missed: liveMissed || 0 
       };
     })
     .filter(g => g.streak > 0 || g.missed > 0)

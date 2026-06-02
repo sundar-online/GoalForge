@@ -139,7 +139,9 @@ export const GoalActivityChart = ({ goals = [] }) => {
         tag: g.tag || 'General',
         rawScore: scoreGoal(g),
         habits: (g.habits || []).length,
-        streak: Math.max(0, ...(g.habits || []).map(h => h.streak || 0)),
+        streak: (g.habits || []).length > 0
+          ? Math.max(0, ...(g.habits || []).map(h => h.streak || 0))
+          : 0,
         completedCount: (g.completedDates || []).length,
       }))
       .filter(g => g.rawScore > 0)

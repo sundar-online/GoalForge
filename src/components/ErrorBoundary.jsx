@@ -18,6 +18,27 @@ export class ErrorBoundary extends React.Component {
 
   render() {
     if (this.state.hasError) {
+      if (this.props.fallbackType === 'widget') {
+        return (
+          <div className="bg-surface p-6 rounded-2xl border border-red-500/20 text-white flex flex-col justify-center items-center h-full min-h-[200px] text-center relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-1 bg-red-500/50"></div>
+            <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center mb-3">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="text-red-500" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="12"></line>
+                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+              </svg>
+            </div>
+            <span className="text-sm font-semibold text-red-400 mb-1">
+              {this.props.errorMessage || 'Component Error'}
+            </span>
+            <span className="text-xs text-text-muted max-w-[300px] block opacity-80" title={this.state.error?.toString()}>
+              {this.state.error?.toString()}
+            </span>
+          </div>
+        );
+      }
+
       return (
         <div className="min-h-screen bg-bg-app text-white flex flex-col items-center justify-center p-6 text-center">
           <div className="bg-surface p-8 rounded-2xl shadow-xl max-w-2xl w-full border border-red-500/30 relative overflow-hidden">

@@ -336,6 +336,7 @@ export async function fetchGoals(userId) {
         deadline: g.deadline || null,
         progress: g.progress ?? 0,
         streak: g.streak ?? 0,
+        bestStreak: g.best_streak ?? 0,
         completedDates: g.completed_dates || [],
         missedDays: g.missed_days ?? 0,
         lastActiveDate: g.last_active_date || null,

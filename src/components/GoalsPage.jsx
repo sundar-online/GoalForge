@@ -419,7 +419,7 @@ const HabitRow = ({ habit, goalId, logHabitTime, deleteHabit, toggleHabitCheck, 
           <p className="text-xs font-black text-text-muted truncate">{habit.title}</p>
           <div className="flex flex-wrap items-center gap-1 sm:gap-1.5 mt-0.5">
             <span className="text-[8px] font-bold text-text-muted uppercase tracking-wider leading-none">Rest Day</span>
-            {habit.streak > 0 && <span className="text-[8px] font-black text-orange-500 bg-orange-500/10 px-1 py-0.5 rounded leading-none">🔥 {habit.streak}d</span>}
+            {(habit.streak || 0) > 0 && <span className="text-[8px] font-black text-orange-500 bg-orange-500/10 px-1 py-0.5 rounded leading-none">🔥 {habit.streak || 0}d</span>}
           </div>
         </div>
       </div>
@@ -450,7 +450,7 @@ const HabitRow = ({ habit, goalId, logHabitTime, deleteHabit, toggleHabitCheck, 
                 <p className="text-[8px] sm:text-[9px] font-bold text-text-muted uppercase tracking-wide">
                   {isCheck ? (done ? 'Completed' : 'Pending') : `${current}/${target} ${isCount ? 'units' : 'mins'}`}
                 </p>
-                {habit.streak > 0 && <span className="text-[8px] font-black text-orange-500 bg-orange-500/10 px-1 py-0.5 rounded leading-none">🔥 {habit.streak}d</span>}
+                {(habit.streak || 0) > 0 && <span className="text-[8px] font-black text-orange-500 bg-orange-500/10 px-1 py-0.5 rounded leading-none">🔥 {habit.streak || 0}d</span>}
               </div>
             </div>
           </div>
