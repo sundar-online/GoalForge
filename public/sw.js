@@ -1,9 +1,10 @@
 // public/sw.js
 // ─── Cache version ── Bump on every deploy to bust ALL stale client caches ───
-const CACHE_VERSION = 'v20260512-2';
+const CACHE_VERSION = 'v20260602-1';
 const CACHE_NAME = `goalforge-${CACHE_VERSION}`;
 
 self.addEventListener('install', (event) => {
+
   // Skip waiting immediately — do not wait for old SW to be unregistered
   self.skipWaiting();
 });
