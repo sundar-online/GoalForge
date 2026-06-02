@@ -1793,21 +1793,24 @@ export const AppProvider = ({ children }) => {
 
     const updatedGoalDates = recalculateGoalCompletedDates(updatedGoal);
     const goalSchedule = getGoalScheduledDays(updatedGoal);
-    const updatedGoalDates2 = recalculateGoalCompletedDates({ ...goal, habits: updatedHabits });
-    const goalSchedule2 = getGoalScheduledDays({ ...goal, habits: updatedHabits });
     // G5 fix: calculateGoalStreak now returns { current, best }
-    const { current: newGoalStreak2, best: newGoalBestStreak2 } = calculateGoalStreak(updatedGoalDates2, goalSchedule2);
-    const newGoalMissed2 = calculateGoalConsecutiveMissedDays(updatedGoalDates2, goalSchedule2, goal.startDate || goal.createdAt);
-    const sortedGoalDates2 = [...updatedGoalDates2].sort((a, b) => b.localeCompare(a));
-    const newGoalLastCompleted2 = sortedGoalDates2.length > 0 ? sortedGoalDates2[0] : null;
+    const { current: newGoalStreak, best: newGoalBestStreak } = calculateGoalStreak(updatedGoalDates, goalSchedule);
+    const newGoalMissed = calculateGoalConsecutiveMissedDays(updatedGoalDates, goalSchedule, targetGoal.startDate || targetGoal.createdAt);
+    const sortedGoalDates = [...updatedGoalDates].sort((a, b) => b.localeCompare(a));
+    const newGoalLastCompleted = sortedGoalDates.length > 0 ? sortedGoalDates[0] : null;
+
+    if (!targetGoal) {
+      console.error('[addHabit] Goal object missing — aborting streak recalculation.');
+      return;
+    }
 
     const finalGoal = {
       ...updatedGoal,
-      completedDates: updatedGoalDates2,
-      streak: newGoalStreak2,
-      bestStreak: Math.max(newGoalBestStreak2, goal.bestStreak || 0),
-      missedDays: newGoalMissed2,
-      lastCompletedDate: newGoalLastCompleted2,
+      completedDates: updatedGoalDates,
+      streak: newGoalStreak,
+      bestStreak: Math.max(newGoalBestStreak, targetGoal.bestStreak || 0),
+      missedDays: newGoalMissed,
+      lastCompletedDate: newGoalLastCompleted,
       lastActionTimestamp: new Date().toISOString()
     };
     finalGoal.progress = calculateOverallProgress(finalGoal);
