@@ -4,7 +4,7 @@ import { calculateGoalDailyProgress, isHabitDoneToday, calculateOverallProgress,
 import { TODAY } from '../utils/dateUtils';
 import { BADGE_DEFINITIONS } from '../utils/gamificationEngine';
 import { useAuth } from '../context/AuthContext';
-import { AlertTriangle, AlertCircle, TrendingUp, TrendingDown, CheckCircle2, Clock, Zap, LogOut, Moon, Sun, Sparkles, Trophy, ChevronRight, Target, Award, CalendarDays, Brain, Plus, Trash2, ChevronDown, ChevronUp, Flame, Star } from 'lucide-react';
+import { AlertTriangle, AlertCircle, TrendingUp, TrendingDown, CheckCircle2, Clock, Zap, LogOut, Moon, Sun, Sparkles, Trophy, ChevronRight, Target, Award, CalendarDays, Brain, Plus, Trash2, ChevronDown, ChevronUp, Flame, Star, Calendar } from 'lucide-react';
 // eslint-disable-next-line no-unused-vars
 import { motion, AnimatePresence } from 'framer-motion';
 import { WeeklyHeatmap } from './WeeklyHeatmap';
@@ -14,6 +14,118 @@ import AIInsights from './AIInsights';
 import { GoalActivityChart } from './GoalActivityChart';
 import ErrorBoundary from './ErrorBoundary';
 import { TaskAnalytics } from './TaskAnalytics';
+
+const EVENT_CATEGORY_COLORS = {
+  general:  { dot: 'bg-blue-400',    text: 'text-blue-400'    },
+  work:     { dot: 'bg-violet-400',  text: 'text-violet-400'  },
+  health:   { dot: 'bg-emerald-400', text: 'text-emerald-400' },
+  learning: { dot: 'bg-amber-400',   text: 'text-amber-400'   },
+  goal:     { dot: 'bg-accent-blue', text: 'text-accent-blue' },
+  personal: { dot: 'bg-pink-400',    text: 'text-pink-400'    },
+};
+
+const UpcomingEventsWidget = ({ setView }) => {
+  const { scheduledEvents } = useAppContext();
+  const today = TODAY();
+  const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  const upcoming = (scheduledEvents || [])
+    .filter(e => !e.completed && e.date >= today)
+    .slice(0, 4);
+
+  const todayEvents = upcoming.filter(e => e.date === today);
+
+  return (
+    <div className="bg-bg-card rounded-[32px] border border-border-light shadow-sm overflow-hidden">
+      {/* Header */}
+      <div
+        className="p-5 flex items-center justify-between cursor-pointer hover:bg-bg-input/30 transition-colors"
+        onClick={() => setView('events')}
+      >
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-400 shrink-0 border border-indigo-500/20">
+            <CalendarDays size={18} />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-black text-text-main tracking-tight leading-none">Upcoming Events</h3>
+              {upcoming.length > 0 && (
+                <span className="bg-indigo-500/15 text-indigo-400 px-1.5 py-0.5 rounded-full text-[9px] font-black">
+                  {upcoming.length}
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-text-muted mt-0.5 font-bold">
+              {todayEvents.length > 0 ? `${todayEvents.length} event${todayEvents.length > 1 ? 's' : ''} today` : 'No events today'}
+            </p>
+          </div>
+        </div>
+        <ChevronRight size={16} className="text-text-muted" />
+      </div>
+
+      {/* Body */}
+      <div className="px-5 pb-5">
+        {upcoming.length === 0 ? (
+          <div className="py-4 text-center">
+            <Calendar size={24} className="text-text-muted mx-auto mb-2 opacity-40" />
+            <p className="text-xs text-text-muted font-bold mb-3">No upcoming events scheduled</p>
+            <button
+              onClick={() => setView('events')}
+              className="text-[10px] font-black text-accent-blue hover:underline underline-offset-4"
+            >
+              + Schedule your first event
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {upcoming.map(event => {
+              const [, m, d] = event.date.split('-');
+              const colors = EVENT_CATEGORY_COLORS[event.category] || EVENT_CATEGORY_COLORS.general;
+              const isToday = event.date === today;
+              return (
+                <div
+                  key={event.id}
+                  onClick={() => setView('events')}
+                  className="flex items-center gap-3 p-3 rounded-2xl hover:bg-bg-input/60 transition-colors cursor-pointer group"
+                >
+                  {/* Date box */}
+                  <div className="w-9 h-9 rounded-xl bg-bg-input border border-border-light flex flex-col items-center justify-center shrink-0 group-hover:border-border-med transition-colors">
+                    <span className="text-[7px] font-black text-text-muted uppercase leading-none">{MONTHS_SHORT[parseInt(m,10)-1]}</span>
+                    <span className="text-sm font-black text-text-main leading-none">{parseInt(d,10)}</span>
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${colors.dot}`} />
+                      <p className="text-xs font-black text-text-main truncate">{event.title}</p>
+                    </div>
+                    <p className="text-[9px] text-text-muted font-bold mt-0.5">
+                      {isToday ? '🔔 Today' : event.date}{event.time ? ` · ${event.time}` : ''}
+                    </p>
+                  </div>
+
+                  {isToday && (
+                    <span className="shrink-0 text-[8px] font-black uppercase tracking-wider text-accent-blue bg-accent-blue/10 px-2 py-0.5 rounded-full">
+                      Today
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+
+            {/* View all link */}
+            <button
+              onClick={() => setView('events')}
+              className="w-full text-[10px] font-black text-text-muted hover:text-accent-blue uppercase tracking-wider py-2 transition-colors"
+            >
+              View all events →
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
 
 const QuickThoughtsWidget = () => {
   const {
@@ -467,14 +579,34 @@ export const Dashboard = ({ setView }) => {
           <p className="text-xs sm:text-sm text-text-muted font-medium italic opacity-80">{quote}</p>
         </div>
         <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto justify-end">
-          <button onClick={() => setView('weeklyplan')} className="flex px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-purple-500/10 text-purple-400 font-black text-xs sm:text-sm items-center gap-1.5 sm:gap-2 hover:bg-purple-500/20 transition-all border border-purple-500/20 shadow-sm">
-            <CalendarDays size={16} className="w-4 h-4 shrink-0" /> <span className="whitespace-nowrap">Plan</span><span className="hidden sm:inline">&nbsp;Week</span>
+          {/* Events / Calendar Icon */}
+          <button
+            onClick={() => setView('events')}
+            title="Scheduled Events"
+            className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 hover:bg-indigo-500/20 hover:border-indigo-500/30 transition-all active:scale-90 shadow-sm shrink-0 group"
+          >
+            <CalendarDays size={18} className="group-hover:scale-110 transition-transform duration-200" />
           </button>
-          <button onClick={toggleTheme} className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-bg-card border border-border-light flex items-center justify-center text-text-main hover:bg-bg-input transition-all active:scale-90 shadow-sm shrink-0">
-            {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
+
+          {/* Theme Toggle */}
+          <button
+            onClick={toggleTheme}
+            title="Toggle theme"
+            className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-bg-card border border-border-light flex items-center justify-center text-text-main hover:bg-bg-input transition-all active:scale-90 shadow-sm shrink-0 group"
+          >
+            {theme === 'light'
+              ? <Moon size={18} className="group-hover:scale-110 transition-transform duration-200" />
+              : <Sun  size={18} className="group-hover:scale-110 transition-transform duration-200" />
+            }
           </button>
+
+          {/* Profile Avatar */}
           <div className="relative shrink-0">
-            <button onClick={() => setShowSignOut(!showSignOut)} className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-bg-dark-elem flex items-center justify-center text-text-inverted font-black text-lg hover:opacity-90 transition-all active:scale-90 shadow-md">
+            <button
+              onClick={() => setShowSignOut(!showSignOut)}
+              title="Account"
+              className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-bg-dark-elem flex items-center justify-center text-text-inverted font-black text-lg hover:opacity-90 transition-all active:scale-90 shadow-md"
+            >
               {initial}
             </button>
             {showSignOut && (
@@ -815,6 +947,9 @@ export const Dashboard = ({ setView }) => {
           <div className="hidden lg:block">
             <QuickThoughtsWidget />
           </div>
+
+          {/* Upcoming Scheduled Events Widget */}
+          <UpcomingEventsWidget setView={setView} />
 
           {/* Weekly Performance Widget */}
           <div className={activeDashboardTab === 'intel' ? 'block' : 'hidden lg:block'}>

@@ -17,6 +17,7 @@ const NotesPage = React.lazy(() => import('./components/NotesPage').then(m => ({
 const AuthPage = React.lazy(() => import('./components/AuthPage').then(m => ({ default: m.AuthPage })));
 const ProfilePage = React.lazy(() => import('./components/ProfilePage').then(m => ({ default: m.ProfilePage })));
 const WeeklyPlan = React.lazy(() => import('./components/WeeklyPlan').then(m => ({ default: m.WeeklyPlan })));
+const ScheduledEvents = React.lazy(() => import('./components/ScheduledEvents').then(m => ({ default: m.ScheduledEvents })));
 
 // Premium fallback loading skeleton
 function ViewSkeleton() {
@@ -111,6 +112,7 @@ function AppInner() {
       case 'notes': return <NotesPage />;
       case 'focus': return <FocusMode />;
       case 'weeklyplan': return <WeeklyPlan />;
+      case 'events': return <ScheduledEvents />;
       case 'profile': return <ProfilePage />;
       default: return <Dashboard setView={setCurrentView} />;
     }

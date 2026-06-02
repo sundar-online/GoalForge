@@ -59,7 +59,8 @@ const STORAGE_KEYS = {
   NOTES: 'goalforge_notes',
   XP: 'goalforge_xp',
   MEMORIES: 'goalforge_memories',
-  QUICK_THOUGHTS: 'goalforge_quick_thoughts'
+  QUICK_THOUGHTS: 'goalforge_quick_thoughts',
+  SCHEDULED_EVENTS: 'goalforge_scheduled_events'
 };
 
 const DEFAULT_XP_DATA = {
@@ -145,6 +146,7 @@ export const AppProvider = ({ children }) => {
   const [notes, setNotes] = useState(() => safeParse(STORAGE_KEYS.NOTES, []));
   const [memories, setMemories] = useState(() => safeParse(STORAGE_KEYS.MEMORIES, []));
   const [quickThoughts, setQuickThoughts] = useState(() => safeParse(STORAGE_KEYS.QUICK_THOUGHTS, []));
+  const [scheduledEvents, setScheduledEvents] = useState(() => safeParse(STORAGE_KEYS.SCHEDULED_EVENTS, []));
 
   const tasksRef = useRef([]);
   const notesRef = useRef([]);
@@ -385,6 +387,7 @@ export const AppProvider = ({ children }) => {
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.NOTES, JSON.stringify(notes)); }, [notes]);
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.XP, JSON.stringify(xpData)); }, [xpData]);
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.QUICK_THOUGHTS, JSON.stringify(quickThoughts)); }, [quickThoughts]);
+  useEffect(() => { localStorage.setItem(STORAGE_KEYS.SCHEDULED_EVENTS, JSON.stringify(scheduledEvents)); }, [scheduledEvents]);
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
     document.documentElement.setAttribute('data-theme', settings.theme || 'dark');
@@ -438,6 +441,7 @@ export const AppProvider = ({ children }) => {
       setNotes([]);
       setMemories([]);
       setQuickThoughts([]);
+      setScheduledEvents([]);
       setXpData(DEFAULT_XP_DATA);
       setSettings({
         theme: 'dark',
@@ -480,6 +484,7 @@ export const AppProvider = ({ children }) => {
     setNotes([]);
     setMemories([]);
     setQuickThoughts([]);
+    setScheduledEvents([]);
     setXpData(DEFAULT_XP_DATA);
     setSettings({
       theme: 'dark',
@@ -991,6 +996,34 @@ export const AppProvider = ({ children }) => {
         console.error('[Realtime Sync] Error in XP subscription:', error);
       });
       unsubscribes.push(unsubXp);
+
+      // 8.5 Subscribe to Scheduled Events Collection
+      const eventsQuery = query(collection(fireDb, 'users', user.id, 'scheduled_events'), orderBy('date', 'asc'));
+      const unsubEvents = onSnapshot(eventsQuery, { includeMetadataChanges: true }, (snapshot) => {
+        const updatedEvents = snapshot.docs.map(docSnap => {
+          const e = docSnap.data();
+          db.updateCache(`users/${user.id}/scheduled_events/${docSnap.id}`, e);
+          return {
+            id: docSnap.id,
+            title: e.title || '',
+            description: e.description || '',
+            date: e.date || '',
+            time: e.time || '',
+            category: e.category || 'general',
+            color: e.color || 'blue',
+            reminderEnabled: e.reminder_enabled ?? false,
+            reminderMinutes: e.reminder_minutes ?? 30,
+            linkedGoalId: e.linked_goal_id || null,
+            completed: e.completed ?? false,
+            createdAt: e.created_at || new Date().toISOString(),
+            syncPending: docSnap.metadata.hasPendingWrites,
+          };
+        });
+        setScheduledEvents(updatedEvents);
+      }, (error) => {
+        console.error('[Realtime Sync] Error in Scheduled Events subscription:', error);
+      });
+      unsubscribes.push(unsubEvents);
 
       // 8. Subscribe to Memories Collection
       const memoriesQuery = query(collection(fireDb, 'users', user.id, 'memories'), orderBy('createdAt', 'desc'));
@@ -3010,6 +3043,44 @@ export const AppProvider = ({ children }) => {
   }, [loading, taskLogs, goals, tasks]);
 
   // ── Weekly Intentions ──────────────────────────────────────────
+  // ── Scheduled Events CRUD ──────────────────────────────────
+  const addScheduledEvent = async (eventData) => {
+    const eventId = Date.now().toString();
+    const newEvent = {
+      ...eventData,
+      id: eventId,
+      completed: false,
+      createdAt: new Date().toISOString(),
+    };
+    setScheduledEvents(prev => [...prev, newEvent].sort((a, b) => a.date.localeCompare(b.date) || (a.time || '').localeCompare(b.time || '')));
+    if (user) {
+      try { await db.upsertScheduledEvent(user.id, newEvent); }
+      catch (err) { console.error('[Sync] Failed to add scheduled event:', err); }
+    }
+  };
+
+  const updateScheduledEvent = async (id, updates) => {
+    setScheduledEvents(prev =>
+      prev.map(e => (e.id === id ? { ...e, ...updates } : e))
+          .sort((a, b) => a.date.localeCompare(b.date) || (a.time || '').localeCompare(b.time || ''))
+    );
+    if (user) {
+      const target = scheduledEvents.find(e => e.id === id);
+      if (target) {
+        try { await db.upsertScheduledEvent(user.id, { ...target, ...updates, id }); }
+        catch (err) { console.error('[Sync] Failed to update scheduled event:', err); }
+      }
+    }
+  };
+
+  const deleteScheduledEvent = async (id) => {
+    setScheduledEvents(prev => prev.filter(e => e.id !== id));
+    if (user) {
+      try { await db.deleteScheduledEventDb(user.id, id); }
+      catch (err) { console.error('[Sync] Failed to delete scheduled event:', err); }
+    }
+  };
+
   const saveWeeklyIntention = useCallback((weekKey, intentionText) => {
     setSettings(prev => ({
       ...prev,
@@ -3088,6 +3159,8 @@ export const AppProvider = ({ children }) => {
     memories, addMemory, deleteMemory,
     // Quick Thoughts
     quickThoughts, addQuickThought, updateQuickThought, deleteQuickThought,
+    // Scheduled Events
+    scheduledEvents, addScheduledEvent, updateScheduledEvent, deleteScheduledEvent,
     completedGoalForCelebration, setCompletedGoalForCelebration,
     clearProfileData
   };

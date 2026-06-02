@@ -3,12 +3,13 @@ import { Home, Target, CalendarCheck, Timer, StickyNote, Award } from 'lucide-re
 import { useAppContext } from '../context/AppContext';
 
 const NAV = [
-  { id: 'dashboard', icon: Home, label: 'Home' },
-  { id: 'goals', icon: Target, label: 'Goals' },
-  { id: 'tasks', icon: CalendarCheck, label: 'Tasks' },
-  { id: 'notes', icon: StickyNote, label: 'Notes' },
-  { id: 'focus', icon: Timer, label: 'Focus' },
+  { id: 'dashboard', icon: Home,         label: 'Home'  },
+  { id: 'goals',     icon: Target,        label: 'Goals' },
+  { id: 'tasks',     icon: CalendarCheck, label: 'Tasks' },
+  { id: 'notes',     icon: StickyNote,    label: 'Notes' },
+  { id: 'focus',     icon: Timer,         label: 'Focus' },
 ];
+
 
 export const Layout = ({ children, currentView, setView }) => {
   const { goals } = useAppContext();

@@ -1077,3 +1077,35 @@ export async function fetchRecurringHistory(userId) {
     return null;
   }
 }
+
+// ── Scheduled Events ───────────────────────────────────
+export async function upsertScheduledEvent(userId, event) {
+  const payload = {
+    title: event.title || '',
+    description: event.description || '',
+    date: event.date || '',
+    time: event.time || '',
+    category: event.category || 'general',
+    color: event.color || 'blue',
+    reminder_enabled: event.reminderEnabled ?? false,
+    reminder_minutes: event.reminderMinutes ?? 30,
+    linked_goal_id: event.linkedGoalId || null,
+    completed: event.completed ?? false,
+    created_at: event.createdAt || new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+  const pathKey = `users/${userId}/scheduled_events/${event.id}`;
+  const docRef = userDoc(userId, 'scheduled_events', event.id);
+  return smartWrite(docRef, payload, pathKey, false, 1000);
+}
+
+export async function deleteScheduledEventDb(userId, eventId) {
+  try {
+    debugLog(`Write START: deleteScheduledEventDb [id=${eventId}]`);
+    invalidateCache(`users/${userId}/scheduled_events/${eventId}`);
+    await deleteDoc(userDoc(userId, 'scheduled_events', eventId));
+    debugLog(`Write SUCCESS: deleteScheduledEventDb [id=${eventId}]`);
+  } catch (err) {
+    errorLog(`Write FAILURE: deleteScheduledEventDb [id=${eventId}]`, err);
+  }
+}
