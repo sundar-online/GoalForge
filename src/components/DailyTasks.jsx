@@ -18,7 +18,7 @@ const TYPE_LABELS = { time: 'Time', check: 'Check', count: 'Count' };
 
 // ── Log Time Modal ──────────────────────────────────────────
 const LogTaskTimeModal = ({ task, onClose, logTaskTime }) => {
-  const [mins, setMins] = useState(25);
+  const [mins, setMins] = useState(task.targetTime || 15);
   const submit = () => { logTaskTime(task.id, mins); onClose(); };
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[200] p-4 backdrop-blur-sm" onClick={onClose}>
@@ -27,10 +27,10 @@ const LogTaskTimeModal = ({ task, onClose, logTaskTime }) => {
         <p className="text-sm text-text-muted font-bold mb-6">{task.title}</p>
         <p className="text-[10px] font-black text-text-muted uppercase tracking-widest mb-3">Minutes Spent</p>
         <div className="flex items-center gap-4 mb-8">
-          <button type="button" onClick={() => setMins(m => Math.max(1, m - 5))}
+          <button type="button" onClick={() => setMins(m => Math.max(1, m - 1))}
             className="w-12 h-12 rounded-xl bg-bg-input text-text-main text-2xl font-black hover:bg-bg-input/80 transition-colors">−</button>
           <span className="flex-1 text-center text-5xl font-black text-text-main tracking-tighter">{mins}</span>
-          <button type="button" onClick={() => setMins(m => m + 5)}
+          <button type="button" onClick={() => setMins(m => m + 1)}
             className="w-12 h-12 rounded-xl bg-bg-input text-text-main text-2xl font-black hover:bg-bg-input/80 transition-colors">+</button>
         </div>
         <div className="grid grid-cols-2 gap-3">

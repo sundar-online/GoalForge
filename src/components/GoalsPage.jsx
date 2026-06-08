@@ -351,7 +351,7 @@ const EditGoalSystemModal = ({ goal, onClose, onSave, allGoals }) => {
 
 // ── Log Time Modal ──────────────────────────────────────────
 const LogTimeModal = ({ habit, goalId, onClose, logHabitTime }) => {
-  const [mins, setMins] = useState(15);
+  const [mins, setMins] = useState(habit.targetTime || 15);
   const submit = () => { logHabitTime(goalId, habit.id, mins); onClose(); };
 
   return (
@@ -361,10 +361,10 @@ const LogTimeModal = ({ habit, goalId, onClose, logHabitTime }) => {
         <p className="text-sm text-text-muted font-bold mb-6">{habit.title}</p>
         <p className="text-[10px] font-black text-text-muted uppercase tracking-widest mb-3">Minutes Spent</p>
         <div className="flex items-center gap-4 mb-8">
-          <button onClick={() => setMins(m => Math.max(1, m - 5))}
+          <button onClick={() => setMins(m => Math.max(1, m - 1))}
             className="w-12 h-12 rounded-xl bg-bg-input text-text-main text-2xl font-black hover:bg-bg-input/80 transition-colors">−</button>
           <span className="flex-1 text-center text-5xl font-black text-text-main tracking-tighter">{mins}</span>
-          <button onClick={() => setMins(m => m + 5)}
+          <button onClick={() => setMins(m => m + 1)}
             className="w-12 h-12 rounded-xl bg-bg-input text-text-main text-2xl font-black hover:bg-bg-input/80 transition-colors">+</button>
         </div>
         <div className="grid grid-cols-2 gap-3">

@@ -586,6 +586,50 @@ export async function upsertFocusHistory(userId, date, seconds) {
   return smartWrite(docRef, payload, pathKey, false, 3000);
 }
 
+// ── Focus Sessions ─────────────────────────────────────
+export async function fetchFocusSessions(userId) {
+  try {
+    const snap = await getDocs(userCol(userId, 'focus_sessions'));
+    const sessions = [];
+    snap.docs.forEach(d => {
+      const data = d.data();
+      const pathKey = `users/${userId}/focus_sessions/${d.id}`;
+      writeCache.set(pathKey, cleanPayload(data)); // Prime values in cache
+      sessions.push({
+        id: d.id,
+        title: data.title,
+        duration: data.duration,
+        goalTitle: data.goalTitle,
+        date: data.date,
+        timestamp: data.timestamp,
+        goalId: data.goalId || 'standalone',
+        itemId: data.itemId || 'standalone'
+      });
+    });
+    return sessions;
+  } catch (err) {
+    log('fetchFocusSessions', err);
+    return [];
+  }
+}
+
+export async function upsertFocusSession(userId, session) {
+  const payload = {
+    id: session.id,
+    title: session.title,
+    duration: session.duration,
+    goalTitle: session.goalTitle,
+    date: session.date,
+    timestamp: session.timestamp,
+    goalId: session.goalId || 'standalone',
+    itemId: session.itemId || 'standalone',
+    updated_at: new Date().toISOString()
+  };
+  const pathKey = `users/${userId}/focus_sessions/${session.id}`;
+  const docRef = userDoc(userId, 'focus_sessions', session.id);
+  return smartWrite(docRef, payload, pathKey, false, 3000);
+}
+
 // ── Task Logs ──────────────────────────────────────────
 export async function fetchTaskLogs(userId) {
   try {
@@ -903,6 +947,13 @@ export async function clearUserDataDb(userId) {
     focusHistorySnap.docs.forEach(f => {
       invalidateCache(`users/${userId}/focus_history/${f.id}`);
       batch.delete(f.ref);
+    });
+
+    // 4b. Delete all focus_sessions
+    const focusSessionsSnap = await getDocs(userCol(userId, 'focus_sessions'));
+    focusSessionsSnap.docs.forEach(s => {
+      invalidateCache(`users/${userId}/focus_sessions/${s.id}`);
+      batch.delete(s.ref);
     });
 
     // 5. Delete all memories

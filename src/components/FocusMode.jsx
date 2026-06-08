@@ -81,7 +81,7 @@ const triggerCompletionHaptics = () => {
 export const FocusMode = () => {
   const { goals = [] } = useGoals();
   const { tasks = [] } = useTasks();
-  const { focusTime, addFocusTimeToHabit } = useFocus();
+  const { focusTime, addFocusTimeToHabit, sessionLogs, logFocusSession } = useFocus();
   const { awardFocusXP } = useGamification();
   const todayStr = TODAY();
 
@@ -130,17 +130,6 @@ export const FocusMode = () => {
   // ── Show Stats & Completed Ledgers ──────────────────────────────────
   const [showCelebration, setShowCelebration] = useState(false);
   const [celebrationDetails, setCelebrationDetails] = useState(null);
-  const [sessionLogs, setSessionLogs] = useState(() => {
-    try {
-      const saved = localStorage.getItem('gf_focus_completed_sessions');
-      if (!saved) return [];
-      const parsed = JSON.parse(saved);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch (e) {
-      console.error('Focus logs parse error:', e);
-      return [];
-    }
-  });
 
   const timerIntervalRef = useRef(null);
 
@@ -430,18 +419,15 @@ export const FocusMode = () => {
     }
 
     // 6. Log Session Detail to persistent history
-    const newSession = {
-      id: Date.now().toString(),
+    logFocusSession({
       title: routineTitle,
       duration: minsCompleted,
       goalTitle: selectedGoal ? selectedGoal.title : (isDailyTaskMode ? 'Daily Routine' : 'Standalone'),
       date: todayStr,
-      timestamp: Date.now()
-    };
-
-    const updatedSessions = [newSession, ...sessionLogs];
-    setSessionLogs(updatedSessions);
-    localStorage.setItem('gf_focus_completed_sessions', JSON.stringify(updatedSessions));
+      timestamp: Date.now(),
+      goalId: selectedGoalId || 'standalone',
+      itemId: selectedHabitId || 'standalone'
+    });
 
     // 7. Open beautiful completion celebration overlay
     setCelebrationDetails({

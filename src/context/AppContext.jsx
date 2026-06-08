@@ -68,7 +68,8 @@ const STORAGE_KEYS = {
   XP: 'goalforge_xp',
   MEMORIES: 'goalforge_memories',
   QUICK_THOUGHTS: 'goalforge_quick_thoughts',
-  SCHEDULED_EVENTS: 'goalforge_scheduled_events'
+  SCHEDULED_EVENTS: 'goalforge_scheduled_events',
+  COMPLETED_SESSIONS: 'gf_focus_completed_sessions'
 };
 
 const DEFAULT_XP_DATA = {
@@ -155,6 +156,7 @@ export const AppProvider = ({ children }) => {
   const [memories, setMemories] = useState(() => safeParse(STORAGE_KEYS.MEMORIES, []));
   const [quickThoughts, setQuickThoughts] = useState(() => safeParse(STORAGE_KEYS.QUICK_THOUGHTS, []));
   const [scheduledEvents, setScheduledEvents] = useState(() => safeParse(STORAGE_KEYS.SCHEDULED_EVENTS, []));
+  const [sessionLogs, setSessionLogs] = useState(() => safeParse(STORAGE_KEYS.COMPLETED_SESSIONS, []));
 
   const tasksRef = useRef([]);
   const notesRef = useRef([]);
@@ -458,6 +460,7 @@ export const AppProvider = ({ children }) => {
       setMemories([]);
       setQuickThoughts([]);
       setScheduledEvents([]);
+      setSessionLogs([]);
       setXpData(DEFAULT_XP_DATA);
       setSettings({
         theme: 'dark',
@@ -484,6 +487,7 @@ export const AppProvider = ({ children }) => {
       localStorage.removeItem(STORAGE_KEYS.XP);
       localStorage.removeItem(STORAGE_KEYS.MEMORIES);
       localStorage.removeItem(STORAGE_KEYS.QUICK_THOUGHTS);
+      localStorage.removeItem(STORAGE_KEYS.COMPLETED_SESSIONS);
       localStorage.removeItem('gf_recurring_history');
       localStorage.removeItem('gf_deleted_goal_ids');
       localStorage.removeItem('gf_deleted_habit_ids');
@@ -501,6 +505,7 @@ export const AppProvider = ({ children }) => {
     setMemories([]);
     setQuickThoughts([]);
     setScheduledEvents([]);
+    setSessionLogs([]);
     setXpData(DEFAULT_XP_DATA);
     setSettings({
       theme: 'dark',
@@ -929,6 +934,31 @@ export const AppProvider = ({ children }) => {
         console.error('[Realtime Sync] Error in Focus History subscription:', error);
       });
       unsubscribes.push(unsubFocus);
+
+      // 5b. Subscribe to Focus Sessions Collection
+      const sessionsQuery = collection(fireDb, 'users', user.id, 'focus_sessions');
+      const unsubSessions = onSnapshot(sessionsQuery, (snapshot) => {
+        const sessions = [];
+        snapshot.docs.forEach(doc => {
+          const fd = doc.data();
+          db.updateCache(`users/${user.id}/focus_sessions/${doc.id}`, fd);
+          sessions.push({
+            id: doc.id,
+            title: fd.title,
+            duration: fd.duration,
+            goalTitle: fd.goalTitle,
+            date: fd.date,
+            timestamp: fd.timestamp,
+            goalId: fd.goalId || 'standalone',
+            itemId: fd.itemId || 'standalone'
+          });
+        });
+        sessions.sort((a, b) => b.timestamp - a.timestamp);
+        setSessionLogs(sessions);
+      }, (error) => {
+        console.error('[Realtime Sync] Error in Focus Sessions subscription:', error);
+      });
+      unsubscribes.push(unsubSessions);
 
       // 6. Subscribe to User Settings document
       const settingsDocRef = doc(fireDb, 'users', user.id, 'settings', 'preferences');
@@ -1881,7 +1911,7 @@ export const AppProvider = ({ children }) => {
 
   const logHabitTime = (goalId, habitId, minutes) => {
     console.log(`%c[Diagnostic Log] ACTION START: logHabitTime [goalId=${goalId}, habitId=${habitId}, minutes=${minutes}]`, 'color: #3b82f6; font-weight: bold;');
-    const goal = goals.find(g => g.id === goalId);
+    const goal = goalsRef.current.find(g => g.id === goalId);
     if (!goal) {
       console.warn(`[Diagnostic Log] Goal ${goalId} not found for logHabitTime.`);
       return;
@@ -2328,7 +2358,8 @@ export const AppProvider = ({ children }) => {
       completedDates: sanitizedDates,
       lastCompletedDate: newLastCompleted,
       missedDays: calculateConsecutiveMissedDays(sanitizedDates, []),
-      lastActiveDate: today
+      lastActiveDate: today,
+      createdAt: new Date().toISOString()
     };
     setTasks(prev => [newT, ...prev]);
     if (user) {
@@ -2566,7 +2597,7 @@ export const AppProvider = ({ children }) => {
 
   const logTaskTime = (id, mins) => {
     console.log(`%c[Diagnostic Log] ACTION START: logTaskTime [taskId=${id}, mins=${mins}]`, 'color: #3b82f6; font-weight: bold;');
-    const t = tasks.find(item => item.id === id);
+    const t = tasksRef.current.find(item => item.id === id);
     if (!t) {
       console.warn(`[Diagnostic Log] Task ${id} not found for logTaskTime.`);
       return;
@@ -2671,6 +2702,64 @@ export const AppProvider = ({ children }) => {
     if (goalId && habitId) {
       if (goalId === 'DAILY_TASK') logTaskTime(habitId, mins);
       else logHabitTime(goalId, habitId, mins);
+    }
+  };
+
+  const logFocusSession = async (session) => {
+    const dateStr = session.date;
+    const goalId = session.goalId || 'standalone';
+    const itemId = session.itemId || 'standalone';
+    const logId = session.id || (session.itemId && session.itemId !== 'standalone'
+      ? `${dateStr}_${goalId}_${itemId}`
+      : `${dateStr}_standalone_${session.title.replace(/\s+/g, '_')}`);
+
+    let finalSession = null;
+    const existingIdx = sessionLogs.findIndex(s => s.id === logId);
+    let updatedLogs = [];
+
+    if (existingIdx > -1) {
+      const existing = sessionLogs[existingIdx];
+      finalSession = {
+        ...existing,
+        duration: existing.duration + session.duration,
+        timestamp: session.timestamp || Date.now()
+      };
+      updatedLogs = sessionLogs.map((s, idx) => idx === existingIdx ? finalSession : s);
+    } else {
+      finalSession = {
+        ...session,
+        id: logId,
+        goalId,
+        itemId
+      };
+      updatedLogs = [finalSession, ...sessionLogs];
+    }
+
+    setSessionLogs(updatedLogs);
+    localStorage.setItem(STORAGE_KEYS.COMPLETED_SESSIONS, JSON.stringify(updatedLogs));
+
+    // Update settings focusTimeToday state as well, to keep legacy code in sync
+    const todaySessions = updatedLogs.filter(s => s.date === dateStr);
+    const newTotalSecondsToday = todaySessions.reduce((acc, s) => acc + s.duration * 60, 0);
+
+    setSettings(prev => ({
+      ...prev,
+      focusTimeToday: newTotalSecondsToday
+    }));
+
+    if (user) {
+      try {
+        await db.upsertFocusSession(user.id, finalSession);
+        await db.upsertFocusHistory(user.id, dateStr, newTotalSecondsToday);
+        // Also sync userSettings to keep theme and focusTimeToday updated
+        await db.upsertUserSettings(user.id, {
+          theme: settings.theme,
+          focusTimeToday: newTotalSecondsToday,
+          lastReset: settings.lastActiveDate
+        });
+      } catch (err) {
+        console.error('[Firestore Sync] Failed to upsert focus session/history:', err);
+      }
     }
   };
 
@@ -2857,6 +2946,7 @@ export const AppProvider = ({ children }) => {
       setTaskLogs({});
       setMemories([]);
       setQuickThoughts([]);
+      setSessionLogs([]);
       setAiInsights([]);
       setRecoveryStrategies([]);
       setSmartSuggestions(null);
@@ -2885,6 +2975,7 @@ export const AppProvider = ({ children }) => {
       localStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify({}));
       localStorage.setItem(STORAGE_KEYS.MEMORIES, JSON.stringify([]));
       localStorage.setItem(STORAGE_KEYS.QUICK_THOUGHTS, JSON.stringify([]));
+      localStorage.setItem(STORAGE_KEYS.COMPLETED_SESSIONS, JSON.stringify([]));
       localStorage.setItem(STORAGE_KEYS.XP, JSON.stringify(DEFAULT_XP_DATA));
       localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify({
         theme: settings.theme || 'dark',
@@ -3139,6 +3230,7 @@ export const AppProvider = ({ children }) => {
 
   const focusValue = {
     focusTime, focusHistory, addFocusTime, addFocusTimeToHabit,
+    sessionLogs, logFocusSession,
     theme, toggleTheme, settings, saveWeeklyIntention,
     loading, syncError, retrySync: syncFromCloud
   };
@@ -3170,6 +3262,7 @@ export const AppProvider = ({ children }) => {
     addHabit, deleteHabit, logHabitTime, toggleHabitCheck, updateHabitCount, updateHabitReminder,
     tasks, addTask, updateTask, deleteTask, logTaskTime, toggleTaskComplete, updateTaskCount,
     focusTime, focusHistory, addFocusTime, addFocusTimeToHabit,
+    sessionLogs, logFocusSession,
     theme, toggleTheme,
     accuracy, alerts, weeklyReport, disciplineScore, userLevel, insights: getInsights(accuracy, avgStreak, focusTime),
     notes, addNote, updateNote, deleteNote,

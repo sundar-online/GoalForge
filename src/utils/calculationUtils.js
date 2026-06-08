@@ -7,13 +7,20 @@ const DAY_ABBRS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
  * Helper to normalize any createdAt / created_at date field to YYYY-MM-DD
  * Supports native Firestore Timestamps, serialized objects, JS Dates, and strings.
  */
+const toLocalYYYYMMDD = (d) => {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 export const normalizeDateStr = (dateVal, fallbackDateStr = null) => {
   if (!dateVal) return fallbackDateStr;
 
   // 1. If it's a Firestore Timestamp instance (or has .toDate function)
   if (typeof dateVal.toDate === 'function') {
     try {
-      return dateVal.toDate().toISOString().split('T')[0];
+      return toLocalYYYYMMDD(dateVal.toDate());
     } catch (e) {
       console.warn('[normalizeDateStr] failed to convert with toDate():', e);
     }
@@ -21,12 +28,12 @@ export const normalizeDateStr = (dateVal, fallbackDateStr = null) => {
 
   // 2. If it's a JS Date instance
   if (dateVal instanceof Date) {
-    return dateVal.toISOString().split('T')[0];
+    return toLocalYYYYMMDD(dateVal);
   }
 
   // 3. If it's an object with seconds property (like serialized Timestamp)
   if (dateVal && typeof dateVal === 'object' && typeof dateVal.seconds === 'number') {
-    return new Date(dateVal.seconds * 1000).toISOString().split('T')[0];
+    return toLocalYYYYMMDD(new Date(dateVal.seconds * 1000));
   }
 
   // 4. Fallback: string manipulation
@@ -34,6 +41,12 @@ export const normalizeDateStr = (dateVal, fallbackDateStr = null) => {
     const str = String(dateVal);
     if (str.includes('[object Object]')) {
       return fallbackDateStr;
+    }
+    if (str.includes('T')) {
+      const d = new Date(str);
+      if (!isNaN(d.getTime())) {
+        return toLocalYYYYMMDD(d);
+      }
     }
     return str.includes('T') ? str.split('T')[0] : str;
   } catch {
