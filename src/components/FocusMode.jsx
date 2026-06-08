@@ -401,6 +401,9 @@ export const FocusMode = () => {
 
   // ── COMPLETION LOGIC ────────────────────────────────────────────────
   const handleTimerCompletion = (minsCompleted, completedInBackground = false) => {
+    // Cancel any scheduled or active timer completion notification
+    cancelTimerNotification();
+
     // 1. Reset timer state locally
     setTimerState('idle');
     setStartTime(null);

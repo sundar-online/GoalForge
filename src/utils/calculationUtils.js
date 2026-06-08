@@ -4,6 +4,44 @@ import { TODAY, addDays, diffDays, parseLocalDate } from './dateUtils';
 const DAY_ABBRS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 /**
+ * Helper to normalize any createdAt / created_at date field to YYYY-MM-DD
+ * Supports native Firestore Timestamps, serialized objects, JS Dates, and strings.
+ */
+export const normalizeDateStr = (dateVal, fallbackDateStr = null) => {
+  if (!dateVal) return fallbackDateStr;
+
+  // 1. If it's a Firestore Timestamp instance (or has .toDate function)
+  if (typeof dateVal.toDate === 'function') {
+    try {
+      return dateVal.toDate().toISOString().split('T')[0];
+    } catch (e) {
+      console.warn('[normalizeDateStr] failed to convert with toDate():', e);
+    }
+  }
+
+  // 2. If it's a JS Date instance
+  if (dateVal instanceof Date) {
+    return dateVal.toISOString().split('T')[0];
+  }
+
+  // 3. If it's an object with seconds property (like serialized Timestamp)
+  if (dateVal && typeof dateVal === 'object' && typeof dateVal.seconds === 'number') {
+    return new Date(dateVal.seconds * 1000).toISOString().split('T')[0];
+  }
+
+  // 4. Fallback: string manipulation
+  try {
+    const str = String(dateVal);
+    if (str.includes('[object Object]')) {
+      return fallbackDateStr;
+    }
+    return str.includes('T') ? str.split('T')[0] : str;
+  } catch {
+    return fallbackDateStr;
+  }
+};
+
+/**
  * Returns true if the habit is scheduled for today (or has no schedule = every day).
  */
 export const isHabitScheduledToday = (h) => {
@@ -315,10 +353,7 @@ export const calculateStreakFromHistory = (completedDates, scheduleDays = [], cr
 
   // Clamp startDaysAgo to the habit's creation date to prevent inflated streaks
   // from before the habit existed. createdAt bounds the earliest evaluation point.
-  let createdDateStr = null;
-  if (createdAt) {
-    createdDateStr = String(createdAt).includes('T') ? String(createdAt).split('T')[0] : String(createdAt);
-  }
+  const createdDateStr = normalizeDateStr(createdAt, null);
   const createdDiff = createdDateStr ? diffDays(todayStr, createdDateStr) : diff;
   const startDaysAgo = Math.min(1000, Math.max(365, diff, createdDiff));
 
@@ -359,14 +394,7 @@ export const calculateStreakFromHistory = (completedDates, scheduleDays = [], cr
   return streak;
 };
 
-/**
- * Helper to normalize any createdAt / created_at date field to YYYY-MM-DD
- */
-const normalizeDateStr = (dateVal, fallbackDateStr) => {
-  if (!dateVal) return fallbackDateStr;
-  const str = String(dateVal);
-  return str.includes('T') ? str.split('T')[0] : str;
-};
+// (normalizeDateStr is now defined and exported at the top of the file)
 
 /**
  * Derives the exact list of completed dates for a Goal based on its habits' histories.
@@ -381,8 +409,8 @@ export const recalculateGoalCompletedDates = (goal) => {
   const todayStr = TODAY();
   datesToTest.add(todayStr);
 
-  let startStr = goal.startDate || goal.createdAt || todayStr;
-  if (startStr.includes('T')) startStr = startStr.split('T')[0];
+  let startStr = goal.startDate || normalizeDateStr(goal.createdAt, todayStr);
+  startStr = normalizeDateStr(startStr, todayStr);
   if (allCompletedDates.length > 0) {
     const earliestHabitDate = [...allCompletedDates].sort()[0];
     if (earliestHabitDate < startStr) {
@@ -448,7 +476,7 @@ export const calculateConsecutiveMissedDays = (completedDates, scheduleDays = []
   if (!completedDates || completedDates.length === 0) return 0;
   const completedSet = new Set(completedDates);
   const todayStr = TODAY();
-  const createdStr = createdAt ? (createdAt.includes('T') ? createdAt.split('T')[0] : createdAt) : null;
+  const createdStr = normalizeDateStr(createdAt, null);
 
   let missed = 0;
   let checkDate = addDays(todayStr, -1);
@@ -482,7 +510,7 @@ export const calculateGoalConsecutiveMissedDays = (goalCompletedDates, scheduleD
   if (!goalCompletedDates || goalCompletedDates.length === 0) return 0;
   const completedSet = new Set(goalCompletedDates);
   const todayStr = TODAY();
-  const createdStr = goalCreatedAt ? (goalCreatedAt.includes('T') ? goalCreatedAt.split('T')[0] : goalCreatedAt) : null;
+  const createdStr = normalizeDateStr(goalCreatedAt, null);
 
   let missed = 0;
   let checkDate = addDays(todayStr, -1);
@@ -592,10 +620,9 @@ export const calculateGoalStreak = (completedDates, scheduleDays = []) => {
  */
 export const calculateOverallProgress = (g) => {
   if (!g) return 0;
-  let startStr = g.startDate || g.createdAt || TODAY();
-  if (startStr.includes('T')) startStr = startStr.split('T')[0];
-  let endStr = g.deadline || addDays(startStr, 30);
-  if (endStr.includes('T')) endStr = endStr.split('T')[0];
+  let startStr = g.startDate || normalizeDateStr(g.createdAt, TODAY());
+  startStr = normalizeDateStr(startStr, TODAY());
+  let endStr = normalizeDateStr(g.deadline || addDays(startStr, 30), TODAY());
 
   const totalDays = diffDays(startStr, endStr);
   const completedDays = (g.completedDates || []).length;
@@ -672,7 +699,7 @@ export const sanitizeAndValidateCompletedDates = (dates, createdAt, taskId, task
   }
 
   const todayStr = TODAY();
-  const createdStr = createdAt ? (createdAt.includes('T') ? createdAt.split('T')[0] : createdAt) : null;
+  const createdStr = normalizeDateStr(createdAt, null);
   const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
   
   const seen = new Set();

@@ -13,7 +13,8 @@
     "LocalNotifications": {
       "smallIcon": "ic_stat_icon_config_sample",
       "iconColor": "#4d7cff",
-      "sound": "default"
+      "sound": "default",
+      "presentationOptions": ["badge", "sound", "alert"]
     }
   }
 }
