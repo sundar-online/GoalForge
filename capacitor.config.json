@@ -8,5 +8,12 @@
   "server": {
     "androidScheme": "https",
     "hostname": "goal-forge-two.vercel.app"
+  },
+  "plugins": {
+    "LocalNotifications": {
+      "smallIcon": "ic_stat_icon_config_sample",
+      "iconColor": "#4d7cff",
+      "sound": "default"
+    }
   }
 }

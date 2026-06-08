@@ -328,6 +328,11 @@ body {
   padding-left: 1rem;
   padding-right: 1rem;
 
+  /* Smooth show/hide when modal-open class is added/removed */
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+
   /* Visual stability: use a translucent gradient so content peek is masked */
   background: linear-gradient(
     to top,
@@ -384,4 +389,30 @@ body {
   scrollbar-width: none;  /* Firefox */
 }
 
+/* ── Modal open state: hide bottom nav + prevent scroll ── */
+/* Applied via document.body.classList.add('modal-open')    */
+.modal-open .safe-bottom-nav-wrapper {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(100%);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.modal-open {
+  overflow: hidden;
+}
+
+/* ── Hide native date/time picker icons & make full input clickable ── */
+.date-input-no-icon::-webkit-calendar-picker-indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: auto;
+  height: auto;
+  background: transparent;
+  color: transparent;
+  cursor: pointer;
+}
 

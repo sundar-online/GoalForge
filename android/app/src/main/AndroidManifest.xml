@@ -27,10 +27,39 @@
             android:grantUriPermissions="true">
             <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" />
         </provider>
+
+        <!-- Broadcast receiver for scheduled local notifications (required by Capacitor LocalNotifications) -->
+        <receiver
+            android:name="com.capacitorjs.plugins.localnotifications.LocalNotificationRestoreReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.REBOOT" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+            </intent-filter>
+        </receiver>
     </application>
 
-    <!-- Permissions -->
+    <!-- ── Permissions ──────────────────────────────────────────────── -->
 
+    <!-- Network access -->
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Notifications: required on Android 13+ (API 33+) to show notifications -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- Wake Lock: prevents Android from killing the background alarm before it fires -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <!-- Reboot receiver: reschedules all pending notifications after device restart -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <!-- Exact Alarms: required for precise notification delivery on Android 12+ (API 31+) -->
+    <!-- Users may need to grant this via Settings > Apps > GoalForge > Alarms & Reminders -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+
+    <!-- Use Exact Alarm: Android 13+ (API 33+) alternative to SCHEDULE_EXACT_ALARM -->
+    <!-- This does NOT require user interaction — granted automatically if approved by Google Play -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+
 </manifest>

@@ -34,7 +34,15 @@ import { buildTaskLogSummary, hasTaskLogChanged } from '../utils/analyticsEngine
 import { getOrBuildRecDates, buildRecurringPayload, getRecId } from '../utils/recurringTaskEngine';
 
 import { XP_SOURCES, getLevelFromXP, evaluateBadges, getNewlyEarnedBadges, getBadgeById } from '../utils/gamificationEngine';
-import { scheduleLocalNotification, scheduleReminder, cancelReminder } from '../utils/notificationUtils';
+import {
+  scheduleLocalNotification,
+  scheduleReminder,
+  cancelReminder,
+  scheduleEventReminder,
+  cancelEventReminder,
+  initNotificationChannel,
+  setupNotificationListeners,
+} from '../utils/notificationUtils';
 import {
   analyzeUserBehavior,
   generateRecoveryStrategies,
@@ -415,6 +423,14 @@ export const AppProvider = ({ children }) => {
       setSyncError('Sync connection failed. Retrying in background.');
     }
   };
+
+  // ── One-time boot: initialize notification channel & listeners ──────────────
+  useEffect(() => {
+    // Run once on mount — sets up the Android notification channel (goalforge-reminders)
+    // with sound, vibration, and high importance, then attaches event listeners.
+    initNotificationChannel();
+    setupNotificationListeners();
+  }, []);
 
   // Reconnect listener to sync automatic retries when network transitions back to online
   useEffect(() => {
@@ -3060,6 +3076,10 @@ export const AppProvider = ({ children }) => {
       try { await db.upsertScheduledEvent(user.id, newEvent); }
       catch (err) { console.error('[Sync] Failed to add scheduled event:', err); }
     }
+    // Schedule local notification reminder for the new event
+    if (newEvent.reminderEnabled && newEvent.time) {
+      scheduleEventReminder(newEvent);
+    }
   };
 
   const updateScheduledEvent = async (id, updates) => {
@@ -3073,11 +3093,20 @@ export const AppProvider = ({ children }) => {
         try { await db.upsertScheduledEvent(user.id, { ...target, ...updates, id }); }
         catch (err) { console.error('[Sync] Failed to update scheduled event:', err); }
       }
+      // Re-schedule event reminder with updated data
+      const updatedEvent = { ...scheduledEvents.find(e => e.id === id), ...updates, id };
+      // Always cancel first to remove stale alarm
+      cancelEventReminder(id);
+      if (updatedEvent.reminderEnabled && updatedEvent.time && !updatedEvent.completed) {
+        scheduleEventReminder(updatedEvent);
+      }
     }
   };
 
   const deleteScheduledEvent = async (id) => {
     setScheduledEvents(prev => prev.filter(e => e.id !== id));
+    // Cancel the notification reminder for the deleted event
+    cancelEventReminder(id);
     if (user) {
       try { await db.deleteScheduledEventDb(user.id, id); }
       catch (err) { console.error('[Sync] Failed to delete scheduled event:', err); }

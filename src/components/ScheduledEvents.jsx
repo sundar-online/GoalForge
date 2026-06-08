@@ -10,11 +10,11 @@ import { TODAY } from '../utils/dateUtils';
 
 // ── Constants ──────────────────────────────────────────
 const REMINDER_OPTIONS = [
-  { value: 0,    label: 'At event time'  },
-  { value: 15,   label: '15 min before'  },
-  { value: 30,   label: '30 min before'  },
-  { value: 60,   label: '1 hour before'  },
-  { value: 1440, label: '1 day before'   },
+  { value: 0,    label: 'At time',    sublabel: 'On the dot'   },
+  { value: 15,   label: '15 min',     sublabel: 'Before'       },
+  { value: 30,   label: '30 min',     sublabel: 'Before'       },
+  { value: 60,   label: '1 hour',     sublabel: 'Before'       },
+  { value: 1440, label: '1 day',      sublabel: 'Before'       },
 ];
 
 const MONTHS       = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -103,7 +103,7 @@ function MiniCalendar({ selectedDate, onSelectDate, events }) {
   );
 }
 
-// ── Event Form Modal ────────────────────────────────────
+// ── Premium Event Form Modal ────────────────────────────
 function EventFormModal({ initialDate, editEvent, onSave, onClose, goals }) {
   const [title,           setTitle]           = useState(editEvent?.title           || '');
   const [description,     setDescription]     = useState(editEvent?.description     || '');
@@ -113,6 +113,12 @@ function EventFormModal({ initialDate, editEvent, onSave, onClose, goals }) {
   const [reminderMinutes, setReminderMinutes] = useState(editEvent?.reminderMinutes ?? 30);
   const [linkedGoalId,    setLinkedGoalId]    = useState(editEvent?.linkedGoalId    || '');
 
+  // Hide bottom nav while modal is open
+  React.useEffect(() => {
+    document.body.classList.add('modal-open');
+    return () => document.body.classList.remove('modal-open');
+  }, []);
+
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!title.trim() || !date) return;
@@ -120,107 +126,314 @@ function EventFormModal({ initialDate, editEvent, onSave, onClose, goals }) {
     onClose();
   };
 
+  const isEditing = !!editEvent;
+  const canSubmit = title.trim().length > 0 && !!date;
+
+  // Format chosen date for the display badge
+  const formattedDate = (() => {
+    if (!date) return 'Pick a date';
+    const [y, m, d] = date.split('-');
+    const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    const dt = new Date(date + 'T00:00:00');
+    return `${dayNames[dt.getDay()]}, ${parseInt(d)} ${MONTHS_SHORT[parseInt(m)-1]} ${y}`;
+  })();
+
   return (
-    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+    <div
+      className="fixed inset-0 z-[300] flex items-end sm:items-center justify-center"
+      role="dialog"
+      aria-modal="true"
+      aria-label={isEditing ? 'Edit Event' : 'Create New Event'}
+    >
+      {/* Backdrop */}
       <motion.div
-        initial={{ y: 60, opacity: 0 }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.2 }}
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        onClick={onClose}
+        aria-hidden="true"
+      />
+
+      {/* Sheet */}
+      <motion.div
+        initial={{ y: '100%', opacity: 0.8 }}
         animate={{ y: 0, opacity: 1 }}
-        exit={{ y: 60, opacity: 0 }}
-        transition={{ type: 'spring', stiffness: 400, damping: 32 }}
-        className="relative w-full sm:max-w-lg bg-bg-card rounded-t-[32px] sm:rounded-[32px] shadow-float border border-border-light p-6 sm:p-8 z-10 max-h-[90vh] overflow-y-auto"
+        exit={{ y: '100%', opacity: 0 }}
+        transition={{ type: 'spring', stiffness: 380, damping: 36, mass: 0.9 }}
+        className="relative w-full sm:max-w-lg bg-bg-card sm:rounded-[32px] rounded-t-[32px] shadow-float border border-border-light z-10 flex flex-col"
+        style={{ maxHeight: 'calc(100dvh - 2rem)' }}
       >
-        {/* Header */}
-        <div className="flex justify-between items-start mb-6">
-          <div>
-            <h2 className="text-xl font-black text-text-main tracking-tight">{editEvent ? 'Edit Event' : 'New Event'}</h2>
-            <p className="text-xs text-text-muted font-bold mt-0.5">Schedule your next milestone</p>
-          </div>
-          <button onClick={onClose} className="w-8 h-8 rounded-xl bg-bg-input flex items-center justify-center text-text-muted hover:text-text-main transition-colors">
-            <X size={16} />
-          </button>
+        {/* ── Drag handle (mobile) */}
+        <div className="flex justify-center pt-3 pb-1 sm:hidden">
+          <div className="w-10 h-1 rounded-full bg-border-med opacity-60" />
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Title */}
-          <div>
-            <label className="text-[10px] font-black text-text-muted uppercase tracking-widest block mb-1.5">Event Title *</label>
+        {/* ── Header ──────────────────────────────────── */}
+        <div className="px-6 pt-4 pb-5 border-b border-border-light/50 flex-shrink-0">
+          <div className="flex items-start justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-accent-blue/10 border border-accent-blue/20 flex items-center justify-center flex-shrink-0">
+                <CalendarDays size={18} className="text-accent-blue" />
+              </div>
+              <div>
+                <h2 className="text-lg font-black text-text-main tracking-tight leading-tight">
+                  {isEditing ? 'Edit Event' : 'New Event'}
+                </h2>
+                <p className="text-[11px] text-text-muted font-semibold mt-0.5">
+                  {isEditing ? 'Update event details' : 'Schedule your next milestone'}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="w-8 h-8 rounded-xl bg-bg-input flex items-center justify-center text-text-muted hover:text-text-main hover:bg-border-med transition-all active:scale-95 flex-shrink-0 ml-2"
+              aria-label="Close modal"
+            >
+              <X size={15} strokeWidth={2.5} />
+            </button>
+          </div>
+        </div>
+
+        {/* ── Scrollable Form Body ─────────────────────── */}
+        <form
+          id="event-form"
+          onSubmit={handleSubmit}
+          className="flex-1 overflow-y-auto overscroll-contain px-6 py-5 space-y-5"
+        >
+          {/* Event Title */}
+          <div className="space-y-2">
+            <label
+              htmlFor="event-title"
+              className="text-[10px] font-black text-text-muted uppercase tracking-widest flex items-center gap-1.5"
+            >
+              <span className="w-1 h-3 rounded-full bg-accent-blue inline-block" />
+              Event Title <span className="text-accent-blue">*</span>
+            </label>
             <input
-              type="text" value={title} onChange={e => setTitle(e.target.value)}
-              placeholder="What's happening?" maxLength={80} required autoFocus
-              className="w-full bg-bg-input border border-border-light rounded-2xl px-4 py-3 text-sm text-text-main font-bold placeholder:text-text-muted focus:outline-none focus:border-accent-blue/50 transition-colors"
+              id="event-title"
+              type="text"
+              value={title}
+              onChange={e => setTitle(e.target.value)}
+              placeholder="What's happening?"
+              maxLength={80}
+              required
+              autoFocus
+              aria-required="true"
+              className="w-full bg-bg-input border-2 border-border-light rounded-2xl px-4 py-3.5 text-sm text-text-main font-bold placeholder:text-text-muted placeholder:font-normal focus:outline-none focus:border-accent-blue/60 focus:bg-accent-blue/5 transition-all"
             />
           </div>
 
           {/* Description */}
-          <div>
-            <label className="text-[10px] font-black text-text-muted uppercase tracking-widest block mb-1.5">Description</label>
+          <div className="space-y-2">
+            <label
+              htmlFor="event-description"
+              className="text-[10px] font-black text-text-muted uppercase tracking-widest flex items-center gap-1.5"
+            >
+              <span className="w-1 h-3 rounded-full bg-border-med inline-block" />
+              Description
+            </label>
             <textarea
-              value={description} onChange={e => setDescription(e.target.value)}
-              placeholder="Add details (optional)" rows={2} maxLength={300}
-              className="w-full bg-bg-input border border-border-light rounded-2xl px-4 py-3 text-sm text-text-main font-bold placeholder:text-text-muted focus:outline-none focus:border-accent-blue/50 transition-colors resize-none"
+              id="event-description"
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              placeholder="Add details (optional)"
+              rows={2}
+              maxLength={300}
+              className="w-full bg-bg-input border-2 border-border-light rounded-2xl px-4 py-3.5 text-sm text-text-main font-bold placeholder:text-text-muted placeholder:font-normal focus:outline-none focus:border-accent-blue/60 focus:bg-accent-blue/5 transition-all resize-none"
             />
           </div>
 
-          {/* Date + Time */}
+          {/* Date + Time row */}
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-[10px] font-black text-text-muted uppercase tracking-widest block mb-1.5">Date *</label>
-              <input type="date" value={date} onChange={e => setDate(e.target.value)} required
-                className="w-full bg-bg-input border border-border-light rounded-2xl px-4 py-3 text-sm text-text-main font-bold focus:outline-none focus:border-accent-blue/50 transition-colors"
-              />
+            {/* Date */}
+            <div className="space-y-2">
+              <label
+                htmlFor="event-date"
+                className="text-[10px] font-black text-text-muted uppercase tracking-widest flex items-center gap-1.5"
+              >
+                <CalendarDays size={10} className="text-text-muted" />
+                Date <span className="text-accent-blue">*</span>
+              </label>
+              <div className="relative">
+                <input
+                  id="event-date"
+                  type="date"
+                  value={date}
+                  onChange={e => setDate(e.target.value)}
+                  required
+                  aria-required="true"
+                  className="w-full bg-bg-input border-2 border-border-light rounded-2xl px-4 py-3.5 pr-10 text-sm text-text-main font-bold focus:outline-none focus:border-accent-blue/60 focus:bg-accent-blue/5 transition-all appearance-none date-input-no-icon"
+                />
+                <CalendarDays size={15} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
+              </div>
             </div>
-            <div>
-              <label className="text-[10px] font-black text-text-muted uppercase tracking-widest block mb-1.5">Time</label>
-              <input type="time" value={time} onChange={e => setTime(e.target.value)}
-                className="w-full bg-bg-input border border-border-light rounded-2xl px-4 py-3 text-sm text-text-main font-bold focus:outline-none focus:border-accent-blue/50 transition-colors"
-              />
+
+            {/* Time */}
+            <div className="space-y-2">
+              <label
+                htmlFor="event-time"
+                className="text-[10px] font-black text-text-muted uppercase tracking-widest flex items-center gap-1.5"
+              >
+                <Clock size={10} className="text-text-muted" />
+                Time
+              </label>
+              <div className="relative">
+                <input
+                  id="event-time"
+                  type="time"
+                  value={time}
+                  onChange={e => setTime(e.target.value)}
+                  className="w-full bg-bg-input border-2 border-border-light rounded-2xl px-4 py-3.5 pr-10 text-sm text-text-main font-bold focus:outline-none focus:border-accent-blue/60 focus:bg-accent-blue/5 transition-all appearance-none date-input-no-icon"
+                />
+                <Clock size={15} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
+              </div>
             </div>
           </div>
 
-          {/* Reminder toggle */}
-          <div className="flex items-center justify-between bg-bg-input/50 border border-border-light rounded-2xl px-4 py-3">
-            <div className="flex items-center gap-2">
-              {reminderEnabled ? <Bell size={16} className="text-accent-blue" /> : <BellOff size={16} className="text-text-muted" />}
-              <span className="text-sm font-bold text-text-main">Reminder</span>
+          {/* Selected date badge */}
+          {date && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-accent-blue/8 border border-accent-blue/15">
+              <div className="w-1.5 h-1.5 rounded-full bg-accent-blue animate-pulse flex-shrink-0" />
+              <p className="text-[11px] font-black text-accent-blue">{formattedDate}{time && ` · ${time}`}</p>
             </div>
-            <div className="flex items-center gap-3">
-              {reminderEnabled && (
-                <select value={reminderMinutes} onChange={e => setReminderMinutes(Number(e.target.value))}
-                  className="bg-bg-card border border-border-light rounded-xl px-2 py-1 text-xs font-bold text-text-main focus:outline-none"
-                >
-                  {REMINDER_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                </select>
-              )}
-              <button type="button" onClick={() => setReminderEnabled(p => !p)}
-                className={`w-10 h-5 rounded-full transition-all relative ${reminderEnabled ? 'bg-accent-blue' : 'bg-bg-input border border-border-light'}`}
+          )}
+
+          {/* Reminder Section */}
+          <div className="space-y-3">
+            {/* Toggle row */}
+            <div className="flex items-center justify-between bg-bg-input/60 border-2 border-border-light rounded-2xl px-4 py-3.5">
+              <div className="flex items-center gap-2.5">
+                <div className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all ${reminderEnabled ? 'bg-accent-blue/15' : 'bg-bg-input'}`}>
+                  {reminderEnabled
+                    ? <Bell size={15} className="text-accent-blue" />
+                    : <BellOff size={15} className="text-text-muted" />
+                  }
+                </div>
+                <div>
+                  <p className="text-sm font-black text-text-main leading-tight">Reminder</p>
+                  <p className="text-[10px] text-text-muted font-semibold">
+                    {reminderEnabled ? 'Will notify you before the event' : 'No notification set'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={reminderEnabled}
+                aria-label="Toggle reminder"
+                onClick={() => setReminderEnabled(p => !p)}
+                className={`relative w-12 h-6 rounded-full transition-all duration-300 flex-shrink-0 ${reminderEnabled ? 'bg-accent-blue shadow-md shadow-accent-blue/30' : 'bg-border-med'}`}
               >
-                <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${reminderEnabled ? 'left-5' : 'left-0.5'}`} />
+                <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-all duration-300 ${reminderEnabled ? 'left-6' : 'left-0.5'}`} />
               </button>
             </div>
+
+            {/* Reminder time pills */}
+            <AnimatePresence>
+              {reminderEnabled && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="overflow-hidden"
+                >
+                  <p className="text-[9px] font-black text-text-muted uppercase tracking-widest mb-2.5 px-1">
+                    Notify me
+                  </p>
+                  <div className="grid grid-cols-5 gap-1.5">
+                    {REMINDER_OPTIONS.map(opt => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => setReminderMinutes(opt.value)}
+                        aria-pressed={reminderMinutes === opt.value}
+                        className={`flex flex-col items-center justify-center py-2.5 px-1 rounded-xl border-2 transition-all active:scale-95 ${
+                          reminderMinutes === opt.value
+                            ? 'bg-accent-blue/10 border-accent-blue text-accent-blue shadow-sm shadow-accent-blue/10'
+                            : 'bg-bg-input border-border-light text-text-muted hover:border-border-med hover:text-text-main'
+                        }`}
+                      >
+                        <span className="text-[11px] font-black leading-tight">{opt.label}</span>
+                        <span className="text-[8px] font-bold opacity-70 leading-tight mt-0.5">{opt.sublabel}</span>
+                      </button>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
           {/* Goal link */}
           {goals && goals.length > 0 && (
-            <div>
-              <label className="text-[10px] font-black text-text-muted uppercase tracking-widest block mb-1.5">Link to Goal (optional)</label>
-              <select value={linkedGoalId} onChange={e => setLinkedGoalId(e.target.value)}
-                className="w-full bg-bg-input border border-border-light rounded-2xl px-4 py-3 text-sm text-text-main font-bold focus:outline-none focus:border-accent-blue/50 transition-colors"
+            <div className="space-y-2">
+              <label
+                htmlFor="event-goal"
+                className="text-[10px] font-black text-text-muted uppercase tracking-widest flex items-center gap-1.5"
               >
-                <option value="">No goal linked</option>
-                {goals.filter(g => !g.isMissingDream).map(g => (
-                  <option key={g.id} value={g.id}>{g.title}</option>
-                ))}
-              </select>
+                <Target size={10} className="text-text-muted" />
+                Link to Goal
+                <span className="text-text-muted/50 font-bold normal-case tracking-normal text-[9px]"> · optional</span>
+              </label>
+              <div className="relative">
+                <select
+                  id="event-goal"
+                  value={linkedGoalId}
+                  onChange={e => setLinkedGoalId(e.target.value)}
+                  className="w-full bg-bg-input border-2 border-border-light rounded-2xl px-4 py-3.5 text-sm text-text-main font-bold focus:outline-none focus:border-accent-blue/60 focus:bg-accent-blue/5 transition-all appearance-none cursor-pointer pr-10"
+                >
+                  <option value="">No goal linked</option>
+                  {goals.filter(g => !g.isMissingDream).map(g => (
+                    <option key={g.id} value={g.id}>{g.title}</option>
+                  ))}
+                </select>
+                <Target size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
+              </div>
             </div>
           )}
 
-          <button type="submit" disabled={!title.trim() || !date}
-            className="w-full py-3.5 rounded-2xl bg-accent-blue text-white font-black text-sm shadow-lg shadow-accent-blue/30 hover:opacity-90 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed mt-2"
-          >
-            {editEvent ? 'Save Changes' : 'Schedule Event'}
-          </button>
+          {/* Bottom padding so content clears the sticky footer */}
+          <div className="h-2" />
         </form>
+
+        {/* ── Sticky CTA Footer ──────────────────────── */}
+        <div className="flex-shrink-0 px-6 py-4 border-t border-border-light/50 bg-bg-card rounded-b-[32px]">
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-5 py-3.5 rounded-2xl bg-bg-input border border-border-light text-text-muted hover:text-text-main hover:bg-border-light text-xs font-black uppercase tracking-wider transition-all active:scale-95 flex-shrink-0"
+              aria-label="Cancel and close"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              form="event-form"
+              disabled={!canSubmit}
+              className={`flex-1 py-3.5 rounded-2xl font-black text-sm uppercase tracking-widest transition-all active:scale-[0.98] flex items-center justify-center gap-2 shadow-lg ${
+                canSubmit
+                  ? 'bg-accent-blue text-white shadow-accent-blue/25 hover:opacity-95'
+                  : 'bg-bg-input text-text-muted cursor-not-allowed opacity-50'
+              }`}
+              aria-label={isEditing ? 'Save changes' : 'Create event'}
+            >
+              {isEditing ? (
+                <>
+                  <Edit3 size={15} strokeWidth={2.5} />
+                  Save Changes
+                </>
+              ) : (
+                <>
+                  <Plus size={15} strokeWidth={2.5} />
+                  Create Event
+                </>
+              )}
+            </button>
+          </div>
+        </div>
       </motion.div>
     </div>
   );

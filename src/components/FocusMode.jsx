@@ -325,12 +325,12 @@ export const FocusMode = () => {
     // Web vibration nudge
     triggerHapticPulse();
 
-    // Schedule native background local notification
+    // Schedule native background local notification — fires even if app is closed/minimized
     const completionEpochMs = nowMs + (remainingTime * 1000);
-    const routineTitle = selectedItem ? selectedItem.title : 'Deep Work Protocol';
+    console.log(`%c[FocusMode] Scheduling completion notification: ID=9999, triggerAt=${new Date(completionEpochMs).toISOString()}, msFromNow=${remainingTime}s`, 'color: #4d7cff; font-weight: bold;');
     scheduleTimerCompletionNotification(
-      'Session Complete! 🚀',
-      `Focus session completed successfully: ${routineTitle}`,
+      'Focus Session Complete 🚀',
+      'Time for a break!',
       completionEpochMs
     );
 
