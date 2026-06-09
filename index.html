@@ -3,60 +3,87 @@
 
 <head>
   <meta charset="UTF-8" />
-  <script>
-    window.addEventListener('error', function(event) {
-      var errorDiv = document.getElementById('debug-error-console');
-      if (!errorDiv) {
-        errorDiv = document.createElement('div');
-        errorDiv.id = 'debug-error-console';
-        errorDiv.style.position = 'fixed';
-        errorDiv.style.top = '0';
-        errorDiv.style.left = '0';
-        errorDiv.style.width = '100%';
-        errorDiv.style.height = '100%';
-        errorDiv.style.backgroundColor = '#0b0b14';
-        errorDiv.style.color = '#f87171';
-        errorDiv.style.padding = '24px';
-        errorDiv.style.zIndex = '999999';
-        errorDiv.style.fontFamily = 'monospace';
-        errorDiv.style.overflow = 'auto';
-        errorDiv.style.boxSizing = 'border-box';
-        document.body.appendChild(errorDiv);
-      }
-      errorDiv.innerHTML += '<h3 style="color:#ef4444;margin-top:0;">Uncaught Error:</h3><pre style="white-space:pre-wrap;word-break:break-all;">' + event.message + '\n at ' + event.filename + ':' + event.lineno + ':' + event.colno + '\n' + (event.error ? event.error.stack : '') + '</pre><hr style="border-color:#374151;"/>';
-    });
-    window.addEventListener('unhandledrejection', function(event) {
-      var errorDiv = document.getElementById('debug-error-console');
-      if (!errorDiv) {
-        errorDiv = document.createElement('div');
-        errorDiv.id = 'debug-error-console';
-        errorDiv.style.position = 'fixed';
-        errorDiv.style.top = '0';
-        errorDiv.style.left = '0';
-        errorDiv.style.width = '100%';
-        errorDiv.style.height = '100%';
-        errorDiv.style.backgroundColor = '#0b0b14';
-        errorDiv.style.color = '#f87171';
-        errorDiv.style.padding = '24px';
-        errorDiv.style.zIndex = '999999';
-        errorDiv.style.fontFamily = 'monospace';
-        errorDiv.style.overflow = 'auto';
-        errorDiv.style.boxSizing = 'border-box';
-        document.body.appendChild(errorDiv);
-      }
-      errorDiv.innerHTML += '<h3 style="color:#ef4444;margin-top:0;">Unhandled Promise Rejection:</h3><pre style="white-space:pre-wrap;word-break:break-all;">' + (event.reason ? (event.reason.stack || event.reason) : 'No reason provided') + '</pre><hr style="border-color:#374151;"/>';
-    });
-  </script>
-  <!-- Favicon -->
+
+  <!-- ── Viewport: removed user-scalable=no (a11y penalty + Lighthouse deduction) ── -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+
+  <!-- ── Primary SEO ──────────────────────────────────────────────────── -->
+  <title>GoalForge | Plan. Focus. Discipline.</title>
+  <meta name="description" content="GoalForge is a powerful productivity app to set goals, build daily habits, track focus sessions, and forge unbreakable discipline — all in one place." />
+  <meta name="keywords" content="goal tracking, habit tracker, focus timer, productivity app, daily tasks, discipline, pomodoro" />
+  <meta name="author" content="GoalForge" />
+  <meta name="robots" content="index, follow" />
+  <link rel="canonical" href="https://goal-forge-two.vercel.app/" />
+
+  <!-- ── Open Graph (Facebook / LinkedIn / WhatsApp) ──────────────────── -->
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://goal-forge-two.vercel.app/" />
+  <meta property="og:title" content="GoalForge | Plan. Focus. Discipline." />
+  <meta property="og:description" content="Set goals, build habits, track focus sessions and forge unbreakable discipline — all in one premium productivity app." />
+  <meta property="og:image" content="https://goal-forge-two.vercel.app/og-image.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="GoalForge — Plan. Focus. Discipline." />
+  <meta property="og:site_name" content="GoalForge" />
+  <meta property="og:locale" content="en_US" />
+
+  <!-- ── Twitter Card ──────────────────────────────────────────────────── -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:url" content="https://goal-forge-two.vercel.app/" />
+  <meta name="twitter:title" content="GoalForge | Plan. Focus. Discipline." />
+  <meta name="twitter:description" content="Set goals, build habits, track focus sessions and forge unbreakable discipline — all in one premium productivity app." />
+  <meta name="twitter:image" content="https://goal-forge-two.vercel.app/og-image.png" />
+
+  <!-- ── PWA & Theme ───────────────────────────────────────────────────── -->
+  <meta name="theme-color" content="#0b0b14" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="GoalForge" />
+
+  <!-- ── Favicons ──────────────────────────────────────────────────────── -->
   <link rel="icon" type="image/x-icon" href="/favicon.ico" />
   <link rel="icon" type="image/png" sizes="96x96" href="/favicon-96x96.png" />
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-  <!-- Mobile / PWA -->
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
   <link rel="manifest" href="/manifest.json" />
-  <meta name="theme-color" content="#000000" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-  <title>GoalForge | Plan. Focus. Discipline.</title>
+
+  <!-- ── Performance: Resource Hints ──────────────────────────────────── -->
+  <link rel="preconnect" href="https://firestore.googleapis.com" />
+  <link rel="preconnect" href="https://identitytoolkit.googleapis.com" />
+  <link rel="preconnect" href="https://securetoken.googleapis.com" />
+  <link rel="dns-prefetch" href="https://firebaseapp.com" />
+  <link rel="dns-prefetch" href="https://googleapis.com" />
+
+  <!-- ── JSON-LD Structured Data ───────────────────────────────────────── -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "GoalForge",
+    "url": "https://goal-forge-two.vercel.app/",
+    "description": "GoalForge is a powerful productivity app to set goals, build daily habits, track focus sessions, and forge unbreakable discipline.",
+    "applicationCategory": "ProductivityApplication",
+    "operatingSystem": "Web, Android, iOS",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD"
+    },
+    "screenshot": "https://goal-forge-two.vercel.app/og-image.png",
+    "featureList": [
+      "Goal tracking",
+      "Habit building",
+      "Focus timer",
+      "Daily task management",
+      "Weekly planning",
+      "Progress analytics"
+    ]
+  }
+  </script>
+
+  <!-- ── Debug error overlay (deferred — non-render-blocking) ─────────── -->
+  <script src="/error-handler.js" defer></script>
 </head>
 
 <body>

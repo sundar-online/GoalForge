@@ -22,8 +22,13 @@ const ScheduledEvents = React.lazy(() => import('./components/ScheduledEvents').
 // Premium fallback loading skeleton
 function ViewSkeleton() {
   return (
-    <div className="w-full h-[60vh] flex flex-col items-center justify-center gap-4">
-      <div className="w-12 h-12 rounded-full border-2 border-accent-blue/10 border-t-accent-blue animate-spin" />
+    <div
+      role="status"
+      aria-label="Loading page content"
+      aria-live="polite"
+      className="w-full h-[60vh] flex flex-col items-center justify-center gap-4"
+    >
+      <div className="w-12 h-12 rounded-full border-2 border-accent-blue/10 border-t-accent-blue animate-spin" aria-hidden="true" />
       <span className="text-xs font-bold text-text-muted uppercase tracking-widest animate-pulse">Forging Layout...</span>
     </div>
   );
@@ -48,7 +53,12 @@ function AppInner() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-bg-app flex flex-col items-center justify-center gap-0 font-inter overflow-hidden relative">
+      <div
+        role="status"
+        aria-label="GoalForge is loading"
+        aria-live="polite"
+        className="min-h-screen bg-bg-app flex flex-col items-center justify-center gap-0 font-inter overflow-hidden relative"
+      >
         {/* Background glow */}
         <div className="absolute w-80 h-80 rounded-full bg-accent-blue/15 blur-[40px] animate-pulse" />
 
