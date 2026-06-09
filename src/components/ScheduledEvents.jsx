@@ -6,7 +6,7 @@ import {
   CalendarDays, Plus, Clock, Trash2, CheckCircle2, Circle,
   Bell, BellOff, ChevronLeft, ChevronRight, X, Edit3,
   Target, Zap, AlertCircle, Calendar, ChevronDown,
-  Repeat2, AlarmClock, RotateCcw, RefreshCw
+  Repeat2, AlarmClock, RotateCcw, RefreshCw, MoreVertical
 } from 'lucide-react';
 import { TODAY } from '../utils/dateUtils';
 
@@ -1079,7 +1079,7 @@ function EventFormModal({ initialDate, editEvent, onSave, onClose, goals }) {
   );
 }
 
-// ── Event Card — compact, no categories ────────────────
+// ── Event Card — compact, mobile-friendly actions ──────
 function EventCard({ event, onComplete, onDelete, onEdit, goals }) {
   const today   = TODAY();
   const isPast  = event.date < today && !event.completed;
@@ -1090,12 +1090,38 @@ function EventCard({ event, onComplete, onDelete, onEdit, goals }) {
   const linkedGoal = goals?.find(g => g.id === event.linkedGoalId);
   const repeatText = repeatLabel(event);
 
+  const [menuOpen, setMenuOpen] = React.useState(false);
+  const menuRef = React.useRef(null);
+  const [isMobile, setIsMobile] = React.useState(() => window.innerWidth < 640);
+
+  // Track viewport size for menu style choice
+  React.useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 640);
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+
+  // Close desktop dropdown on outside click
+  React.useEffect(() => {
+    if (!menuOpen || isMobile) return;
+    const handler = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [menuOpen, isMobile]);
+
   // Status pill config
   let statusLabel, statusClass;
   if (event.completed)  { statusLabel = 'Completed'; statusClass = 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'; }
   else if (isPast)      { statusLabel = 'Overdue';   statusClass = 'bg-red-500/15    text-red-400    border-red-500/30';     }
   else if (isToday)     { statusLabel = 'Today';     statusClass = 'bg-accent-blue/15 text-accent-blue border-accent-blue/30'; }
   else                  { statusLabel = 'Upcoming';  statusClass = 'bg-bg-input text-text-muted border-border-light';          }
+
+  const handleAction = (fn) => {
+    setMenuOpen(false);
+    fn();
+  };
 
   return (
     <motion.div
@@ -1112,7 +1138,7 @@ function EventCard({ event, onComplete, onDelete, onEdit, goals }) {
           :                 'border-border-light hover:border-border-med'}
       `}
     >
-      {/* Top row: status + actions */}
+      {/* Top row: status pills + three-dot menu */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-1.5 flex-wrap">
           <span className={`text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg border ${statusClass}`}>
@@ -1125,13 +1151,53 @@ function EventCard({ event, onComplete, onDelete, onEdit, goals }) {
             </span>
           )}
         </div>
-        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button onClick={() => onEdit(event)} className="w-7 h-7 rounded-lg hover:bg-bg-input flex items-center justify-center text-text-muted hover:text-text-main transition-colors">
-            <Edit3 size={13} />
+
+        {/* ── Three-dot overflow menu ── */}
+        <div className="relative" ref={menuRef}>
+          <button
+            onClick={() => setMenuOpen(p => !p)}
+            aria-label="Event actions"
+            className="w-8 h-8 rounded-xl flex items-center justify-center text-text-muted hover:text-text-main hover:bg-bg-input transition-colors active:scale-90"
+          >
+            <MoreVertical size={15} />
           </button>
-          <button onClick={() => onDelete(event.id)} className="w-7 h-7 rounded-lg hover:bg-red-500/10 flex items-center justify-center text-text-muted hover:text-red-400 transition-colors">
-            <Trash2 size={13} />
-          </button>
+
+          {/* Desktop dropdown */}
+          {!isMobile && (
+            <AnimatePresence>
+              {menuOpen && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.92, y: -4 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.92, y: -4 }}
+                  transition={{ duration: 0.12, ease: 'easeOut' }}
+                  className="absolute right-0 top-10 w-44 bg-bg-card border border-border-med rounded-2xl shadow-float z-[200] overflow-hidden"
+                >
+                  <button
+                    onClick={() => handleAction(() => onEdit(event))}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-xs font-bold text-text-main hover:bg-bg-input transition-colors"
+                  >
+                    <Edit3 size={13} className="text-accent-blue" /> Edit Event
+                  </button>
+                  <button
+                    onClick={() => handleAction(() => onComplete(event.id, !event.completed))}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-xs font-bold text-text-main hover:bg-bg-input transition-colors"
+                  >
+                    {event.completed
+                      ? <><RotateCcw size={13} className="text-text-muted" /> Mark Incomplete</>
+                      : <><CheckCircle2 size={13} className="text-emerald-400" /> Mark as Done</>}
+                  </button>
+                  <div className="mx-4 border-t border-border-light" />
+                  <button
+                    onClick={() => handleAction(() => onDelete(event.id))}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-xs font-bold text-red-400 hover:bg-red-500/10 transition-colors"
+                  >
+                    <Trash2 size={13} /> Delete Event
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          )}
         </div>
       </div>
 
@@ -1183,6 +1249,78 @@ function EventCard({ event, onComplete, onDelete, onEdit, goals }) {
       >
         {event.completed ? <><CheckCircle2 size={13} /> Completed</> : <><Circle size={13} /> Mark as Done</>}
       </button>
+
+      {/* ── Mobile bottom-sheet action menu ── */}
+      {isMobile && (
+        <AnimatePresence>
+          {menuOpen && (
+            <motion.div
+              initial={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[500] flex items-end"
+            >
+              {/* Backdrop */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.15 }}
+                className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                onClick={() => setMenuOpen(false)}
+              />
+              {/* Sheet */}
+              <motion.div
+                initial={{ y: '100%' }}
+                animate={{ y: 0 }}
+                exit={{ y: '100%' }}
+                transition={{ type: 'spring', stiffness: 380, damping: 36 }}
+                className="relative w-full bg-bg-card border-t border-border-light rounded-t-[28px] px-5 pt-3 pb-10 z-10"
+              >
+                {/* Drag handle */}
+                <div className="w-10 h-1 rounded-full bg-border-med opacity-60 mx-auto mb-4" />
+                {/* Event label */}
+                <p className="text-xs font-black text-text-muted uppercase tracking-widest mb-4 px-1">
+                  {event.title}
+                </p>
+
+                <div className="flex flex-col gap-2">
+                  <button
+                    onClick={() => handleAction(() => onEdit(event))}
+                    className="flex items-center gap-4 px-4 py-3.5 rounded-2xl bg-bg-input text-sm font-bold text-text-main active:scale-[0.98] transition-all"
+                  >
+                    <span className="w-8 h-8 rounded-xl bg-accent-blue/10 flex items-center justify-center flex-shrink-0">
+                      <Edit3 size={15} className="text-accent-blue" />
+                    </span>
+                    Edit Event
+                  </button>
+
+                  <button
+                    onClick={() => handleAction(() => onComplete(event.id, !event.completed))}
+                    className="flex items-center gap-4 px-4 py-3.5 rounded-2xl bg-bg-input text-sm font-bold text-text-main active:scale-[0.98] transition-all"
+                  >
+                    <span className="w-8 h-8 rounded-xl bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
+                      {event.completed
+                        ? <RotateCcw size={15} className="text-text-muted" />
+                        : <CheckCircle2 size={15} className="text-emerald-400" />}
+                    </span>
+                    {event.completed ? 'Mark Incomplete' : 'Mark as Done'}
+                  </button>
+
+                  <button
+                    onClick={() => handleAction(() => onDelete(event.id))}
+                    className="flex items-center gap-4 px-4 py-3.5 rounded-2xl bg-red-500/10 text-sm font-bold text-red-400 active:scale-[0.98] transition-all mt-1"
+                  >
+                    <span className="w-8 h-8 rounded-xl bg-red-500/15 flex items-center justify-center flex-shrink-0">
+                      <Trash2 size={15} className="text-red-400" />
+                    </span>
+                    Delete Event
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      )}
     </motion.div>
   );
 }
@@ -1239,10 +1377,6 @@ export const ScheduledEvents = () => {
     [scheduledEvents, today]
   );
 
-  const todayEvents = useMemo(() =>
-    scheduledEvents.filter(e => e.date === today),
-    [scheduledEvents, today]
-  );
 
   const filteredEvents = useMemo(() => {
     if (activeFilter === 'upcoming')  {
@@ -1315,6 +1449,7 @@ export const ScheduledEvents = () => {
           { label: 'Recurring', val: recurringCount, color: 'text-indigo-400',   bg: 'bg-indigo-500/10',   icon: Repeat2      },
           { label: 'Completed', val: completedCount, color: 'text-emerald-400',  bg: 'bg-emerald-500/10',  icon: CheckCircle2 },
           { label: 'Overdue',   val: overdueCount,   color: 'text-red-400',      bg: 'bg-red-500/10',      icon: AlertCircle  },
+        // eslint-disable-next-line no-unused-vars
         ].map(({ label, val, color, bg, icon: Icon }) => (
           <div key={label} className="bg-bg-card rounded-[22px] p-4 border border-border-light shadow-sm flex flex-col items-center gap-2 text-center">
             <div className={`w-9 h-9 rounded-xl ${bg} flex items-center justify-center`}>

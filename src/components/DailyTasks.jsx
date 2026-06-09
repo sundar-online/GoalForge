@@ -42,21 +42,23 @@ const LogTaskTimeModal = ({ task, onClose, logTaskTime }) => {
   );
 };
 
+// Bug 1 Fix: factory function so TODAY() is always fresh, never captured at mount
+const makeDefaultTask = () => ({
+  title: '',
+  type: 'daily',
+  completionType: 'check',
+  targetTime: 30,
+  targetCount: 10,
+  priority: 'Medium',
+  targetDate: TODAY(),
+  startDate: TODAY(),
+  endDate: TODAY(),
+  reminderEnabled: false,
+  reminderTime: '08:00'
+});
+
 export const DailyTasks = () => {
-  const defaultTask = {
-    title: '',
-    type: 'daily',
-    completionType: 'check',
-    targetTime: 30,
-    targetCount: 10,
-    priority: 'Medium',
-    targetDate: TODAY(),
-    startDate: TODAY(),
-    endDate: TODAY(),
-    reminderEnabled: false,
-    reminderTime: '08:00'
-  };
-  const [newTask, setNewTask] = useState(defaultTask);
+  const [newTask, setNewTask] = useState(makeDefaultTask);
   const [isAdding, setIsAdding] = useState(false);
   const [showLog, setShowLog] = useState(null);
   const [deletingTaskItem, setDeletingTaskItem] = useState(null);
@@ -66,10 +68,11 @@ export const DailyTasks = () => {
 
   const { tasks, addTask, deleteTask, logTaskTime, toggleTaskComplete, updateTaskCount } = useTasks();
 
-  // Debounce search input
+  // Debounce search input + Bug 5 Fix: reset completedLimit when query changes
   useEffect(() => {
     const handler = setTimeout(() => {
       setDebouncedQuery(searchQuery);
+      setCompletedLimit(5); // reset so Load More reappears correctly
     }, 250);
     return () => clearTimeout(handler);
   }, [searchQuery]);
@@ -105,7 +108,7 @@ export const DailyTasks = () => {
       targetTime: Number(newTask.targetTime),
       targetCount: Number(newTask.targetCount)
     });
-    setNewTask(defaultTask);
+    setNewTask(makeDefaultTask()); // Bug 1 Fix: fresh dates on every reset
     setIsAdding(false);
   };
 
@@ -222,12 +225,18 @@ export const DailyTasks = () => {
               </div>
               <div className="flex items-center gap-4">
                 {newTask.reminderEnabled && (
-                  <input
-                    type="time"
-                    value={newTask.reminderTime}
-                    onChange={e => setNewTask({ ...newTask, reminderTime: e.target.value })}
-                    className="bg-white/5 dark:bg-black/20 border border-white/10 rounded-lg px-2 py-1 text-sm font-black text-accent-blue outline-none animate-in fade-in"
-                  />
+                  <div className="flex flex-col items-end gap-1">
+                    <input
+                      type="time"
+                      value={newTask.reminderTime}
+                      onChange={e => setNewTask({ ...newTask, reminderTime: e.target.value })}
+                      className="bg-white/5 dark:bg-black/20 border border-white/10 rounded-lg px-2 py-1 text-sm font-black text-accent-blue outline-none animate-in fade-in"
+                    />
+                    {/* Bug 6 Fix: warn if reminder time is earlier than current time */}
+                    {newTask.reminderTime && newTask.reminderTime < new Date().toTimeString().slice(0, 5) && (
+                      <span className="text-[9px] font-black text-amber-400">⚠ Time already passed today</span>
+                    )}
+                  </div>
                 )}
                 <button
                   type="button"
@@ -282,11 +291,17 @@ export const DailyTasks = () => {
 
         <AnimatePresence initial={false}>
           {/* Active / Uncompleted Tasks */}
+          {/* Bug 7 Fix: show targeted empty state when search filters all active tasks */}
+          {activeTasks.length === 0 && debouncedQuery && completedTasks.length > 0 && (
+            <div className="py-6 text-center text-text-muted font-bold text-sm">
+              No active tasks match &ldquo;{debouncedQuery}&rdquo;
+            </div>
+          )}
           {activeTasks.map(task => {
             const todayStr = TODAY();
             const isDaily = (task.schedule_type || task.type) === 'daily';
             const hasBeenActiveToday = task.lastActiveDate === todayStr;
-            const tDone = false;
+            const tDone = isTaskDone(task); // Bug 2 Fix: was hard-coded false
             const cType = task.completionType || task.type || 'check';
             const isTime = cType === 'time';
             const isCount = cType === 'count';
@@ -340,7 +355,12 @@ export const DailyTasks = () => {
                   <div className="flex gap-1.5 sm:gap-2 items-center shrink-0">
                     {isCount ? (
                       <div className="flex bg-bg-input rounded-xl border border-border-light overflow-hidden h-7 sm:h-9">
-                        <button onClick={() => updateTaskCount(task.id, -1)} className="px-2 py-0.5 sm:px-3 sm:py-1.5 text-text-main font-black hover:bg-border-light text-xs sm:text-sm">−</button>
+                        {/* Bug 3 Fix: disable − button at zero */}
+                        <button
+                          onClick={() => updateTaskCount(task.id, -1)}
+                          disabled={(task.currentCount || 0) === 0}
+                          className="px-2 py-0.5 sm:px-3 sm:py-1.5 text-text-main font-black hover:bg-border-light text-xs sm:text-sm disabled:opacity-30 disabled:cursor-not-allowed"
+                        >−</button>
                         <button onClick={() => updateTaskCount(task.id, 1)} className="px-2 py-0.5 sm:px-3 sm:py-1.5 text-accent-blue font-black border-l border-border-light hover:bg-border-light transition-colors text-xs sm:text-sm">+</button>
                       </div>
                     ) : (isTime && !tDone) && (
@@ -361,27 +381,8 @@ export const DailyTasks = () => {
 
           {/* Completed / Done Tasks (Lazy Loaded / Windowed) */}
           {visibleCompletedTasks.map(task => {
-            const todayStr = TODAY();
-            const isDaily = (task.schedule_type || task.type) === 'daily';
-            const hasBeenActiveToday = task.lastActiveDate === todayStr;
             const cType = task.completionType || task.type || 'check';
-            const isCount = cType === 'count';
             const isCheck = cType === 'check';
-
-            let target = 0;
-            let current = 0;
-            if (isDaily && !hasBeenActiveToday) {
-              current = 0;
-              if (task.isRecovering && task.originalTarget !== undefined) {
-                target = task.originalTarget;
-              } else {
-                target = isCount ? (task.targetCount ?? 10) : (task.targetTime ?? 30);
-              }
-            } else {
-              target = isCount ? (task.targetCount ?? 10) : (task.targetTime ?? 30);
-              current = isCount ? (task.currentCount || 0) : (task.timeSpent || 0);
-            }
-            const pct = isCheck ? 0 : Math.min(100, Math.round((current / (target || 1)) * 100));
             const sType = task.type || 'daily';
 
             return (
@@ -418,9 +419,10 @@ export const DailyTasks = () => {
                   </div>
                 </div>
 
+                {/* Bug 8 Fix: completed tasks always show full bar */}
                 {!isCheck && (
                   <div className="bg-bg-input rounded-full h-1.5 overflow-hidden">
-                    <div className="h-full transition-all duration-700 bg-emerald-500" style={{ width: `${pct}%` }} />
+                    <div className="h-full transition-all duration-700 bg-emerald-500" style={{ width: '100%' }} />
                   </div>
                 )}
               </motion.div>

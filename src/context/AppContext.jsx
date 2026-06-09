@@ -2341,7 +2341,9 @@ export const AppProvider = ({ children }) => {
     const recDates = existingRec ? existingRec.completedDates : [];
     const today = TODAY();
     const isCompletedToday = recDates.includes(today);
-    const { sanitizedDates } = sanitizeAndValidateCompletedDates(recDates, task.createdAt, 'new_task', task.title, existingRec ? existingRec.streak : 0);
+    // Bug 9 Fix: compute createdAt BEFORE sanitize so it's available as the date anchor
+    const createdAt = new Date().toISOString();
+    const { sanitizedDates } = sanitizeAndValidateCompletedDates(recDates, createdAt, 'new_task', task.title, existingRec ? existingRec.streak : 0);
     const { current: currentStreak, best: bestStreak } = calculateTaskStreak(sanitizedDates);
     const sortedDates = [...sanitizedDates].sort((a, b) => b.localeCompare(a));
     const newLastCompleted = sortedDates.length > 0 ? sortedDates[0] : null;
@@ -2359,7 +2361,7 @@ export const AppProvider = ({ children }) => {
       lastCompletedDate: newLastCompleted,
       missedDays: calculateConsecutiveMissedDays(sanitizedDates, []),
       lastActiveDate: today,
-      createdAt: new Date().toISOString()
+      createdAt // Bug 9 Fix: use the pre-computed value
     };
     setTasks(prev => [newT, ...prev]);
     if (user) {
@@ -2400,7 +2402,8 @@ export const AppProvider = ({ children }) => {
 
   const toggleTaskComplete = (taskId) => {
     console.log(`%c[Diagnostic Log] ACTION START: toggleTaskComplete [taskId=${taskId}]`, 'color: #3b82f6; font-weight: bold;');
-    const t = tasks.find(item => item.id === taskId);
+    // Bug 10 Fix: use tasksRef.current to avoid stale-closure reads (consistent with logTaskTime)
+    const t = tasksRef.current.find(item => item.id === taskId);
     if (!t) {
       console.warn(`[Diagnostic Log] Task ${taskId} not found for toggleTaskComplete.`);
       return;
@@ -2408,6 +2411,7 @@ export const AppProvider = ({ children }) => {
 
     const today = TODAY();
     const isDaily = (t.schedule_type || t.type) === 'daily';
+    const isSingle = (t.schedule_type || t.type) === 'single';
     let updated = { ...t };
 
     if (isDaily && t.lastActiveDate !== today) {
@@ -2442,16 +2446,22 @@ export const AppProvider = ({ children }) => {
     }
 
     const recId = updated.recurringId || getTaskTrackingKey(updated);
-    // Bug 4 fix: always use task.completedDates as authoritative source (already sanitized from
+    // Bug 4 Fix: always use task.completedDates as authoritative source (already sanitized from
     // Firestore on load). recurringHistory can diverge and cause stale streak calculations.
     let recDates = updated.completedDates ? [...updated.completedDates] : [];
 
     if (isDone) {
-      if (!recDates.includes(today)) {
-        recDates.push(today);
+      // Bug 4 Fix: for single tasks, isTaskDone checks completedDates.includes(targetDate),
+      // so we must push targetDate (not just today) when marking complete.
+      const dateToRecord = isSingle ? (updated.targetDate || updated.date || today) : today;
+      if (!recDates.includes(today)) recDates.push(today); // always record actual completion date
+      if (isSingle && dateToRecord !== today && !recDates.includes(dateToRecord)) {
+        recDates.push(dateToRecord);
       }
     } else {
-      recDates = recDates.filter(d => d !== today);
+      // On un-complete: remove both today and the targetDate for single tasks
+      const dateToRemove = isSingle ? (updated.targetDate || updated.date || today) : today;
+      recDates = recDates.filter(d => d !== today && d !== dateToRemove);
     }
 
     const { sanitizedDates } = sanitizeAndValidateCompletedDates(recDates, updated.createdAt, updated.id, updated.title, updated.currentStreak);
@@ -2504,7 +2514,8 @@ export const AppProvider = ({ children }) => {
 
   const updateTaskCount = (taskId, delta) => {
     console.log(`%c[Diagnostic Log] ACTION START: updateTaskCount [taskId=${taskId}, delta=${delta}]`, 'color: #3b82f6; font-weight: bold;');
-    const t = tasks.find(item => item.id === taskId);
+    // Bug 10 Fix: use tasksRef.current to avoid stale-closure reads
+    const t = tasksRef.current.find(item => item.id === taskId);
     if (!t) {
       console.warn(`[Diagnostic Log] Task ${taskId} not found for updateTaskCount.`);
       return;
