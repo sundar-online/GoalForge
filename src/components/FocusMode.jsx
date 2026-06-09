@@ -113,6 +113,12 @@ export const FocusMode = () => {
     return localStorage.getItem('gf_focus_selectedHabitId') || '';
   });
 
+  // ── Refs so stale-closure callbacks (setInterval, visibility) always see current IDs ──
+  const selectedGoalIdRef = useRef(selectedGoalId);
+  const selectedHabitIdRef = useRef(selectedHabitId);
+  useEffect(() => { selectedGoalIdRef.current = selectedGoalId; }, [selectedGoalId]);
+  useEffect(() => { selectedHabitIdRef.current = selectedHabitId; }, [selectedHabitId]);
+
   // ── local countdown rendering state ───────────────────────────────
   const [time, setTime] = useState(duration * 60);
 
@@ -413,20 +419,35 @@ export const FocusMode = () => {
     awardFocusXP(); // +20 XP via GoalForge Engine
 
     // 5. Update associated Habits or Tasks
-    const routineTitle = selectedItem ? selectedItem.title : 'Deep Work Protocol';
-    if (selectedGoalId && selectedHabitId) {
-      addFocusTimeToHabit(selectedGoalId, selectedHabitId, minsCompleted * 60);
+    // FIX: Read from refs (always current) rather than the stale React state closure.
+    // The setInterval ticker and background calibration path both call this function
+    // after the component has re-rendered, so direct state values captured at
+    // startCountdownTicker() creation time can be stale.
+    const liveGoalId  = selectedGoalIdRef.current
+      || localStorage.getItem('gf_focus_selectedGoalId')
+      || '';
+    const liveHabitId = selectedHabitIdRef.current
+      || localStorage.getItem('gf_focus_selectedHabitId')
+      || '';
+    const liveIsDailyTask = liveGoalId === 'DAILY_TASK';
+    const liveGoal = liveIsDailyTask ? null : (goals || []).find(g => g.id === liveGoalId);
+    const liveList = liveIsDailyTask ? todayTasks : (liveGoal?.habits || []);
+    const liveItem = (liveList || []).find(h => h.id === liveHabitId);
+    const routineTitle = liveItem ? liveItem.title : 'Deep Work Protocol';
+
+    if (liveGoalId && liveHabitId) {
+      addFocusTimeToHabit(liveGoalId, liveHabitId, minsCompleted * 60);
     }
 
     // 6. Log Session Detail to persistent history
     logFocusSession({
       title: routineTitle,
       duration: minsCompleted,
-      goalTitle: selectedGoal ? selectedGoal.title : (isDailyTaskMode ? 'Daily Routine' : 'Standalone'),
+      goalTitle: liveGoal ? liveGoal.title : (liveIsDailyTask ? 'Daily Routine' : 'Standalone'),
       date: todayStr,
       timestamp: Date.now(),
-      goalId: selectedGoalId || 'standalone',
-      itemId: selectedHabitId || 'standalone'
+      goalId: liveGoalId || 'standalone',
+      itemId: liveHabitId || 'standalone'
     });
 
     // 7. Open beautiful completion celebration overlay

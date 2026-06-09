@@ -2631,7 +2631,7 @@ export const AppProvider = ({ children }) => {
 
     const newTime = Math.max(0, (updated.timeSpent || 0) + mins);
     const wasCompleted = updated.completed;
-    const target = updated.targetTime ?? 15;
+    const target = updated.targetTime ?? 30; // default matches form default (was 15, mismatched)
     const isDone = newTime >= target;
 
     updated.timeSpent = newTime;
