@@ -202,7 +202,7 @@ export const scheduleLocalNotification = async (title, options = {}) => {
           id: notifId,
           channelId: CHANNEL_ID,
           schedule: { at: new Date(Date.now() + 1000) }, // 1s delay
-          sound: 'default',
+          sound: Capacitor.getPlatform() === 'ios' ? 'default' : undefined,
           extra: options?.extra || null,
         }]
       });
@@ -286,7 +286,7 @@ export const scheduleTimerCompletionNotification = async (title, body, triggerAt
           at: triggerDate,
           allowWhileIdle: true, // Delivers even in Doze mode
         },
-        sound: 'default',
+        sound: Capacitor.getPlatform() === 'ios' ? 'default' : undefined,
         extra: { type: 'focus-timer-complete' },
         actionTypeId: '',
         // wakeup: true is handled by allowWhileIdle + channel importance
@@ -411,7 +411,7 @@ export const scheduleEventReminder = async (event) => {
           at: triggerDate,
           allowWhileIdle: true,
         },
-        sound: 'default',
+        sound: Capacitor.getPlatform() === 'ios' ? 'default' : undefined,
         extra: {
           type: 'event-reminder',
           eventId: event.id,
@@ -508,7 +508,7 @@ export const scheduleReminder = async (id, title, body, timeStr, scheduleDays = 
             repeats: true,
             allowWhileIdle: true,
           },
-          sound: 'default',
+          sound: Capacitor.getPlatform() === 'ios' ? 'default' : undefined,
           extra: { type: 'reminder', originalId: id },
         }]
       });
@@ -527,7 +527,7 @@ export const scheduleReminder = async (id, title, body, timeStr, scheduleDays = 
             repeats: true,
             allowWhileIdle: true,
           },
-          sound: 'default',
+          sound: Capacitor.getPlatform() === 'ios' ? 'default' : undefined,
           extra: { type: 'reminder', originalId: id, day },
         }));
 

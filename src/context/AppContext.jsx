@@ -1603,6 +1603,8 @@ export const AppProvider = ({ children }) => {
           targetTime,
           targetCount,
           scheduleDays: h.scheduleDays || [],
+          reminderEnabled: !!h.reminderEnabled,
+          reminderTime: h.reminderTime || '08:00',
           currentCount,
           timeSpent,
           completed,
