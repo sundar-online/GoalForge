@@ -207,8 +207,12 @@ const QuickThoughtsWidget = () => {
             )}
           </div>
         </div>
-        <button className="text-text-muted hover:text-text-main p-1 transition-colors">
-          {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+        <button
+          className="text-text-muted hover:text-text-main p-1 transition-colors"
+          aria-label={isExpanded ? 'Collapse quick thoughts' : 'Expand quick thoughts'}
+          aria-expanded={isExpanded}
+        >
+          {isExpanded ? <ChevronUp size={16} aria-hidden="true" /> : <ChevronDown size={16} aria-hidden="true" />}
         </button>
       </div>
 
@@ -282,11 +286,12 @@ const QuickThoughtsWidget = () => {
                       </div>
 
                       {/* Delete Action */}
-                      <button 
+                      <button
                         onClick={() => deleteQuickThought(thought.id)}
+                        aria-label={`Delete thought: ${thought.content}`}
                         className="text-text-muted hover:text-red-500 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 p-1 rounded-lg hover:bg-red-500/10 transition-all shrink-0 flex items-center justify-center"
                       >
-                        <Trash2 size={14} />
+                        <Trash2 size={14} aria-hidden="true" />
                       </button>
                     </div>
                   ))
@@ -328,9 +333,10 @@ const QuickThoughtsWidget = () => {
                     <button
                       type="submit"
                       disabled={!newText.trim() || isSaving}
+                      aria-label="Add thought"
                       className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-xl bg-accent-blue hover:bg-accent-blue/90 disabled:opacity-55 disabled:cursor-not-allowed flex items-center justify-center text-white transition-all active:scale-95 shadow-md shadow-accent-blue/20"
                     >
-                      <Plus size={16} />
+                      <Plus size={16} aria-hidden="true" />
                     </button>
                   </div>
                 </form>
@@ -559,9 +565,9 @@ export const Dashboard = ({ setView }) => {
     <div className="flex flex-col gap-6 lg:gap-8 max-w-full">
       {/* Sync Error Banner */}
       {syncError && (
-        <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-2xl flex justify-between items-center animate-in fade-in slide-in-from-top-4">
+        <div role="alert" className="bg-red-500/10 border border-red-500/20 p-4 rounded-2xl flex justify-between items-center animate-in fade-in slide-in-from-top-4">
           <div className="flex items-center gap-3">
-            <AlertCircle size={18} className="text-red-500" />
+            <AlertCircle size={18} className="text-red-500" aria-hidden="true" />
             <span className="text-sm font-bold text-text-main">{syncError}</span>
           </div>
           <button onClick={retrySync} className="bg-accent-blue hover:bg-accent-blue/90 px-4 py-2 rounded-xl text-xs font-black text-white transition-all active:scale-95 shadow-md shadow-accent-blue/20">
@@ -582,21 +588,21 @@ export const Dashboard = ({ setView }) => {
           {/* Events / Calendar Icon */}
           <button
             onClick={() => setView('events')}
-            title="Scheduled Events"
+            aria-label="Scheduled Events"
             className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 hover:bg-indigo-500/20 hover:border-indigo-500/30 transition-all active:scale-90 shadow-sm shrink-0 group"
           >
-            <CalendarDays size={18} className="group-hover:scale-110 transition-transform duration-200" />
+            <CalendarDays size={18} className="group-hover:scale-110 transition-transform duration-200" aria-hidden="true" />
           </button>
 
           {/* Theme Toggle */}
           <button
             onClick={toggleTheme}
-            title="Toggle theme"
+            aria-label={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
             className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-bg-card border border-border-light flex items-center justify-center text-text-main hover:bg-bg-input transition-all active:scale-90 shadow-sm shrink-0 group"
           >
             {theme === 'light'
-              ? <Moon size={18} className="group-hover:scale-110 transition-transform duration-200" />
-              : <Sun  size={18} className="group-hover:scale-110 transition-transform duration-200" />
+              ? <Moon size={18} className="group-hover:scale-110 transition-transform duration-200" aria-hidden="true" />
+              : <Sun  size={18} className="group-hover:scale-110 transition-transform duration-200" aria-hidden="true" />
             }
           </button>
 
@@ -604,7 +610,9 @@ export const Dashboard = ({ setView }) => {
           <div className="relative shrink-0">
             <button
               onClick={() => setShowSignOut(!showSignOut)}
-              title="Account"
+              aria-label={`Account menu for ${displayName}`}
+              aria-expanded={showSignOut}
+              aria-haspopup="true"
               className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-bg-dark-elem flex items-center justify-center text-text-inverted font-black text-lg hover:opacity-90 transition-all active:scale-90 shadow-md"
             >
               {initial}
@@ -715,8 +723,15 @@ export const Dashboard = ({ setView }) => {
                   <span>Level {currentLevelInfo.level}</span>
                   <span>{currentLevelInfo.isMaxLevel ? 'MAX' : `Level ${currentLevelInfo.level + 1}`}</span>
                 </div>
-                <div className="h-2.5 bg-white/10 rounded-full overflow-hidden">
-                  <div 
+                <div
+                  className="h-2.5 bg-white/10 rounded-full overflow-hidden"
+                  role="progressbar"
+                  aria-valuenow={currentLevelInfo.progress}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-label={`XP progress: ${currentLevelInfo.progress}% to next level`}
+                >
+                  <div
                     className="h-full bg-gradient-to-r from-accent-blue to-indigo-400 rounded-full transition-all duration-[1.5s] ease-out"
                     style={{ width: `${currentLevelInfo.progress}%`, boxShadow: '0 0 15px rgba(90,133,255,0.5)' }}
                   />
@@ -849,7 +864,12 @@ export const Dashboard = ({ setView }) => {
             <div className="bg-bg-card rounded-3xl p-5 sm:p-8 shadow-sm border border-border-light flex flex-col items-center gap-4 sm:gap-5 hover:shadow-md transition-shadow">
               <p className="text-[10px] font-black text-text-muted uppercase tracking-[0.15em]">Today's Accuracy</p>
               <div className="relative w-28 h-28 sm:w-36 sm:h-36">
-                <svg className="w-full h-full -rotate-90" viewBox="0 0 124 124">
+                <svg
+                  className="w-full h-full -rotate-90"
+                  viewBox="0 0 124 124"
+                  role="img"
+                  aria-label={`Today's accuracy: ${accuracy}%`}
+                >
                   <circle cx="62" cy="62" r={R} fill="none" className="stroke-bg-input" strokeWidth="10" />
                   <circle 
                     cx="62" cy="62" r={R} fill="none" stroke={accColor} strokeWidth="10"
@@ -857,7 +877,7 @@ export const Dashboard = ({ setView }) => {
                     className="transition-all duration-1000 ease-out"
                   />
                 </svg>
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <div className="absolute inset-0 flex flex-col items-center justify-center" aria-hidden="true">
                   <span className="text-3xl sm:text-4xl font-black text-text-main tracking-tighter">{accuracy}%</span>
                 </div>
               </div>

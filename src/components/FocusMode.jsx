@@ -577,7 +577,9 @@ export const FocusMode = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {/* Goal Selection Select */}
                   <div className="relative group">
+                    <label htmlFor="focus-goal-select" className="sr-only">Choose Active Target</label>
                     <select
+                      id="focus-goal-select"
                       value={selectedGoalId}
                       onChange={e => { setSelectedGoalId(e.target.value); setSelectedHabitId(''); }}
                       disabled={timerState !== 'idle'}
@@ -600,7 +602,9 @@ export const FocusMode = () => {
 
                   {/* Habit/Routine Selection Select */}
                   <div className="relative group">
+                    <label htmlFor="focus-habit-select" className="sr-only">Select Routine or Habit</label>
                     <select
+                      id="focus-habit-select"
                       value={selectedHabitId}
                       onChange={e => setSelectedHabitId(e.target.value)}
                       disabled={timerState !== 'idle' || !selectedGoalId || activeList.length === 0}
@@ -657,7 +661,9 @@ export const FocusMode = () => {
 
                   {/* Custom Input */}
                   <div className="relative flex items-center">
+                    <label htmlFor="focus-custom-duration" className="sr-only">Custom duration in minutes</label>
                     <input
+                      id="focus-custom-duration"
                       type="text"
                       inputMode="numeric"
                       pattern="[0-9]*"
@@ -666,9 +672,10 @@ export const FocusMode = () => {
                       onBlur={handleCustomDurationBlur}
                       disabled={timerState !== 'idle'}
                       placeholder="Custom..."
+                      aria-label="Custom duration in minutes"
                       className="w-full bg-bg-input border border-border-med rounded-2xl pl-4 pr-12 py-3 text-sm font-bold text-text-main shadow-xs outline-hidden focus:border-accent-blue transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     />
-                    <span className="absolute right-4 text-xs font-bold text-text-muted pointer-events-none">min</span>
+                    <span className="absolute right-4 text-xs font-bold text-text-muted pointer-events-none" aria-hidden="true">min</span>
                   </div>
                 </div>
               </div>
@@ -795,10 +802,10 @@ export const FocusMode = () => {
                 {timerState !== 'idle' && (
                   <button
                     onClick={handleReset}
+                    aria-label="Reset timer"
                     className="px-5 py-4 rounded-2xl bg-bg-input border border-border-med text-text-muted hover:text-text-main hover:bg-bg-input/80 transition-all active:scale-95 flex items-center justify-center gap-1.5 shadow-sm"
-                    title="Reset Timer"
                   >
-                    <RotateCcw size={16} strokeWidth={2.5} />
+                    <RotateCcw size={16} strokeWidth={2.5} aria-hidden="true" />
                     <span className="hidden sm:inline text-xs font-bold">Reset</span>
                   </button>
                 )}
@@ -838,12 +845,14 @@ export const FocusMode = () => {
                 </span>
                 <button
                   onClick={() => setIsMuted(!isMuted)}
+                  aria-label={isMuted ? 'Unmute alert sound' : 'Mute alert sound'}
+                  aria-pressed={isMuted}
                   className={`p-2 rounded-xl border transition-all active:scale-90 ${isMuted
                     ? 'bg-red-500/10 border-red-500/20 text-red-500'
                     : 'bg-bg-input border-border-med text-text-muted hover:text-text-main'
                     }`}
                 >
-                  {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
+                  {isMuted ? <VolumeX size={16} aria-hidden="true" /> : <Volume2 size={16} aria-hidden="true" />}
                 </button>
               </div>
 
@@ -871,7 +880,7 @@ export const FocusMode = () => {
               </div>
 
               <div className="flex items-center gap-3 pt-1">
-                <VolumeX size={12} className="text-text-muted animate-pulse" />
+                <VolumeX size={12} className="text-text-muted" aria-hidden="true" />
                 <input
                   type="range"
                   min="0"
@@ -879,9 +888,10 @@ export const FocusMode = () => {
                   step="0.1"
                   value={volume}
                   onChange={e => setVolume(parseFloat(e.target.value))}
+                  aria-label={`Alert volume: ${Math.round(volume * 100)}%`}
                   className="flex-1 accent-accent-blue h-1 bg-bg-input rounded-lg cursor-pointer appearance-none"
                 />
-                <Volume2 size={12} className="text-text-muted" />
+                <Volume2 size={12} className="text-text-muted" aria-hidden="true" />
               </div>
             </div>
 

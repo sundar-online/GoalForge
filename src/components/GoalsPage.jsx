@@ -68,9 +68,15 @@ const ExtendDeadlineModal = ({ goal, onClose, onExtend }) => {
   const newDeadline = addDays(currentDeadline, selectedDays);
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[300] p-4 backdrop-blur-md" onClick={onClose}>
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="extend-deadline-title"
+      className="fixed inset-0 bg-black/60 flex items-center justify-center z-[300] p-4 backdrop-blur-md"
+      onClick={onClose}
+    >
       <div className="bg-bg-card rounded-[32px] p-8 w-full max-w-md shadow-float border border-border-light animate-in fade-in zoom-in-95" onClick={e => e.stopPropagation()}>
-        <h3 className="text-xl font-black text-text-main tracking-tight mb-2">Extend Deadline</h3>
+        <h3 id="extend-deadline-title" className="text-xl font-black text-text-main tracking-tight mb-2">Extend Deadline</h3>
         <p className="text-sm text-text-muted font-medium leading-relaxed mb-6">Push back the deadline for "<b>{goal.title}</b>" without losing your progress.</p>
 
         <div className="space-y-3 mb-6">
@@ -177,11 +183,17 @@ const EditGoalSystemModal = ({ goal, onClose, onSave, allGoals }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[250] p-4 backdrop-blur-md" onClick={onClose}>
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="edit-goal-system-title"
+      className="fixed inset-0 bg-black/60 flex items-center justify-center z-[250] p-4 backdrop-blur-md"
+      onClick={onClose}
+    >
       <div className="bg-bg-card rounded-[32px] p-6 md:p-8 w-full max-w-2xl shadow-float border border-border-light max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95" onClick={e => e.stopPropagation()}>
         <div className="flex justify-between items-center mb-6">
           <div>
-            <h3 className="text-xl font-black text-text-main tracking-tight">Edit Goal System</h3>
+            <h3 id="edit-goal-system-title" className="text-xl font-black text-text-main tracking-tight">Edit Goal System</h3>
             <p className="text-xs font-bold text-text-muted mt-0.5">Optimize your system configuration and daily habits on the fly.</p>
           </div>
           <button type="button" onClick={onClose} className="px-4 py-2 rounded-xl bg-bg-input text-text-muted font-bold text-xs hover:bg-border-light transition-colors">Cancel</button>
@@ -436,12 +448,14 @@ const HabitRow = ({ habit, goalId, logHabitTime, deleteHabit, toggleHabitCheck, 
           <div className="flex items-center gap-2 flex-1 min-w-0">
             <button
               onClick={() => toggleHabitCheck(goalId, habit.id)}
+              aria-label={done ? `Mark "${habit.title}" as incomplete` : `Mark "${habit.title}" as complete`}
+              aria-pressed={done}
               className={`
                  w-8 h-8 shrink-0 rounded-lg border-2 flex items-center justify-center transition-all duration-200
                  ${done ? 'bg-emerald-500 border-emerald-500 scale-95' : 'bg-bg-card border-border-med cursor-pointer hover:border-accent-blue'}
                `}
             >
-              {done ? <Check size={14} className="text-white animate-in zoom-in-50" strokeWidth={3} /> : (isCheck ? null : <Icon size={12} className="text-text-muted" />)}
+              {done ? <Check size={14} className="text-white animate-in zoom-in-50" strokeWidth={3} aria-hidden="true" /> : (isCheck ? null : <Icon size={12} className="text-text-muted" aria-hidden="true" />)}
             </button>
 
             <div className="flex-1 min-w-0">
@@ -458,20 +472,39 @@ const HabitRow = ({ habit, goalId, logHabitTime, deleteHabit, toggleHabitCheck, 
           <div className="flex items-center gap-1 shrink-0">
             {isCount ? (
               <div className="flex bg-bg-card rounded-lg border border-border-light overflow-hidden shadow-sm h-7">
-                <button onClick={() => updateHabitCount(goalId, habit.id, -1)} className="px-2 py-0.5 text-text-main font-black hover:bg-bg-input transition-colors text-xs">−</button>
-                <button onClick={() => updateHabitCount(goalId, habit.id, 1)} className="px-2 py-0.5 text-accent-blue font-black border-l border-border-light hover:bg-bg-input transition-colors text-xs">+</button>
+                <button
+                  onClick={() => updateHabitCount(goalId, habit.id, -1)}
+                  aria-label={`Decrease count for ${habit.title}`}
+                  className="px-2 py-0.5 text-text-main font-black hover:bg-bg-input transition-colors text-xs"
+                >−</button>
+                <button
+                  onClick={() => updateHabitCount(goalId, habit.id, 1)}
+                  aria-label={`Increase count for ${habit.title}`}
+                  className="px-2 py-0.5 text-accent-blue font-black border-l border-border-light hover:bg-bg-input transition-colors text-xs"
+                >+</button>
               </div>
             ) : (!isCheck && !done) && (
               <button onClick={() => setShowLog(true)} className="h-7 px-2.5 rounded-lg bg-accent-blue text-white text-[9px] font-black shadow-sm active:scale-95 transition-all">+ Log</button>
             )}
-            <button onClick={() => deleteHabit(goalId, habit.id)} className="w-7 h-7 rounded-lg text-text-muted hover:text-rose-500 hover:bg-rose-500/10 transition-all flex items-center justify-center shrink-0">
-              <Trash2 size={12} />
+            <button
+              onClick={() => deleteHabit(goalId, habit.id)}
+              aria-label={`Delete habit: ${habit.title}`}
+              className="w-7 h-7 rounded-lg text-text-muted hover:text-rose-500 hover:bg-rose-500/10 transition-all flex items-center justify-center shrink-0"
+            >
+              <Trash2 size={12} aria-hidden="true" />
             </button>
           </div>
         </div>
 
         {!isCheck && (
-          <div className="w-full bg-bg-card rounded-full h-1 overflow-hidden">
+          <div
+            className="w-full bg-bg-card rounded-full h-1 overflow-hidden"
+            role="progressbar"
+            aria-valuenow={pct}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label={`${habit.title} progress: ${current} of ${target}`}
+          >
             <div className={`h-full transition-all duration-700 ${done ? 'bg-emerald-500' : 'bg-accent-blue'}`} style={{ width: `${pct}%` }} />
           </div>
         )}
@@ -484,6 +517,9 @@ const HabitRow = ({ habit, goalId, logHabitTime, deleteHabit, toggleHabitCheck, 
             </div>
             <button
               type="button"
+              role="switch"
+              aria-checked={!!habit.reminderEnabled}
+              aria-label={`Reminder for ${habit.title}`}
               onClick={(e) => {
                 e.stopPropagation();
                 updateHabitReminder(goalId, habit.id, !habit.reminderEnabled, habit.reminderTime);
@@ -498,6 +534,7 @@ const HabitRow = ({ habit, goalId, logHabitTime, deleteHabit, toggleHabitCheck, 
               <input
                 type="time"
                 value={habit.reminderTime || '08:00'}
+                aria-label={`Reminder time for ${habit.title}`}
                 onClick={e => e.stopPropagation()}
                 onChange={e => updateHabitReminder(goalId, habit.id, true, e.target.value)}
                 className="bg-transparent border-none text-[9px] font-black text-accent-blue outline-none cursor-pointer"
@@ -801,27 +838,31 @@ export const GoalsPage = () => {
               <button
                 type="button"
                 onClick={() => setIsReorderMode(!isReorderMode)}
+                aria-label={isReorderMode ? 'Exit reorder mode' : 'Enable goal reorder mode'}
+                aria-pressed={isReorderMode}
                 title={isReorderMode ? "Exit Reorder Mode" : "Reorder Queue"}
                 className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer ${isReorderMode ? 'text-accent-blue bg-accent-blue/10 border border-accent-blue/20' : 'text-white/40 hover:text-white hover:bg-white/5'
                   }`}
               >
-                <GripVertical size={16} strokeWidth={2.5} />
+                <GripVertical size={16} strokeWidth={2.5} aria-hidden="true" />
               </button>
               <button
                 type="button"
                 onClick={handleExpandAll}
+                aria-label="Expand all goals"
                 title="Expand All"
                 className="w-9 h-9 rounded-xl flex items-center justify-center text-white/40 hover:text-white hover:bg-white/5 transition-all cursor-pointer"
               >
-                <Maximize2 size={16} strokeWidth={2.5} />
+                <Maximize2 size={16} strokeWidth={2.5} aria-hidden="true" />
               </button>
               <button
                 type="button"
                 onClick={handleCollapseAll}
+                aria-label="Collapse all goals"
                 title="Collapse All"
                 className="w-9 h-9 rounded-xl flex items-center justify-center text-white/40 hover:text-rose-400 hover:bg-white/5 transition-all cursor-pointer"
               >
-                <Minimize2 size={16} strokeWidth={2.5} />
+                <Minimize2 size={16} strokeWidth={2.5} aria-hidden="true" />
               </button>
             </div>
 
@@ -830,9 +871,12 @@ export const GoalsPage = () => {
               <button
                 type="button"
                 onClick={() => setShowOverflowMenu(!showOverflowMenu)}
+                aria-label="More actions"
+                aria-expanded={showOverflowMenu}
+                aria-haspopup="true"
                 className="w-9 h-9 rounded-xl flex items-center justify-center text-white/50 hover:text-white bg-bg-card/40 border border-white/5 active:scale-95 transition-all"
               >
-                <MoreVertical size={18} />
+                <MoreVertical size={18} aria-hidden="true" />
               </button>
 
               {showOverflowMenu && (
@@ -883,7 +927,7 @@ export const GoalsPage = () => {
 
       {/* Add Goal Form */}
       {showAddGoal && (
-        <form onSubmit={submitGoal} className="bg-bg-card rounded-2xl p-4 sm:p-6 flex flex-col gap-4 border border-border-light shadow-float animate-in fade-in slide-in-from-top-4 duration-500 max-w-3xl mx-auto w-full">
+        <form onSubmit={submitGoal} role="dialog" className="bg-bg-card rounded-2xl p-4 sm:p-6 flex flex-col gap-4 border border-border-light shadow-float animate-in fade-in slide-in-from-top-4 duration-500 max-w-3xl mx-auto w-full">
           {/* Quick Creation Row: Goal Name + Target Date (Optional) */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1.5">

@@ -88,7 +88,10 @@ export const AuthPage = () => {
 
 
   return (
-    <div className="min-h-screen bg-bg-app flex items-center justify-center p-6 md:p-12 lg:p-16 relative overflow-hidden font-inter">
+    <main
+      aria-label="Sign in to GoalForge"
+      className="min-h-screen bg-bg-app flex items-center justify-center p-6 md:p-12 lg:p-16 relative overflow-hidden font-inter"
+    >
       {/* Cinematic background elements */}
       <div className="absolute top-[-10%] left-[-10%] w-[50%] aspect-square bg-accent-blue/10 rounded-full blur-[120px] animate-pulse" />
       <div className="absolute bottom-[-10%] right-[-10%] w-[50%] aspect-square bg-accent-blue/5 rounded-full blur-[120px]" />
@@ -121,7 +124,7 @@ export const AuthPage = () => {
                 <Loader2 size={20} className="animate-spin" />
               ) : (
                 <>
-                  <svg width="20" height="20" viewBox="0 0 48 48">
+                  <svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true">
                     <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
                     <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
                     <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
@@ -146,67 +149,75 @@ export const AuthPage = () => {
         {/* Form */}
         <form onSubmit={handleSubmit} className="flex flex-col gap-5">
           {displayError && (
-            <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-bold text-center tracking-wide animate-in fade-in slide-in-from-top-2 flex items-start gap-2">
-              <AlertTriangle size={14} className="shrink-0 mt-0.5" />
+            <div role="alert" className="p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-bold text-center tracking-wide animate-in fade-in slide-in-from-top-2 flex items-start gap-2">
+              <AlertTriangle size={14} className="shrink-0 mt-0.5" aria-hidden="true" />
               <span>{displayError}</span>
             </div>
           )}
           {message && (
-            <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-xs font-black text-center uppercase tracking-widest animate-in fade-in slide-in-from-top-2">
+            <div role="status" className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-xs font-black text-center uppercase tracking-widest animate-in fade-in slide-in-from-top-2">
               {message}
             </div>
           )}
 
           {!isLogin && !isForgot && (
             <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-text-muted uppercase tracking-widest px-1">Full Name</label>
-              <input 
-                type="text" 
-                required 
-                value={name} 
+              <label htmlFor="mobile-signup-name" className="text-[10px] font-black text-text-muted uppercase tracking-widest px-1">Full Name</label>
+              <input
+                id="mobile-signup-name"
+                type="text"
+                required
+                value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Agent Name"
+                autoComplete="name"
                 className="w-full bg-bg-input/50 border border-border-light rounded-xl px-4 py-4 text-sm font-bold text-text-main outline-hidden focus:border-accent-blue focus:ring-4 focus:ring-accent-blue/10 transition-all placeholder:text-text-muted/30"
               />
             </div>
           )}
 
           <div className="space-y-1.5">
-            <label className="text-[10px] font-black text-text-muted uppercase tracking-widest px-1">
+            <label htmlFor="mobile-email" className="text-[10px] font-black text-text-muted uppercase tracking-widest px-1">
               {isForgot ? 'Your Email' : 'Email Terminal'}
             </label>
             <div className="relative">
-              <input 
-                type="email" 
-                required 
-                value={email} 
+              <input
+                id="mobile-email"
+                type="email"
+                required
+                value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@forge.com"
+                autoComplete="email"
                 className="w-full bg-bg-input/50 border border-border-light rounded-xl px-4 py-4 pr-12 text-sm font-bold text-text-main outline-hidden focus:border-accent-blue focus:ring-4 focus:ring-accent-blue/10 transition-all placeholder:text-text-muted/30"
               />
-              <Mail size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-text-muted/30" />
+              <Mail size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-text-muted/30" aria-hidden="true" />
             </div>
           </div>
 
           {!isForgot && (
             <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-text-muted uppercase tracking-widest px-1">Encryption Key</label>
+              <label htmlFor="mobile-password" className="text-[10px] font-black text-text-muted uppercase tracking-widest px-1">Password</label>
               <div className="relative">
-                <input 
-                  type={showPassword ? "text" : "password"} 
-                  required 
-                  value={password} 
+                <input
+                  id="mobile-password"
+                  type={showPassword ? "text" : "password"}
+                  required
+                  value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
                   minLength={6}
+                  autoComplete={isLogin ? 'current-password' : 'new-password'}
                   className="w-full bg-bg-input/50 border border-border-light rounded-xl px-4 py-4 pr-12 text-sm font-bold text-text-main outline-hidden focus:border-accent-blue focus:ring-4 focus:ring-accent-blue/10 transition-all placeholder:text-text-muted/30"
                 />
-                <button 
-                  type="button" 
+                <button
+                  type="button"
                   onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  aria-controls="mobile-password"
                   className="absolute right-4 top-1/2 -translate-y-1/2 text-text-muted hover:text-accent-blue transition-colors p-1"
                 >
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  {showPassword ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
                 </button>
               </div>
             </div>
@@ -363,54 +374,62 @@ export const AuthPage = () => {
 
             {!isLogin && !isForgot && (
               <div className="space-y-1">
-                <label className="text-[10px] font-black text-text-muted uppercase tracking-widest px-1">Full Name</label>
-                <input 
-                  type="text" 
-                  required 
-                  value={name} 
+                <label htmlFor="desktop-signup-name" className="text-[10px] font-black text-text-muted uppercase tracking-widest px-1">Full Name</label>
+                <input
+                  id="desktop-signup-name"
+                  type="text"
+                  required
+                  value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Agent Name"
+                  autoComplete="name"
                   className="w-full bg-bg-input/50 border border-border-light rounded-xl px-4 py-3 text-sm font-bold text-text-main outline-hidden focus:border-accent-blue focus:ring-4 focus:ring-accent-blue/10 transition-all placeholder:text-text-muted/30"
                 />
               </div>
             )}
 
             <div className="space-y-1">
-              <label className="text-[10px] font-black text-text-muted uppercase tracking-widest px-1">
+              <label htmlFor="desktop-email" className="text-[10px] font-black text-text-muted uppercase tracking-widest px-1">
                 {isForgot ? 'Your Email' : 'Email Terminal'}
               </label>
               <div className="relative">
-                <input 
-                  type="email" 
-                  required 
-                  value={email} 
+                <input
+                  id="desktop-email"
+                  type="email"
+                  required
+                  value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@forge.com"
+                  autoComplete="email"
                   className="w-full bg-bg-input/50 border border-border-light rounded-xl px-4 py-3 pr-12 text-sm font-bold text-text-main outline-hidden focus:border-accent-blue focus:ring-4 focus:ring-accent-blue/10 transition-all placeholder:text-text-muted/30"
                 />
-                <Mail size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-text-muted/30" />
+                <Mail size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-text-muted/30" aria-hidden="true" />
               </div>
             </div>
 
             {!isForgot && (
               <div className="space-y-1">
-                <label className="text-[10px] font-black text-text-muted uppercase tracking-widest px-1">Encryption Key</label>
+                <label htmlFor="desktop-password" className="text-[10px] font-black text-text-muted uppercase tracking-widest px-1">Password</label>
                 <div className="relative">
-                  <input 
-                    type={showPassword ? "text" : "password"} 
-                    required 
-                    value={password} 
+                  <input
+                    id="desktop-password"
+                    type={showPassword ? "text" : "password"}
+                    required
+                    value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
                     minLength={6}
+                    autoComplete={isLogin ? 'current-password' : 'new-password'}
                     className="w-full bg-bg-input/50 border border-border-light rounded-xl px-4 py-3 pr-12 text-sm font-bold text-text-main outline-hidden focus:border-accent-blue focus:ring-4 focus:ring-accent-blue/10 transition-all placeholder:text-text-muted/30"
                   />
-                  <button 
-                    type="button" 
+                  <button
+                    type="button"
                     onClick={() => setShowPassword(!showPassword)}
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    aria-controls="desktop-password"
                     className="absolute right-4 top-1/2 -translate-y-1/2 text-text-muted hover:text-accent-blue transition-colors p-1"
                   >
-                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    {showPassword ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
                   </button>
                 </div>
               </div>
@@ -477,6 +496,6 @@ export const AuthPage = () => {
         </div>
 
       </div>
-    </div>
+    </main>
   );
 };

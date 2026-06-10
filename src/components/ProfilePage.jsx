@@ -325,10 +325,10 @@ export const ProfilePage = () => {
                                 deleteMemory(memory.id);
                               }
                             }}
+                            aria-label={`Delete memory: ${memory.title}`}
                             className="text-text-muted/40 hover:text-red-400 p-1 rounded-lg transition-colors"
-                            title="Delete Memory"
                           >
-                            <Trash2 size={13} />
+                            <Trash2 size={13} aria-hidden="true" />
                           </button>
                         </div>
                       </div>
@@ -445,11 +445,14 @@ export const ProfilePage = () => {
                 <p className="text-sm font-black text-text-main">Smart Notifications</p>
                 <p className="text-[10px] font-bold text-text-muted mt-0.5 max-w-[200px]">Get daily PWA pushes if you're falling behind on goals.</p>
               </div>
-              <button 
+              <button
                 onClick={handleToggleNotifications}
+                role="switch"
+                aria-checked={pushPerm === 'granted'}
+                aria-label={`Smart notifications: ${pushPerm === 'granted' ? 'enabled' : 'disabled'}`}
                 className={`w-12 h-6 rounded-full relative transition-colors ${pushPerm === 'granted' ? 'bg-accent-blue' : 'bg-border-med'}`}
               >
-                <div className={`w-4 h-4 rounded-full bg-white absolute top-1 transition-transform ${pushPerm === 'granted' ? 'translate-x-7' : 'translate-x-1'}`} />
+                <div className={`w-4 h-4 rounded-full bg-white absolute top-1 transition-transform ${pushPerm === 'granted' ? 'translate-x-7' : 'translate-x-1'}`} aria-hidden="true" />
               </button>
             </div>
           </section>
@@ -522,12 +525,18 @@ export const ProfilePage = () => {
 
       {/* Badge Detail Modal */}
       {selectedBadge && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[200] p-4" onClick={() => setSelectedBadge(null)}>
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="badge-modal-title"
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[200] p-4"
+          onClick={() => setSelectedBadge(null)}
+        >
           <div className="bg-bg-card rounded-[32px] p-8 w-full max-w-sm shadow-float border border-border-light animate-in fade-in zoom-in-95 text-center space-y-4" onClick={e => e.stopPropagation()}>
-            <div className="w-20 h-20 rounded-2xl bg-accent-blue/10 border border-accent-blue/20 flex items-center justify-center mx-auto">
+            <div className="w-20 h-20 rounded-2xl bg-accent-blue/10 border border-accent-blue/20 flex items-center justify-center mx-auto" aria-hidden="true">
               <span className="text-4xl">{selectedBadge.icon}</span>
             </div>
-            <h3 className="text-xl font-black text-text-main tracking-tight">{selectedBadge.title}</h3>
+            <h3 id="badge-modal-title" className="text-xl font-black text-text-main tracking-tight">{selectedBadge.title}</h3>
             <p className="text-sm font-bold text-text-muted leading-relaxed">{selectedBadge.description}</p>
             {badgeUnlockDates[selectedBadge.id] && (
               <p className="text-xs font-black text-accent-blue uppercase tracking-widest">
@@ -542,11 +551,14 @@ export const ProfilePage = () => {
       )}
       {/* Story Moment Replay / History Modal */}
       {activeReplayMemory && (
-        <div 
-          className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[200] p-4 animate-in fade-in duration-300" 
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="replay-modal-title"
+          className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[200] p-4 animate-in fade-in duration-300"
           onClick={() => setActiveReplayMemory(null)}
         >
-          <div 
+          <div
             className="bg-[#0e0e11] border border-white/10 rounded-[32px] p-6 md:p-8 w-full max-w-md shadow-2xl relative overflow-hidden text-center space-y-6 animate-in zoom-in-95 duration-300"
             onClick={e => e.stopPropagation()}
           >
@@ -562,7 +574,7 @@ export const ProfilePage = () => {
               <span className="text-[10px] font-black tracking-[0.3em] uppercase text-accent-blue">
                 Mastered Journey Story
               </span>
-              <h3 className="text-2xl font-black text-white tracking-tight leading-tight">
+              <h3 id="replay-modal-title" className="text-2xl font-black text-white tracking-tight leading-tight">
                 {activeReplayMemory.title}
               </h3>
               <p className="text-xs text-white/40 font-bold uppercase tracking-wider">

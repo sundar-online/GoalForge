@@ -28,7 +28,10 @@ export const DeleteConfirmationModal = ({
   if (!isOpen) return null;
 
   return (
-    <div 
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="delete-modal-title"
       className="fixed inset-0 z-[9999] flex items-center justify-center p-4 animate-in fade-in duration-200"
       onClick={onClose}
     >
@@ -36,7 +39,7 @@ export const DeleteConfirmationModal = ({
       <div className="absolute inset-0 bg-black/85 backdrop-blur-md" />
 
       {/* Modal Container */}
-      <div 
+      <div
         className="relative bg-bg-card border border-border-light rounded-[32px] p-6 md:p-8 w-full max-w-md shadow-float overflow-hidden space-y-6 animate-in zoom-in-95 duration-200 text-center"
         onClick={(e) => e.stopPropagation()}
       >
@@ -50,7 +53,7 @@ export const DeleteConfirmationModal = ({
 
         {/* Text Header */}
         <div className="space-y-2">
-          <h3 className="text-xl md:text-2xl font-black text-text-main tracking-tight leading-none">
+          <h3 id="delete-modal-title" className="text-xl md:text-2xl font-black text-text-main tracking-tight leading-none">
             {title}
           </h3>
           {itemName && (
@@ -90,10 +93,10 @@ export const DeleteConfirmationModal = ({
         {/* Optional absolute top corner X dismiss */}
         <button
           onClick={onClose}
+          aria-label="Close dialog"
           className="absolute top-4 right-4 text-text-muted/40 hover:text-text-main p-1.5 rounded-xl transition-colors"
-          title="Close Modal"
         >
-          <X size={18} />
+          <X size={18} aria-hidden="true" />
         </button>
       </div>
     </div>
