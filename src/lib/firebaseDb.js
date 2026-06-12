@@ -686,6 +686,7 @@ export async function fetchUserSettings(userId) {
       focusTimeToday: data.focus_time_today || 0,
       lastReset: data.last_reset || null,
       dailyResetProcessed: data.daily_reset_processed || '',
+      aiSettings: data.ai_settings || null,
     };
   } catch (err) {
     log('fetchUserSettings', err);
@@ -700,6 +701,9 @@ export async function upsertUserSettings(userId, settings) {
     last_reset: settings.lastReset,
     ...(settings.dailyResetProcessed !== undefined && {
       daily_reset_processed: settings.dailyResetProcessed
+    }),
+    ...(settings.aiSettings !== undefined && {
+      ai_settings: settings.aiSettings
     }),
     updated_at: new Date().toISOString(),
   };
@@ -1008,6 +1012,8 @@ export async function clearUserDataDb(userId) {
       total_completions: 0,
       last_xp_date: '',
       xp_history: [],
+      night_owl_dates: [],
+      early_bird_dates: [],
       updated_at: new Date().toISOString()
     };
     await setDoc(xpRef, xpPayload, { merge: true });

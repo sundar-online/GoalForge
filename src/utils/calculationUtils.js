@@ -139,13 +139,22 @@ export const isTaskDone = (t) => {
 
 export const calculateAccuracy = (tasks, goals) => {
   const activeGoals = goals.filter(g => !g.isMissingDream);
-  const todayHabits = activeGoals.flatMap(g => g.habits || []).filter(isHabitScheduledToday);
-  const completedTodayHabitsCount = todayHabits.filter(isHabitDoneToday).length;
 
-  const totalUnits = todayHabits.length;
-  if (totalUnits === 0) return 100;
-  
-  return Math.round((completedTodayHabitsCount / totalUnits) * 100);
+  // Filter to goals that have at least one habit scheduled today
+  const goalsWithScheduledHabits = activeGoals.filter(g => {
+    const scheduled = (g.habits || []).filter(isHabitScheduledToday);
+    return scheduled.length > 0;
+  });
+
+  if (goalsWithScheduledHabits.length === 0) return 100;
+
+  // Average each goal's rule-aware daily progress so that goals with CUSTOM/ANY
+  // modes are evaluated against their configured minimum, not the raw habit total.
+  const totalProgress = goalsWithScheduledHabits.reduce((sum, g) => {
+    return sum + calculateGoalDailyProgress(g);
+  }, 0);
+
+  return Math.round(totalProgress / goalsWithScheduledHabits.length);
 };
 
 export const calculateDisciplineScore = (accuracy, avgStreak, focusTime) => {
@@ -248,7 +257,7 @@ export const calculateWeeklyReport = (taskLogs) => {
   
   const totalCompleted = weeklyStats.reduce((acc, d) => acc + (d.completed_tasks || 0), 0);
   const totalTasks = weeklyStats.reduce((acc, d) => acc + (d.total_tasks || 0), 0);
-  const totalFocusTime = weeklyStats.reduce((acc, d) => acc + (d.time_spent || 0), 0);
+  const totalFocusTime = weeklyStats.reduce((acc, d) => acc + (d.time_spent || 0), 0) * 60;
   
   const weeklyAccuracy = totalTasks === 0 ? 0 : Math.round((totalCompleted / totalTasks) * 100);
   
@@ -571,11 +580,12 @@ export const getGoalScheduledDays = (goal) => {
  * Calculates the exact goal streak (consecutive scheduled days fully completed).
  * Bug G5 fix: now returns { current, best } matching calculateTaskStreak shape.
  */
-export const calculateGoalStreak = (completedDates, scheduleDays = []) => {
+export const calculateGoalStreak = (completedDates, scheduleDays = [], createdAt = null) => {
   if (!completedDates || completedDates.length === 0) return { current: 0, best: 0 };
 
   const completedSet = new Set(completedDates);
   const todayStr = TODAY();
+  const createdStr = normalizeDateStr(createdAt, null);
 
   // Find the earliest date to set a dynamic simulation window
   const sorted = [...completedSet].sort();
@@ -588,6 +598,10 @@ export const calculateGoalStreak = (completedDates, scheduleDays = []) => {
 
   for (let i = startDaysAgo; i >= 0; i--) {
     const currentDateStr = addDays(todayStr, -i);
+
+    // Skip dates before the goal was created to avoid false missed-day resets
+    if (createdStr && currentDateStr < createdStr) continue;
+
     const isCompleted = completedSet.has(currentDateStr);
 
     const dateObj = parseLocalDate(currentDateStr);
@@ -649,13 +663,14 @@ export const getTaskTrackingKey = (task) => {
   return `${titlePart}_${typePart}`;
 };
 
-export const calculateTaskStreak = (completedDates, scheduleDays = []) => {
+export const calculateTaskStreak = (completedDates, scheduleDays = [], createdAt = null) => {
   if (!completedDates || completedDates.length === 0) {
     return { current: 0, best: 0 };
   }
 
   const completedSet = new Set(completedDates);
   const todayStr = TODAY();
+  const createdStr = normalizeDateStr(createdAt, null);
   const sortedDates = [...completedSet].sort();
 
   if (sortedDates.length === 0) return { current: 0, best: 0 };
@@ -700,6 +715,10 @@ export const calculateTaskStreak = (completedDates, scheduleDays = []) => {
 
   for (let i = startDaysAgo; i >= 0; i--) {
     const currentDateStr = addDays(todayStr, -i);
+
+    // Skip dates before the task was created to avoid false missed-day resets
+    if (createdStr && currentDateStr < createdStr) continue;
+
     const isCompleted = completedSet.has(currentDateStr);
 
     // Determine whether this day is a scheduled day for the task

@@ -5,19 +5,248 @@ import { BADGE_DEFINITIONS, LEVEL_THRESHOLDS, getLevelFromXP } from '../utils/ga
 import { Award, Zap, Target, Clock, Flame, TrendingUp, Star, Lock, ChevronRight, Bell, BellOff, BookOpen, Trash2, Sparkles, History } from 'lucide-react';
 import {requestNotificationPermission, checkNotificationPermission } from '../utils/notificationUtils';
 
+const parseLocalDate = (dateStr) => {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, m - 1, d);
+};
+
+const getBadgeProgress = (badge, state) => {
+  const { goals = [], tasks = [], notes = [], focusHistory = {}, focusTime = 0, comebackCount = 0, totalCompletions = 0, nightOwlDates = [], earlyBirdDates = [], memories = [], disciplineScore = 0, sessionLogs = [], taskLogs = {} } = state;
+
+  const maxStreak = Math.max(
+    0,
+    ...goals.flatMap(g => (g.habits || []).map(h => h.streak ?? 0)),
+    ...tasks.map(t => t.currentStreak ?? 0)
+  );
+  
+  const maxHabitStreak = Math.max(
+    0,
+    ...goals.flatMap(g => (g.habits || []).map(h => h.streak ?? 0))
+  );
+
+  const totalFocusSeconds = Object.values(focusHistory).reduce((a, b) => a + b, 0) + focusTime;
+  const totalFocusHours = Math.floor(totalFocusSeconds / 3600);
+
+  const completedGoalsCount = Math.max(
+    memories.length,
+    goals.filter(g => g.progress === 100).length
+  );
+
+  switch (badge.id) {
+    // Consistency
+    case 'streak_apprentice':
+      return { current: maxStreak, target: 7, unit: 'days' };
+    case 'streak_master':
+      return { current: maxStreak, target: 30, unit: 'days' };
+    case 'iron_will':
+      return { current: maxStreak, target: 60, unit: 'days' };
+    case 'unbreakable':
+      return { current: maxStreak, target: 100, unit: 'days' };
+    case 'eternal_forge':
+      return { current: maxStreak, target: 365, unit: 'days' };
+
+    // Learning
+    case 'scholar':
+    case 'knowledge_seeker':
+    case 'lifelong_learner': {
+      const target = badge.id === 'scholar' ? 10 : badge.id === 'knowledge_seeker' ? 50 : 100;
+      const count = (sessionLogs || []).filter(s => {
+        const goal = goals.find(g => String(g.id) === String(s.goalId));
+        if (goal && goal.tag === 'Learning') return true;
+        const title = (s.title || '').toLowerCase();
+        const goalTitle = (s.goalTitle || '').toLowerCase();
+        return title.includes('learn') || title.includes('study') || title.includes('read') || title.includes('course') ||
+               goalTitle.includes('learn') || goalTitle.includes('study') || goalTitle.includes('read') || goalTitle.includes('course');
+      }).length;
+      return { current: count, target, unit: 'sessions' };
+    }
+
+    // Focus
+    case 'deep_worker':
+      return { current: totalFocusHours, target: 10, unit: 'hours' };
+    case 'focus_titan':
+      return { current: totalFocusHours, target: 50, unit: 'hours' };
+    case 'time_architect':
+      return { current: totalFocusHours, target: 100, unit: 'hours' };
+
+    // Accuracy
+    case 'sharpshooter':
+    case 'precision_master':
+    case 'perfectionist': {
+      const target = badge.id === 'sharpshooter' ? 7 : badge.id === 'precision_master' ? 30 : 10;
+      const minAcc = badge.id === 'perfectionist' ? 100 : 90;
+      const todayStr = new Date().toISOString().split('T')[0];
+      const todayAccuracy = state.accuracy ?? 100;
+
+      const dates = Object.keys(taskLogs).filter(d => d !== todayStr);
+      const accMap = {};
+      dates.forEach(d => {
+        const log = taskLogs[d];
+        accMap[d] = log.total_tasks > 0 ? (log.completed_tasks / log.total_tasks) * 100 : 100;
+      });
+      accMap[todayStr] = todayAccuracy;
+
+      const allDates = Object.keys(accMap).sort();
+      let currentAccStreak = 0;
+      if (allDates.length > 0) {
+        const firstDate = parseLocalDate(allDates[0]);
+        const lastDate = parseLocalDate(todayStr);
+
+        let curr = new Date(firstDate);
+        let maxStreak = 0;
+        let runningStreak = 0;
+        while (curr <= lastDate) {
+          const dStr = curr.getFullYear() + '-' + String(curr.getMonth() + 1).padStart(2, '0') + '-' + String(curr.getDate()).padStart(2, '0');
+          const acc = accMap[dStr];
+
+          if (acc !== undefined && acc >= minAcc) {
+            runningStreak++;
+            if (runningStreak > maxStreak) {
+              maxStreak = runningStreak;
+            }
+          } else {
+            runningStreak = 0;
+          }
+          curr.setDate(curr.getDate() + 1);
+        }
+        currentAccStreak = maxStreak;
+      }
+      return { current: currentAccStreak, target, unit: 'days' };
+    }
+
+    // Recovery
+    case 'comeback_king':
+      return { current: comebackCount, target: 1, unit: 'recoveries' };
+    case 'phoenix_rising':
+      return { current: comebackCount >= 1 ? maxStreak : 0, target: 30, unit: 'streak' };
+    case 'never_give_up':
+      return { current: comebackCount, target: 3, unit: 'recoveries' };
+
+    // System Builder
+    case 'architect':
+      return { current: goals.length, target: 5, unit: 'goals' };
+    case 'forge_master':
+      return { current: goals.filter(g => !g.isMissingDream).length, target: 10, unit: 'active goals' };
+    case 'empire_builder':
+      return { current: completedGoalsCount, target: 25, unit: 'goals mastered' };
+
+    // Discipline
+    case 'diamond_hands':
+      return { current: state.level || 1, target: 5, unit: 'level' };
+    case 'spartan_mind':
+      return { current: maxHabitStreak, target: 50, unit: 'days streak' };
+    case 'discipline_legend':
+      return { current: disciplineScore, target: 100, unit: 'points' };
+
+    // Reflection
+    case 'chronicler':
+      return { current: notes.length, target: 10, unit: 'notes' };
+    case 'story_keeper':
+      return { current: notes.length, target: 50, unit: 'notes' };
+    case 'wisdom_archivist':
+      return { current: notes.length, target: 100, unit: 'notes' };
+
+    // Achievement
+    case 'centurion':
+      return { current: totalCompletions, target: 100, unit: 'tasks' };
+    case 'champion':
+      return { current: totalCompletions, target: 500, unit: 'tasks' };
+    case 'legend':
+      return { current: totalCompletions, target: 1000, unit: 'tasks' };
+
+    // Legendary
+    case 'night_owl':
+      return { current: nightOwlDates.length, target: 7, unit: 'days' };
+    case 'early_bird':
+      return { current: earlyBirdDates.length, target: 7, unit: 'days' };
+    case 'weekend_warrior': {
+      const todayStr = new Date().toISOString().split('T')[0];
+      const todayAccuracy = state.accuracy ?? 100;
+
+      const dates = Object.keys(taskLogs).filter(d => d !== todayStr);
+      const accMap = {};
+      dates.forEach(d => {
+        const log = taskLogs[d];
+        accMap[d] = log.total_tasks > 0 ? (log.completed_tasks / log.total_tasks) * 100 : 100;
+      });
+      accMap[todayStr] = todayAccuracy;
+
+      const weekendCompletions = {};
+
+      Object.keys(accMap).forEach(dStr => {
+        const date = parseLocalDate(dStr);
+        const day = date.getDay(); // 0 = Sunday, 6 = Saturday
+        if (day === 0 || day === 6) {
+          const monday = new Date(date);
+          const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+          monday.setDate(diff);
+          const weekKey = monday.getFullYear() + '-' + String(monday.getMonth() + 1).padStart(2, '0') + '-' + String(monday.getDate()).padStart(2, '0');
+
+          if (!weekendCompletions[weekKey]) {
+            weekendCompletions[weekKey] = { sat: false, sun: false };
+          }
+
+          const is100 = accMap[dStr] >= 100;
+          if (day === 6) weekendCompletions[weekKey].sat = is100;
+          if (day === 0) weekendCompletions[weekKey].sun = is100;
+        }
+      });
+
+      let wCount = 0;
+      Object.values(weekendCompletions).forEach(w => {
+        if (w.sat && w.sun) wCount++;
+      });
+      return { current: wCount, target: 10, unit: 'weekends' };
+    }
+    case 'renaissance_soul': {
+      const unlockedSet = new Set(state.earnedBadges || []);
+      const categoriesToCheck = ['consistency', 'learning', 'focus', 'accuracy', 'recovery', 'system', 'discipline', 'reflection', 'achievement'];
+      const currentCatsCount = categoriesToCheck.filter(cat => {
+        const catBadges = BADGE_DEFINITIONS.filter(b => b.category === cat).map(b => b.id);
+        return catBadges.some(id => unlockedSet.has(id));
+      }).length;
+      return { current: currentCatsCount, target: 9, unit: 'categories' };
+    }
+    case 'the_goalforge': {
+      const unlockedSet = new Set(state.earnedBadges || []);
+      const otherBadgeIds = BADGE_DEFINITIONS.filter(b => b.id !== 'the_goalforge').map(b => b.id);
+      const count = otherBadgeIds.filter(id => unlockedSet.has(id)).length;
+      return { current: count, target: 33, unit: 'badges' };
+    }
+    default:
+      return null;
+  }
+};
+
+const CATEGORY_METADATA = {
+  consistency: { title: 'Consistency', icon: '🔥', description: 'Streaks and daily routines' },
+  learning: { title: 'Learning', icon: '🧠', description: 'Acquiring knowledge and courses' },
+  focus: { title: 'Focus', icon: '⚡', description: 'Deep work and logged hours' },
+  accuracy: { title: 'Accuracy', icon: '🎯', description: 'Completion rates and target hits' },
+  recovery: { title: 'Recovery', icon: '🔄', description: 'Resilience and setbacks' },
+  system: { title: 'System Builder', icon: '🏗️', description: 'Goal creation and architecture' },
+  discipline: { title: 'Discipline', icon: '💎', description: 'Spartan consistency and levels' },
+  reflection: { title: 'Reflection', icon: '📖', description: 'Notes and self-journaling' },
+  achievement: { title: 'Achievement', icon: '🏆', description: 'Task and habit volume' },
+  legendary: { title: 'Hidden Legendary', icon: '🌟', description: 'Secret elite accomplishments' }
+};
+
 export const ProfilePage = () => {
   const {
     xpData: rawXpData, goals, tasks, notes,
     focusTime, focusHistory, accuracy,
     disciplineScore, allHabits,
     memories = [], deleteMemory,
-    clearProfileData
+    clearProfileData,
+    sessionLogs = [],
+    taskLogs = {}
   } = useAppContext();
   const { displayName, user } = useAuth();
   const [selectedBadge, setSelectedBadge] = useState(null);
   const [activeReplayMemory, setActiveReplayMemory] = useState(null);
   const [pushPerm, setPushPerm] = useState('default');
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [activeCategory, setActiveCategory] = useState('all');
 
   useEffect(() => {
     const fetchPerm = async () => {
@@ -181,60 +410,171 @@ export const ProfilePage = () => {
           </section>
 
           {/* Badge Showcase */}
-          <section className="space-y-5">
-            <div className="flex items-center gap-2 px-2">
-              <Award size={18} className="text-accent-blue" />
-              <h3 className="text-[10px] font-black text-text-muted uppercase tracking-[0.15em]">Identity Badges</h3>
+          <section className="space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 px-2">
+              <div className="flex items-center gap-2">
+                <Award size={18} className="text-accent-blue" />
+                <h3 className="text-[10px] font-black text-text-muted uppercase tracking-[0.15em]">Identity Badges</h3>
+              </div>
             </div>
 
+            {/* Category Filter Tabs */}
+            <div className="flex gap-2 pb-2 overflow-x-auto scrollbar-none border-b border-border-light/40">
+              <button
+                onClick={() => setActiveCategory('all')}
+                className={`px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-350 border shrink-0 ${
+                  activeCategory === 'all'
+                    ? 'bg-accent-blue text-white border-accent-blue shadow-lg shadow-accent-blue/20'
+                    : 'bg-bg-card hover:bg-bg-input border-border-light text-text-muted'
+                }`}
+              >
+                🌟 All ({BADGE_DEFINITIONS.length})
+              </button>
+              {Object.entries(CATEGORY_METADATA).map(([key, meta]) => {
+                const catBadgesCount = BADGE_DEFINITIONS.filter(b => b.category === key).length;
+                const catEarnedCount = BADGE_DEFINITIONS.filter(b => b.category === key && earnedBadges.includes(b.id)).length;
+                return (
+                  <button
+                    key={key}
+                    onClick={() => setActiveCategory(key)}
+                    className={`px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-350 border shrink-0 flex items-center gap-2 ${
+                      activeCategory === key
+                        ? 'bg-accent-blue text-white border-accent-blue shadow-lg shadow-accent-blue/20'
+                        : 'bg-bg-card hover:bg-bg-input border-border-light text-text-muted'
+                    }`}
+                  >
+                    <span>{meta.icon}</span>
+                    <span>{meta.title}</span>
+                    <span className={`text-[10px] font-bold ${activeCategory === key ? 'text-white/80' : 'text-text-muted/60'}`}>
+                      ({catEarnedCount}/{catBadgesCount})
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Badges Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {BADGE_DEFINITIONS.map(badge => {
+              {BADGE_DEFINITIONS.filter(b => activeCategory === 'all' || b.category === activeCategory).map(badge => {
                 const isEarned = earnedBadges.includes(badge.id);
                 const unlockDate = badgeUnlockDates[badge.id];
+                const isLegendary = badge.category === 'legendary';
+
+                const displayTitle = (isLegendary && !isEarned) ? 'Hidden Legendary' : badge.title;
+                const displayIcon = (isLegendary && !isEarned) ? '❓' : badge.icon;
+                const displayDesc = isEarned ? badge.description : badge.hint;
+
+                const progress = getBadgeProgress(badge, {
+                  goals, tasks, notes, focusHistory, focusTime,
+                  comebackCount: xpData.comebackCount || 0,
+                  totalCompletions: xpData.totalCompletions || 0,
+                  nightOwlDates: xpData.nightOwlDates || [],
+                  earlyBirdDates: xpData.earlyBirdDates || [],
+                  memories, disciplineScore, accuracy, sessionLogs, taskLogs,
+                  level: levelInfo.level, earnedBadges
+                });
+
+                const hasProgress = !isEarned && progress;
+                const progressPercent = hasProgress ? Math.min(100, Math.round((progress.current / progress.target) * 100)) : 0;
 
                 return (
                   <div
                     key={badge.id}
                     onClick={() => isEarned && setSelectedBadge(badge)}
                     className={`
-                      rounded-[24px] p-5 border-2 transition-all duration-300 relative overflow-hidden
+                      rounded-[24px] p-5 border-2 transition-all duration-300 relative overflow-hidden flex flex-col justify-between
                       ${isEarned
-                        ? 'bg-bg-card border-accent-blue/30 shadow-md hover:shadow-lg hover:scale-[1.02] cursor-pointer'
-                        : 'bg-bg-card/50 border-border-light opacity-60 grayscale'
+                        ? isLegendary
+                          ? 'legendary-card legendary-earned cursor-pointer'
+                          : 'bg-bg-card border-accent-blue/30 shadow-md hover:shadow-lg hover:scale-[1.02] cursor-pointer'
+                        : isLegendary
+                          ? 'bg-bg-card/40 border-yellow-500/10 opacity-75 grayscale-[40%] legendary-card'
+                          : 'bg-bg-card/50 border-border-light opacity-65 grayscale'
                       }
                     `}
                   >
-                    {/* Earned glow */}
-                    {isEarned && (
+                    {/* Earned Glow */}
+                    {isEarned && !isLegendary && (
                       <div className="absolute -top-8 -right-8 w-24 h-24 bg-accent-blue/10 rounded-full blur-2xl" />
                     )}
 
                     <div className="relative z-10 flex items-start gap-4">
-                      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 ${isEarned ? 'bg-accent-blue/10 border border-accent-blue/20' : 'bg-bg-input border border-border-light'}`}>
+                      {/* Icon */}
+                      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 ${
+                        isEarned
+                          ? isLegendary
+                            ? 'bg-yellow-500/10 border border-yellow-500/30'
+                            : 'bg-accent-blue/10 border border-accent-blue/20'
+                          : 'bg-bg-input border border-border-light'
+                      }`}>
                         {isEarned ? (
-                          <span className="text-2xl">{badge.icon}</span>
+                          <span className="text-2xl">{displayIcon}</span>
+                        ) : isLegendary ? (
+                          <span className="text-2xl text-yellow-500/70 font-black">❓</span>
                         ) : (
                           <Lock size={20} className="text-text-muted/40" />
                         )}
                       </div>
+
+                      {/* Info */}
                       <div className="flex-1 min-w-0">
-                        <p className={`text-sm font-black tracking-tight ${isEarned ? 'text-text-main' : 'text-text-muted'}`}>
-                          {badge.title}
+                        <p className={`text-sm font-black tracking-tight ${
+                          isEarned
+                            ? isLegendary
+                              ? 'text-yellow-400'
+                              : 'text-text-main'
+                            : 'text-text-muted'
+                        }`}>
+                          {displayTitle}
                         </p>
                         <p className="text-xs font-bold text-text-muted mt-1 leading-relaxed">
-                          {isEarned ? badge.description : badge.hint}
+                          {displayDesc}
                         </p>
                         {isEarned && unlockDate && (
-                          <p className="text-[9px] font-black text-accent-blue mt-2 uppercase tracking-widest">
+                          <p className={`text-[9px] font-black mt-2.5 uppercase tracking-widest ${isLegendary ? 'text-yellow-400' : 'text-accent-blue'}`}>
                             Unlocked {new Date(unlockDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                           </p>
                         )}
                       </div>
                     </div>
+
+                    {/* Progress Bar (Only for locked badges with progress) */}
+                    {hasProgress && (
+                      <div className="mt-4 pt-3 border-t border-border-light/30 relative z-10 space-y-1.5">
+                        <div className="flex justify-between text-[9px] font-black uppercase tracking-wider text-text-muted">
+                          <span>Progress</span>
+                          <span>{progress.current} / {progress.target} {progress.unit}</span>
+                        </div>
+                        <div className="h-1.5 bg-bg-input rounded-full overflow-hidden border border-border-light/10">
+                          <div
+                            className={`h-full rounded-full transition-all duration-500 ${
+                              isLegendary
+                                ? 'bg-gradient-to-r from-yellow-500 to-amber-400'
+                                : 'bg-gradient-to-r from-accent-blue to-indigo-400'
+                            }`}
+                            style={{ width: `${progressPercent}%` }}
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })}
             </div>
+
+            <style>{`
+              .legendary-card {
+                border-color: rgba(234, 179, 8, 0.15) !important;
+                background: linear-gradient(135deg, rgba(23, 23, 30, 0.95), rgba(30, 25, 15, 0.95)) !important;
+              }
+              .legendary-earned {
+                animation: gold-shimmer-card 3.5s ease-in-out infinite alternate;
+              }
+              @keyframes gold-shimmer-card {
+                0% { border-color: rgba(234, 179, 8, 0.35) !important; box-shadow: 0 0 15px rgba(234, 179, 8, 0.1); }
+                100% { border-color: rgba(234, 179, 8, 0.85) !important; box-shadow: 0 0 25px rgba(234, 179, 8, 0.35), 0 0 45px rgba(234, 179, 8, 0.08); }
+              }
+            `}</style>
           </section>
 
           {/* Story Moment Memories Timeline */}

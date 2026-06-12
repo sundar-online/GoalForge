@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { calculateGoalDailyProgress, isHabitDoneToday, calculateOverallProgress, isGoalDoneToday, calculateGoalStreak, recalculateGoalCompletedDates, getGoalScheduledDays, calculateGoalConsecutiveMissedDays, isTaskDone, getRecommendedNextGoal, isHabitScheduledToday } from '../utils/calculationUtils';
+import { calculateGoalDailyProgress, isHabitDoneToday, calculateOverallProgress, isGoalDoneToday, calculateGoalStreak, getGoalScheduledDays, calculateGoalConsecutiveMissedDays, isTaskDone, getRecommendedNextGoal, isHabitScheduledToday } from '../utils/calculationUtils';
 import { TODAY } from '../utils/dateUtils';
 import { BADGE_DEFINITIONS } from '../utils/gamificationEngine';
 import { useAuth } from '../context/AuthContext';
@@ -16,18 +16,18 @@ import ErrorBoundary from './ErrorBoundary';
 import { TaskAnalytics } from './TaskAnalytics';
 
 const EVENT_CATEGORY_COLORS = {
-  general:  { dot: 'bg-blue-400',    text: 'text-blue-400'    },
-  work:     { dot: 'bg-violet-400',  text: 'text-violet-400'  },
-  health:   { dot: 'bg-emerald-400', text: 'text-emerald-400' },
-  learning: { dot: 'bg-amber-400',   text: 'text-amber-400'   },
-  goal:     { dot: 'bg-accent-blue', text: 'text-accent-blue' },
-  personal: { dot: 'bg-pink-400',    text: 'text-pink-400'    },
+  general: { dot: 'bg-blue-400', text: 'text-blue-400' },
+  work: { dot: 'bg-violet-400', text: 'text-violet-400' },
+  health: { dot: 'bg-emerald-400', text: 'text-emerald-400' },
+  learning: { dot: 'bg-amber-400', text: 'text-amber-400' },
+  goal: { dot: 'bg-accent-blue', text: 'text-accent-blue' },
+  personal: { dot: 'bg-pink-400', text: 'text-pink-400' },
 };
 
 const UpcomingEventsWidget = ({ setView }) => {
   const { scheduledEvents } = useAppContext();
   const today = TODAY();
-  const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
   const upcoming = (scheduledEvents || [])
     .filter(e => !e.completed && e.date >= today)
@@ -90,8 +90,8 @@ const UpcomingEventsWidget = ({ setView }) => {
                 >
                   {/* Date box */}
                   <div className="w-9 h-9 rounded-xl bg-bg-input border border-border-light flex flex-col items-center justify-center shrink-0 group-hover:border-border-med transition-colors">
-                    <span className="text-[7px] font-black text-text-muted uppercase leading-none">{MONTHS_SHORT[parseInt(m,10)-1]}</span>
-                    <span className="text-sm font-black text-text-main leading-none">{parseInt(d,10)}</span>
+                    <span className="text-[7px] font-black text-text-muted uppercase leading-none">{MONTHS_SHORT[parseInt(m, 10) - 1]}</span>
+                    <span className="text-sm font-black text-text-main leading-none">{parseInt(d, 10)}</span>
                   </div>
 
                   <div className="flex-1 min-w-0">
@@ -126,6 +126,7 @@ const UpcomingEventsWidget = ({ setView }) => {
     </div>
   );
 };
+
 
 const QuickThoughtsWidget = () => {
   const {
@@ -177,7 +178,7 @@ const QuickThoughtsWidget = () => {
   return (
     <div className="bg-bg-card rounded-[32px] border border-border-light shadow-sm overflow-hidden transition-all duration-300">
       {/* Header / Collapsed Bar */}
-      <div 
+      <div
         onClick={() => setIsExpanded(!isExpanded)}
         className="p-5 flex items-center justify-between cursor-pointer hover:bg-bg-input/30 transition-colors"
       >
@@ -235,7 +236,7 @@ const QuickThoughtsWidget = () => {
                   </p>
                 ) : (
                   quickThoughts.map((thought) => (
-                    <div 
+                    <div
                       key={thought.id}
                       className="group flex items-center justify-between gap-3 p-3 rounded-2xl bg-bg-input/40 border border-border-light/50 hover:border-border-light transition-all duration-200"
                     >
@@ -276,7 +277,7 @@ const QuickThoughtsWidget = () => {
                             maxLength={100}
                           />
                         ) : (
-                          <span 
+                          <span
                             onClick={() => handleStartEdit(thought)}
                             className="text-xs text-text-main truncate flex-1 cursor-text select-text py-0.5 leading-normal"
                           >
@@ -309,11 +310,10 @@ const QuickThoughtsWidget = () => {
                           key={emoji}
                           type="button"
                           onClick={() => setSelectedEmoji(emoji)}
-                          className={`text-sm w-7 h-7 rounded-lg flex items-center justify-center transition-all ${
-                            selectedEmoji === emoji 
-                              ? 'bg-bg-card text-text-main shadow-sm' 
-                              : 'text-text-muted hover:text-text-main'
-                          }`}
+                          className={`text-sm w-7 h-7 rounded-lg flex items-center justify-center transition-all ${selectedEmoji === emoji
+                            ? 'bg-bg-card text-text-main shadow-sm'
+                            : 'text-text-muted hover:text-text-main'
+                            }`}
                         >
                           {emoji}
                         </button>
@@ -362,7 +362,13 @@ export const Dashboard = ({ setView }) => {
     theme, toggleTheme, loading, weeklyReport, syncError, retrySync,
     xpData: rawXpData, currentLevelInfo: rawLevelInfo,
     tasks,
-    setFocusGoal
+    setFocusGoal,
+    settings,
+    updateAiSettings,
+    isAiAnalyzing,
+    triggerNeuralAudit,
+    setGoalsAction,
+    addQuickThought
   } = useAppContext();
 
   const focusGoal = goals.find(g => g.isFocusGoal && !g.isMissingDream);
@@ -371,7 +377,7 @@ export const Dashboard = ({ setView }) => {
     const isFinished = liveProgress === 100;
     return { ...g, progress: liveProgress, isFinished };
   }).filter(g => !g.isMissingDream && !g.isFinished);
-  
+
   const fallbackActiveGoal = activeCalculatedGoals[0];
   const todayMainTarget = focusGoal || fallbackActiveGoal;
 
@@ -383,17 +389,17 @@ export const Dashboard = ({ setView }) => {
   const currentLevelInfo = rawLevelInfo || { level: 1, title: 'Recruit', progress: 0, xpForNext: 100, isMaxLevel: false };
 
   const reminders = [
-    ...(todayTasks || []).filter(t => t.reminderEnabled && t.reminderTime).map(t => ({ 
-      id: t.id, 
-      title: t.title, 
-      time: t.reminderTime, 
-      type: 'Task' 
+    ...(todayTasks || []).filter(t => t.reminderEnabled && t.reminderTime).map(t => ({
+      id: t.id,
+      title: t.title,
+      time: t.reminderTime,
+      type: 'Task'
     })),
-    ...(allHabits || []).filter(h => h.reminderEnabled && h.reminderTime).map(h => ({ 
-      id: h.id, 
-      title: h.title, 
-      time: h.reminderTime, 
-      type: 'Habit' 
+    ...(allHabits || []).filter(h => h.reminderEnabled && h.reminderTime).map(h => ({
+      id: h.id,
+      title: h.title,
+      time: h.reminderTime,
+      type: 'Habit'
     }))
   ].sort((a, b) => a.time.localeCompare(b.time));
 
@@ -412,7 +418,7 @@ export const Dashboard = ({ setView }) => {
 
   const R = 52; const CIRC = 2 * Math.PI * R;
   const accOffset = CIRC - (CIRC * accuracy) / 100;
-  
+
   let accColor;
   if (accuracy >= 100) accColor = '#22c55e';
   else if (accuracy >= 50) accColor = 'var(--accent-blue)';
@@ -422,20 +428,18 @@ export const Dashboard = ({ setView }) => {
   const topStreaks = (goals || [])
     .filter(g => !g.isMissingDream)
     .map(g => {
-      // Always derive streak live from completedDates so we never show stale cached values
-      const liveCompletedDates = recalculateGoalCompletedDates(g);
       const goalSchedule = getGoalScheduledDays(g);
-      const { current: liveStreak } = calculateGoalStreak(liveCompletedDates, goalSchedule) || {};
-      const liveMissed = calculateGoalConsecutiveMissedDays(liveCompletedDates, goalSchedule, g.startDate || g.createdAt);
-      return { 
-        name: g.title, 
-        tag: g.tag, 
-        streak: liveStreak || 0, 
-        missed: liveMissed || 0 
+      const liveMissed = calculateGoalConsecutiveMissedDays(g.completedDates || [], goalSchedule, g.startDate || g.createdAt);
+      return {
+        name: g.title,
+        tag: g.tag,
+        streak: g.completedDates?.length || 0,
+        missed: liveMissed || 0
       };
     })
-    .filter(g => g.streak > 0 || g.missed > 0)
-    .sort((a, b) => b.streak - a.streak).slice(0, 3);
+    .filter(g => g.streak > 0)
+    .sort((a, b) => b.streak - a.streak)
+    .slice(0, 3);
 
 
   const activeTasksCount = React.useMemo(() => {
@@ -498,12 +502,8 @@ export const Dashboard = ({ setView }) => {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6">
         {activeGoalsList.map(goal => {
-          const habitsTotal = goal.habits.length;
           const dailyProgress = calculateGoalDailyProgress(goal);
           const achieved = goal.isDoneToday || dailyProgress === 100;
-          const habitsDone = goal.habits.filter(isHabitDoneToday).length;
-          const targetReq = goal.mode === 'ANY' ? 1 : (goal.mode === 'CUSTOM' ? (goal.minHabits || 1) : habitsTotal);
-          const habitAccuracy = Math.min(100, Math.round((habitsDone / (targetReq || 1)) * 100));
           const ruleLabel = goal.mode === 'ANY' ? 'Any Rule' : goal.mode === 'CUSTOM' ? `Min ${goal.minHabits} Rule` : 'All Habits Rule';
 
           return (
@@ -519,18 +519,18 @@ export const Dashboard = ({ setView }) => {
                   </div>
                 </div>
                 <div className="text-right">
-                  <span className={`text-2xl font-black leading-none tracking-tighter ${achieved ? 'text-emerald-500' : 'text-accent-blue'}`}>{achieved ? 100 : habitAccuracy}%</span>
+                  <span className={`text-2xl font-black leading-none tracking-tighter ${achieved ? 'text-emerald-500' : 'text-accent-blue'}`}>{achieved ? 100 : dailyProgress}%</span>
                   <p className="text-[8px] font-black text-text-muted uppercase tracking-widest mt-0.5">Grit Score</p>
                 </div>
               </div>
 
               <div className="h-2 bg-bg-input rounded-full overflow-hidden mb-4">
-                <div 
+                <div
                   className={`h-full rounded-full transition-all duration-700 ${achieved ? 'bg-emerald-500' : 'bg-accent-blue'}`}
                   style={{ width: `${achieved ? 100 : dailyProgress}%` }}
                 />
               </div>
-              
+
               <div className="flex justify-between items-center pt-4 border-t border-border-light">
                 <span className="text-[9px] font-black text-text-muted uppercase tracking-widest">Mastery</span>
                 <span className="text-sm font-black text-text-main tracking-tighter">{goal.progress || 0}%</span>
@@ -593,6 +593,14 @@ export const Dashboard = ({ setView }) => {
           >
             <CalendarDays size={18} className="group-hover:scale-110 transition-transform duration-200" aria-hidden="true" />
           </button>
+          {/* Forge Workspace Button */}
+          <button
+            onClick={() => { setView('workspace'); setShowSignOut(false); }}
+            aria-label="Forge Workspace"
+            className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 hover:bg-indigo-500/20 hover:border-indigo-500/30 flex items-center justify-center transition-all active:scale-90 shadow-sm shrink-0 group"
+          >
+            <Sparkles size={18} className="group-hover:scale-110 transition-transform duration-200" aria-hidden="true" />
+          </button>
 
           {/* Theme Toggle */}
           <button
@@ -602,7 +610,7 @@ export const Dashboard = ({ setView }) => {
           >
             {theme === 'light'
               ? <Moon size={18} className="group-hover:scale-110 transition-transform duration-200" aria-hidden="true" />
-              : <Sun  size={18} className="group-hover:scale-110 transition-transform duration-200" aria-hidden="true" />
+              : <Sun size={18} className="group-hover:scale-110 transition-transform duration-200" aria-hidden="true" />
             }
           </button>
 
@@ -637,10 +645,10 @@ export const Dashboard = ({ setView }) => {
 
       {/* Main Dashboard Layout Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
-        
+
         {/* Left/Main Column */}
         <div className="lg:col-span-8 flex flex-col gap-6 lg:gap-8">
-          
+
           {/* Today's Main Target Hero Banner */}
           {todayMainTarget && (
             <div className="relative overflow-hidden bg-gradient-to-r from-accent-blue/15 via-indigo-500/10 to-transparent border border-accent-blue/30 rounded-[32px] p-6 sm:p-8 shadow-xl hover:shadow-2xl transition-all duration-300 group">
@@ -663,7 +671,7 @@ export const Dashboard = ({ setView }) => {
                       <span className="flex items-center gap-1.5 bg-bg-input px-2.5 py-1 rounded-lg">
                         {(() => {
                           const [y, m, d] = todayMainTarget.deadline.split('-');
-                          const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                          const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
                           return `Due: ${parseInt(d, 10)} ${months[parseInt(m, 10) - 1]} ${y}`;
                         })()}
                       </span>
@@ -672,7 +680,7 @@ export const Dashboard = ({ setView }) => {
                       <Clock size={12} /> {targetHabitsRemaining > 0 ? `${targetHabitsRemaining} habits left today` : "All habits done today! 🎉"}
                     </span>
                   </div>
-                  
+
                   {/* Progress bar */}
                   <div className="space-y-1.5">
                     <div className="flex justify-between text-[10px] font-black text-text-muted uppercase tracking-widest">
@@ -680,7 +688,7 @@ export const Dashboard = ({ setView }) => {
                       <span>{todayMainTarget.progress || 0}%</span>
                     </div>
                     <div className="w-full bg-bg-input h-2 rounded-full overflow-hidden">
-                      <div 
+                      <div
                         className="h-full bg-accent-blue rounded-full transition-all duration-1000 ease-out"
                         style={{ width: `${todayMainTarget.progress || 0}%` }}
                       />
@@ -689,7 +697,7 @@ export const Dashboard = ({ setView }) => {
                 </div>
 
                 <div className="shrink-0 w-full md:w-auto">
-                  <button 
+                  <button
                     onClick={() => setView('focus')}
                     className="w-full md:w-auto px-6 py-4 rounded-2xl bg-accent-blue text-white font-black text-sm shadow-lg shadow-accent-blue/30 hover:opacity-90 active:scale-95 transition-all flex items-center justify-center gap-2"
                   >
@@ -786,11 +794,10 @@ export const Dashboard = ({ setView }) => {
               <button
                 key={tab.id}
                 onClick={() => setActiveDashboardTab(tab.id)}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-black uppercase tracking-wider rounded-xl transition-all ${
-                  activeDashboardTab === tab.id
-                    ? 'bg-bg-dark-elem text-text-inverted shadow-md'
-                    : 'text-text-muted hover:text-text-main'
-                }`}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-black uppercase tracking-wider rounded-xl transition-all ${activeDashboardTab === tab.id
+                  ? 'bg-bg-dark-elem text-text-inverted shadow-md'
+                  : 'text-text-muted hover:text-text-main'
+                  }`}
               >
                 {tab.icon}
                 <span>{tab.label}</span>
@@ -804,9 +811,7 @@ export const Dashboard = ({ setView }) => {
           </div>
 
           {/* AI Insights & Recovery */}
-          <div className={activeDashboardTab === 'intel' ? 'block' : 'hidden lg:block'}>
-            <AIInsights />
-          </div>
+          {/* Inline view replaced by top navigation Forge Intelligence Hub panel */}
 
           {/* Alert Banners (Stacked) */}
           {alerts.length > 0 && (
@@ -871,7 +876,7 @@ export const Dashboard = ({ setView }) => {
                   aria-label={`Today's accuracy: ${accuracy}%`}
                 >
                   <circle cx="62" cy="62" r={R} fill="none" className="stroke-bg-input" strokeWidth="10" />
-                  <circle 
+                  <circle
                     cx="62" cy="62" r={R} fill="none" stroke={accColor} strokeWidth="10"
                     strokeDasharray={CIRC} strokeDashoffset={accOffset} strokeLinecap="round"
                     className="transition-all duration-1000 ease-out"
@@ -905,7 +910,7 @@ export const Dashboard = ({ setView }) => {
                   </div>
                 )}
               </div>
-              <button 
+              <button
                 onClick={() => setView('focus')}
                 className="w-full bg-white/10 hover:bg-white/20 px-5 py-3.5 rounded-2xl text-text-inverted text-sm font-black transition-all flex justify-between items-center group-hover:bg-accent-blue group-hover:shadow-lg group-hover:shadow-accent-blue/30"
               >
@@ -913,7 +918,7 @@ export const Dashboard = ({ setView }) => {
               </button>
             </div>
           </div>
-          
+
           {/* Standalone Task Analytics Section */}
           <div className={activeDashboardTab === 'tasks' ? 'block' : 'hidden lg:block'}>
             <TaskAnalytics setView={setView} />
@@ -947,7 +952,7 @@ export const Dashboard = ({ setView }) => {
                     </p>
                   </div>
                   <div className="flex gap-2 w-full sm:w-auto shrink-0">
-                    <button 
+                    <button
                       onClick={() => setFocusGoal(recommended.id)}
                       className="flex-1 sm:flex-initial px-4 py-2.5 rounded-xl bg-accent-blue text-xs font-black text-white hover:opacity-90 transition-all shadow-sm active:scale-95 flex items-center justify-center gap-1.5"
                     >
@@ -962,7 +967,7 @@ export const Dashboard = ({ setView }) => {
 
         {/* Right Column / Sidebar Dashboard Content */}
         <div className="lg:col-span-4 flex flex-col gap-6 lg:gap-8">
-          
+
           {/* Quick Thoughts Widget - Desktop Only */}
           <div className="hidden lg:block">
             <QuickThoughtsWidget />
@@ -1090,7 +1095,7 @@ export const Dashboard = ({ setView }) => {
                     </p>
                   </div>
                   <div className="flex gap-2 w-full sm:w-auto shrink-0">
-                    <button 
+                    <button
                       onClick={() => setFocusGoal(recommended.id)}
                       className="flex-1 sm:flex-initial px-4 py-2.5 rounded-xl bg-accent-blue text-xs font-black text-white hover:opacity-90 transition-all shadow-sm active:scale-95 flex items-center justify-center gap-1.5"
                     >
@@ -1105,7 +1110,7 @@ export const Dashboard = ({ setView }) => {
           {/* Footer Quote / Branding */}
           <div className="mt-auto pt-6 text-center lg:text-left opacity-40">
             <p className="text-[10px] font-black text-text-muted uppercase tracking-widest leading-loose">
-              © 2026 GoalForge Strategy <br/>
+              © 2026 GoalForge Strategy <br />
               Advanced Productivity Suite
             </p>
           </div>

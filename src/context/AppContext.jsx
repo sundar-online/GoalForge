@@ -9,6 +9,7 @@ import {
   isTaskDone,
   isHabitDoneToday,
   calculateAccuracy,
+  calculateGoalDailyProgress,
   calculateDisciplineScore,
   getUserLevel,
   getInsights,
@@ -83,6 +84,24 @@ const DEFAULT_XP_DATA = {
   lastXPDate: '',
   xpHistory: [],  // last 50 entries: { amount, reason, date }
   notifiedBadges: [],
+  nightOwlDates: [],
+  earlyBirdDates: [],
+};
+
+const DEFAULT_AI_SETTINGS = {
+  liveInsightsEnabled: true,
+  weeklyReviewEnabled: true,
+  monthlyReviewEnabled: true,
+  streakRiskEnabled: true,
+  recoveryEnabled: true,
+  motivationEnabled: true,
+  goalIntelEnabled: true,
+  accuracyIntelEnabled: true,
+  sendNotifications: true,
+  quietHoursStart: '22:00',
+  quietHoursEnd: '07:00',
+  insightFrequency: 'medium',
+  motivationStyle: 'supportive'
 };
 
 const safeParse = (key, fallback) => {
@@ -250,7 +269,7 @@ export const AppProvider = ({ children }) => {
   }, [goals, loading]);
 
   const [xpData, setXpData] = useState(() => ({ ...DEFAULT_XP_DATA, ...safeParse(STORAGE_KEYS.XP, DEFAULT_XP_DATA) }));
-  const lastSyncedXpRef = useRef(xpData.totalXP);
+  const lastSyncedXpRef = useRef(null);
   const lastSavedSummaryRef = useRef(null);
   const [levelUpEvent, setLevelUpEvent] = useState(null);   // { level, title }
   const [badgeUnlockEvent, setBadgeUnlockEvent] = useState(null); // badge definition object
@@ -258,25 +277,88 @@ export const AppProvider = ({ children }) => {
   const badgeQueueRef = useRef([]);
 
   // Settings - composite state
-  const [settings, setSettings] = useState(() => safeParse(STORAGE_KEYS.SETTINGS, {
-    theme: 'dark',
-    focusTimeToday: 0,
-    lastActiveDate: '',
-    focusHistory: {},
-    dismissedInsights: [],
-    weeklyIntentions: {},
-    lastPushDate: '',
-    dailyResetProcessed: ''
-  }));
+  const [settings, setSettings] = useState(() => {
+    const s = safeParse(STORAGE_KEYS.SETTINGS, {
+      theme: 'dark',
+      focusTimeToday: 0,
+      lastActiveDate: '',
+      focusHistory: {},
+      dismissedInsights: [],
+      weeklyIntentions: {},
+      lastPushDate: '',
+      dailyResetProcessed: ''
+    });
+    return {
+      ...s,
+      aiSettings: {
+        ...DEFAULT_AI_SETTINGS,
+        ...(s.aiSettings || {})
+      }
+    };
+  });
 
   // AI Insights State
   const [aiInsights, setAiInsights] = useState([]);
   const [recoveryStrategies, setRecoveryStrategies] = useState([]);
   const [smartSuggestions, setSmartSuggestions] = useState(null);
+  const [weeklyReview, setWeeklyReview] = useState(null);
+  const [monthlyReview, setMonthlyReview] = useState(null);
+  // Tracks last timestamps for frequency-gated engines
+  const aiLastRunTimesRef = useRef({ sixHour: 0, weekly: 0, monthly: 0 });
+
+  const [goalsAction, setGoalsAction] = useState(null);
+  const [isAiAnalyzing, setIsAiAnalyzing] = useState(false);
+  const [aiTriggerVal, setAiTriggerVal] = useState(0);
 
   const theme = settings.theme || 'dark';
-  const focusTime = settings.focusTimeToday || 0;
+
+  const calculatedFocusTimeToday = useMemo(() => {
+    const todayStr = TODAY();
+    // 1. Sum of focus sessions today (duration is in minutes, convert to seconds)
+    const todaySessions = (sessionLogs || []).filter(s => s.date === todayStr);
+    const sessionsSeconds = todaySessions.reduce((acc, s) => acc + s.duration * 60, 0);
+
+    // 2. Sum of manual habit time today
+    let manualHabitSeconds = 0;
+    (goals || []).filter(g => !g.isMissingDream).forEach(g => {
+      (g.habits || []).forEach(h => {
+        if (h.lastActiveDate === todayStr) {
+          const focusMins = todaySessions
+            .filter(s => s.goalId === String(g.id) && s.itemId === String(h.id))
+            .reduce((acc, s) => acc + s.duration, 0);
+          const manualMins = Math.max(0, (h.timeSpent || 0) - focusMins);
+          manualHabitSeconds += manualMins * 60;
+        }
+      });
+    });
+
+    // 3. Sum of manual task time today
+    let manualTaskSeconds = 0;
+    (tasks || []).forEach(t => {
+      if (t.lastActiveDate === todayStr) {
+        const focusMins = todaySessions
+          .filter(s => s.goalId === 'DAILY_TASK' && s.itemId === String(t.id))
+          .reduce((acc, s) => acc + s.duration, 0);
+        const manualMins = Math.max(0, (t.timeSpent || 0) - focusMins);
+        manualTaskSeconds += manualMins * 60;
+      }
+    });
+
+    return sessionsSeconds + manualHabitSeconds + manualTaskSeconds;
+  }, [sessionLogs, goals, tasks]);
+
+  const focusTime = calculatedFocusTimeToday;
   const focusHistory = settings.focusHistory || {};
+
+  useEffect(() => {
+    setSettings(prev => {
+      if (prev.focusTimeToday === calculatedFocusTimeToday) return prev;
+      return {
+        ...prev,
+        focusTimeToday: calculatedFocusTimeToday
+      };
+    });
+  }, [calculatedFocusTimeToday]);
 
   // ── Gamification: XP Award Engine ───────────────────────
   const awardXP = useCallback((amount, reason) => {
@@ -354,9 +436,23 @@ export const AppProvider = ({ children }) => {
   const completedItems = completedTodayHabitsCount;
 
   const accuracy = useMemo(() => {
-    if (totalItems === 0) return 100;
-    return Math.round((completedItems / totalItems) * 100);
-  }, [completedItems, totalItems]);
+    // Evaluate accuracy per-goal using each goal's configured completion rule
+    // (ALL, ANY, or CUSTOM minimum), then average across goals that have habits
+    // scheduled today. This ensures CUSTOM/ANY goals are not penalised for habits
+    // that don't count toward their completion requirement.
+    const goalsWithScheduledHabits = (sortedGoals || []).filter(g => {
+      if (g.isMissingDream) return false;
+      return (g.habits || []).some(isHabitScheduledToday);
+    });
+
+    if (goalsWithScheduledHabits.length === 0) return 100;
+
+    const totalProgress = goalsWithScheduledHabits.reduce((sum, g) => {
+      return sum + calculateGoalDailyProgress(g);
+    }, 0);
+
+    return Math.round(totalProgress / goalsWithScheduledHabits.length);
+  }, [sortedGoals]);
 
   const avgStreak = useMemo(() => {
     const activeGoals = (sortedGoals || []).filter(g => !g.isMissingDream);
@@ -843,9 +939,19 @@ export const AppProvider = ({ children }) => {
                     }
                   }
 
+                  // Recalculate goal completedDates and streak from fresh habits
+                  const goalWithMerged = { ...g, habits: merged };
+                  const recalcDates = recalculateGoalCompletedDates(goalWithMerged);
+                  const goalSchedule = getGoalScheduledDays(goalWithMerged);
+                  const { current: recalcStreak, best: recalcBest } = calculateGoalStreak(recalcDates, goalSchedule, g.startDate || g.createdAt);
+                  const recalcMissed = calculateGoalConsecutiveMissedDays(recalcDates, goalSchedule, g.startDate || g.createdAt);
                   return {
                     ...g,
-                    habits: merged
+                    habits: merged,
+                    completedDates: recalcDates,
+                    streak: recalcStreak,
+                    bestStreak: Math.max(recalcBest, g.bestStreak || 0),
+                    missedDays: recalcMissed
                   };
                 }
                 return g;
@@ -966,13 +1072,22 @@ export const AppProvider = ({ children }) => {
         if (docSnap.exists()) {
           const s = docSnap.data();
           db.updateCache(`users/${user.id}/settings/preferences`, s);
-          setSettings(prev => ({
-            ...prev,
-            theme: s.theme || prev.theme,
-            focusTimeToday: s.focus_time_today || prev.focusTimeToday,
-            lastActiveDate: s.last_reset || prev.lastActiveDate,
-            dailyResetProcessed: s.daily_reset_processed || prev.dailyResetProcessed,
-          }));
+          setSettings(prev => {
+            const rawAi = s.ai_settings || {};
+            const mergedAi = {
+              ...DEFAULT_AI_SETTINGS,
+              ...(prev.aiSettings || {}),
+              ...rawAi
+            };
+            return {
+              ...prev,
+              theme: s.theme || prev.theme,
+              focusTimeToday: s.focus_time_today || prev.focusTimeToday,
+              lastActiveDate: s.last_reset || prev.lastActiveDate,
+              dailyResetProcessed: s.daily_reset_processed || prev.dailyResetProcessed,
+              aiSettings: mergedAi,
+            };
+          });
         } else {
           // New user has no preferences in DB yet, initialize local settings state to safe default values
           setSettings({
@@ -983,7 +1098,8 @@ export const AppProvider = ({ children }) => {
             dismissedInsights: [],
             weeklyIntentions: {},
             lastPushDate: '',
-            dailyResetProcessed: ''
+            dailyResetProcessed: '',
+            aiSettings: DEFAULT_AI_SETTINGS
           });
         }
       }, (error) => {
@@ -998,7 +1114,10 @@ export const AppProvider = ({ children }) => {
           const x = docSnap.data();
           db.updateCache(`users/${user.id}/xp/profile`, x);
           const serverXP = x.total_xp || 0;
-          lastSyncedXpRef.current = serverXP; // Shield against echo write loops
+          const serverEarnedCount = (x.earned_badges || []).length;
+          const serverNightCount = (x.night_owl_dates || []).length;
+          const serverEarlyCount = (x.early_bird_dates || []).length;
+          lastSyncedXpRef.current = `${serverXP}_${serverEarnedCount}_${serverNightCount}_${serverEarlyCount}`; // Shield against echo write loops
           const profile = {
             totalXP: serverXP,
             level: x.level || 1,
@@ -1010,6 +1129,8 @@ export const AppProvider = ({ children }) => {
             lastXPDate: x.last_xp_date || '',
             xpHistory: x.xp_history || [],
             notifiedBadges: x.notified_badges || [],
+            nightOwlDates: x.night_owl_dates || [],
+            earlyBirdDates: x.early_bird_dates || [],
           };
           console.log("Current UID:", user.id);
           console.log("Loaded Profile:", profile);
@@ -1030,6 +1151,8 @@ export const AppProvider = ({ children }) => {
             lastXPDate: '',
             xpHistory: [],
             notifiedBadges: [],
+            nightOwlDates: [],
+            earlyBirdDates: [],
           };
           console.log("Current UID:", user.id);
           console.log("Loaded Profile:", defaultProfile);
@@ -1143,7 +1266,7 @@ export const AppProvider = ({ children }) => {
   const toggleTheme = () => {
     const newTheme = settings.theme === 'light' ? 'dark' : 'light';
     setSettings(prev => ({ ...prev, theme: newTheme }));
-    if (user) db.upsertUserSettings(user.id, { theme: newTheme, focusTimeToday: focusTime, lastReset: settings.lastActiveDate });
+    if (user) db.upsertUserSettings(user.id, { theme: newTheme, focusTimeToday: focusTime, lastReset: settings.lastActiveDate, aiSettings: settings.aiSettings });
   };
 
   // ── Stable refs for daily reset to avoid stale closure deps ──
@@ -1185,6 +1308,7 @@ export const AppProvider = ({ children }) => {
         focusTimeToday: 0,
         lastReset: todayStr,
         dailyResetProcessed: todayStr,
+        aiSettings: currentSettings.aiSettings,
       });
     }
 
@@ -1231,6 +1355,7 @@ export const AppProvider = ({ children }) => {
         focusTimeToday: currentSettings.focusTimeToday,
         lastReset: currentSettings.lastActiveDate,
         dailyResetProcessed: todayStr,
+        aiSettings: currentSettings.aiSettings,
       });
     }
 
@@ -1261,6 +1386,12 @@ export const AppProvider = ({ children }) => {
   const aiWorkerRef = useRef(null);
   const lastAiHashRef = useRef('');
 
+  const triggerNeuralAudit = useCallback(() => {
+    setIsAiAnalyzing(true);
+    lastAiHashRef.current = '';
+    setAiTriggerVal(prev => prev + 1);
+  }, []);
+
   useEffect(() => {
     // Initialize Web Worker for background AI processing
     const worker = new Worker(new URL('../workers/aiWorker.js', import.meta.url), { type: 'module' });
@@ -1268,12 +1399,41 @@ export const AppProvider = ({ children }) => {
 
     worker.onmessage = (e) => {
       if (e.data.type === 'SUCCESS') {
-        const { insights, strategies, suggestion } = e.data.payload;
+        const {
+          insights, strategies, suggestion,
+          weeklyReview: wr, monthlyReview: mr,
+          newMilestones,
+          ranSixHour, ranWeekly, ranMonthly,
+          timestamp,
+        } = e.data.payload;
+
         setAiInsights(insights);
         setRecoveryStrategies(strategies);
         setSmartSuggestions(suggestion);
+        if (wr !== null) setWeeklyReview(wr);
+        if (mr !== null) setMonthlyReview(mr);
+
+        // Update last-run timestamps for frequency gating
+        const now = timestamp || Date.now();
+        if (ranSixHour) aiLastRunTimesRef.current.sixHour = now;
+        if (ranWeekly)  aiLastRunTimesRef.current.weekly  = now;
+        if (ranMonthly) aiLastRunTimesRef.current.monthly = now;
+
+        // Persist newly detected milestones to settings
+        if (newMilestones && Object.keys(newMilestones).length > 0) {
+          setSettings(prev => {
+            const existing = prev.celebratedMilestones || {};
+            const merged = { ...existing };
+            for (const [habitId, milestone] of Object.entries(newMilestones)) {
+              merged[habitId] = [...new Set([...(merged[habitId] || []), milestone])];
+            }
+            return { ...prev, celebratedMilestones: merged };
+          });
+        }
+        setIsAiAnalyzing(false);
       } else {
         console.error('[AI Worker Error]', e.data.error);
+        setIsAiAnalyzing(false);
       }
     };
 
@@ -1293,8 +1453,9 @@ export const AppProvider = ({ children }) => {
       const tasksHash = tasks.map(t => `${t.id}_${t.completed}_${t.isRecovering}_${t.currentCount || t.targetCount}`).join('|');
       const dismissedCount = (settings.dismissedInsights || []).length;
       const logCount = Object.keys(taskLogs).length;
+      const aiSettingsHash = JSON.stringify(settings.aiSettings || DEFAULT_AI_SETTINGS);
 
-      const currentHash = `${goalsHash}_${tasksHash}_${logCount}_${focusTime}_${accuracy}_${dismissedCount}`;
+      const currentHash = `${goalsHash}_${tasksHash}_${logCount}_${focusTime}_${accuracy}_${dismissedCount}_${aiSettingsHash}_${aiTriggerVal}`;
 
       if (lastAiHashRef.current !== currentHash) {
         lastAiHashRef.current = currentHash;
@@ -1306,13 +1467,18 @@ export const AppProvider = ({ children }) => {
           focusTime,
           accuracy,
           dismissedInsights: settings.dismissedInsights || [],
-          dateStr: TODAY()
+          celebratedMilestones: settings.celebratedMilestones || {},
+          userCreatedAt: goals.length > 0 ? (goals[0].createdAt || null) : null,
+          lastRunTimes: aiLastRunTimesRef.current,
+          forceAll: aiLastRunTimesRef.current.sixHour === 0 || aiTriggerVal > 0, // force on first run or manual trigger
+          dateStr: TODAY(),
+          aiSettings: settings.aiSettings || DEFAULT_AI_SETTINGS
         });
       }
     }, 800);
 
     return () => clearTimeout(timer);
-  }, [goals, tasks, taskLogs, focusTime, accuracy, settings.dismissedInsights, loading, workerReady]);
+  }, [goals, tasks, taskLogs, focusTime, accuracy, settings.dismissedInsights, settings.aiSettings, loading, workerReady, aiTriggerVal]);
 
   const dismissInsight = (id) => {
     // Store with today's date so it auto-resets the next day
@@ -1627,7 +1793,7 @@ export const AppProvider = ({ children }) => {
     const updatedGoalDates = recalculateGoalCompletedDates(updatedGoal);
     const goalSchedule = getGoalScheduledDays(updatedGoal);
     // G5 fix: calculateGoalStreak now returns { current, best }
-    const { current: newGoalStreak, best: newGoalBestStreak } = calculateGoalStreak(updatedGoalDates, goalSchedule);
+    const { current: newGoalStreak, best: newGoalBestStreak } = calculateGoalStreak(updatedGoalDates, goalSchedule, targetGoal.startDate || targetGoal.createdAt);
     const newGoalMissed = calculateGoalConsecutiveMissedDays(updatedGoalDates, goalSchedule, targetGoal.startDate || targetGoal.createdAt);
     const sortedGoalDates = [...updatedGoalDates].sort((a, b) => b.localeCompare(a));
     const newGoalLastCompleted = sortedGoalDates.length > 0 ? sortedGoalDates[0] : null;
@@ -1842,7 +2008,7 @@ export const AppProvider = ({ children }) => {
     const updatedGoalDates = recalculateGoalCompletedDates(updatedGoal);
     const goalSchedule = getGoalScheduledDays(updatedGoal);
     // G5 fix: calculateGoalStreak now returns { current, best }
-    const { current: newGoalStreak, best: newGoalBestStreak } = calculateGoalStreak(updatedGoalDates, goalSchedule);
+    const { current: newGoalStreak, best: newGoalBestStreak } = calculateGoalStreak(updatedGoalDates, goalSchedule, targetGoal.startDate || targetGoal.createdAt);
     const newGoalMissed = calculateGoalConsecutiveMissedDays(updatedGoalDates, goalSchedule, targetGoal.startDate || targetGoal.createdAt);
     const sortedGoalDates = [...updatedGoalDates].sort((a, b) => b.localeCompare(a));
     const newGoalLastCompleted = sortedGoalDates.length > 0 ? sortedGoalDates[0] : null;
@@ -1885,7 +2051,7 @@ export const AppProvider = ({ children }) => {
     const updatedGoalDates = recalculateGoalCompletedDates(updatedGoal);
     const goalSchedule = getGoalScheduledDays(updatedGoal);
     // G5 fix: calculateGoalStreak now returns { current, best }
-    const { current: newGoalStreak, best: newGoalBestStreak } = calculateGoalStreak(updatedGoalDates, goalSchedule);
+    const { current: newGoalStreak, best: newGoalBestStreak } = calculateGoalStreak(updatedGoalDates, goalSchedule, goal.startDate || goal.createdAt);
     const newGoalMissed = calculateGoalConsecutiveMissedDays(updatedGoalDates, goalSchedule, goal.startDate || goal.createdAt);
     const sortedGoalDates = [...updatedGoalDates].sort((a, b) => b.localeCompare(a));
     const newGoalLastCompleted = sortedGoalDates.length > 0 ? sortedGoalDates[0] : null;
@@ -1993,7 +2159,7 @@ export const AppProvider = ({ children }) => {
     const updatedGoalDates = recalculateGoalCompletedDates(updatedGoalWithoutDates);
     const goalSchedule = getGoalScheduledDays(updatedGoalWithoutDates);
     // G5 fix: calculateGoalStreak now returns { current, best }
-    const { current: newGoalStreak, best: newGoalBestStreak } = calculateGoalStreak(updatedGoalDates, goalSchedule);
+    const { current: newGoalStreak, best: newGoalBestStreak } = calculateGoalStreak(updatedGoalDates, goalSchedule, goal.startDate || goal.createdAt);
     const newGoalMissed = calculateGoalConsecutiveMissedDays(updatedGoalDates, goalSchedule, goal.startDate || goal.createdAt);
     const sortedGoalDates = [...updatedGoalDates].sort((a, b) => b.localeCompare(a));
     const newGoalLastCompleted = sortedGoalDates.length > 0 ? sortedGoalDates[0] : null;
@@ -2144,6 +2310,19 @@ export const AppProvider = ({ children }) => {
           awardXP(XP_SOURCES.HABIT_COMPLETE, `Completed: ${h.title}`);
           incrementCompletions();
           if ((updatedH.missedDays || 0) >= 2) recordComeback();
+
+          // Night Owl tracker: habit completed after 11 PM or before 4 AM
+          const now = new Date();
+          const hour = now.getHours();
+          if (hour >= 23 || hour < 4) {
+            setXpData(prev => {
+              const dates = prev.nightOwlDates ? [...prev.nightOwlDates] : [];
+              if (!dates.includes(today)) {
+                return { ...prev, nightOwlDates: [...dates, today] };
+              }
+              return prev;
+            });
+          }
         }
 
         habitToUpdate = updatedH;
@@ -2161,7 +2340,7 @@ export const AppProvider = ({ children }) => {
     const updatedGoalDates = recalculateGoalCompletedDates(updatedGoalWithoutDates);
     const goalSchedule = getGoalScheduledDays(updatedGoalWithoutDates);
     // G5 fix: calculateGoalStreak now returns { current, best }
-    const { current: newGoalStreak, best: newGoalBestStreak } = calculateGoalStreak(updatedGoalDates, goalSchedule);
+    const { current: newGoalStreak, best: newGoalBestStreak } = calculateGoalStreak(updatedGoalDates, goalSchedule, goal.startDate || goal.createdAt);
     const newGoalMissed = calculateGoalConsecutiveMissedDays(updatedGoalDates, goalSchedule, goal.startDate || goal.createdAt);
     const sortedGoalDates = [...updatedGoalDates].sort((a, b) => b.localeCompare(a));
     const newGoalLastCompleted = sortedGoalDates.length > 0 ? sortedGoalDates[0] : null;
@@ -2289,7 +2468,7 @@ export const AppProvider = ({ children }) => {
     const updatedGoalDates = recalculateGoalCompletedDates(updatedGoalWithoutDates);
     const goalSchedule = getGoalScheduledDays(updatedGoalWithoutDates);
     // G5 fix: calculateGoalStreak now returns { current, best }
-    const { current: newGoalStreak, best: newGoalBestStreak } = calculateGoalStreak(updatedGoalDates, goalSchedule);
+    const { current: newGoalStreak, best: newGoalBestStreak } = calculateGoalStreak(updatedGoalDates, goalSchedule, goal.startDate || goal.createdAt);
     const newGoalMissed = calculateGoalConsecutiveMissedDays(updatedGoalDates, goalSchedule, goal.startDate || goal.createdAt);
     const sortedGoalDates = [...updatedGoalDates].sort((a, b) => b.localeCompare(a));
     const newGoalLastCompleted = sortedGoalDates.length > 0 ? sortedGoalDates[0] : null;
@@ -2768,7 +2947,8 @@ export const AppProvider = ({ children }) => {
         await db.upsertUserSettings(user.id, {
           theme: settings.theme,
           focusTimeToday: newTotalSecondsToday,
-          lastReset: settings.lastActiveDate
+          lastReset: settings.lastActiveDate,
+          aiSettings: settings.aiSettings
         });
       } catch (err) {
         console.error('[Firestore Sync] Failed to upsert focus session/history:', err);
@@ -2783,11 +2963,22 @@ export const AppProvider = ({ children }) => {
       db.upsertUserSettings(user.id, {
         theme: settings.theme,
         focusTimeToday: settings.focusTimeToday,
-        lastReset: settings.lastActiveDate
+        lastReset: settings.lastActiveDate,
+        aiSettings: settings.aiSettings
       });
     }, 15000);
     return () => clearTimeout(timer);
   }, [settings.focusTimeToday, settings.theme, user]);
+
+  // Sync focus history today to DB on change (debounced)
+  useEffect(() => {
+    if (!user || loading) return;
+    const today = TODAY();
+    const timer = setTimeout(() => {
+      db.upsertFocusHistory(user.id, today, settings.focusTimeToday);
+    }, 15000);
+    return () => clearTimeout(timer);
+  }, [settings.focusTimeToday, user, loading]);
 
   const addNote = async note => {
     const now = new Date().toISOString();
@@ -2997,7 +3188,8 @@ export const AppProvider = ({ children }) => {
         focusHistory: {},
         dismissedInsights: [],
         weeklyIntentions: {},
-        lastPushDate: ''
+        lastPushDate: '',
+        aiSettings: DEFAULT_AI_SETTINGS
       }));
 
       // 3. Perform Firestore delete
@@ -3017,14 +3209,36 @@ export const AppProvider = ({ children }) => {
   // Sync XP data to DB on change (debounced and guarded against echo loops)
   useEffect(() => {
     if (!user || loading) return;
-    if (xpData.totalXP === lastSyncedXpRef.current) return;
+
+    const syncKey = `${xpData.totalXP}_${(xpData.earnedBadges || []).length}_${(xpData.nightOwlDates || []).length}_${(xpData.earlyBirdDates || []).length}`;
+    if (syncKey === lastSyncedXpRef.current) return;
 
     const timer = setTimeout(() => {
-      lastSyncedXpRef.current = xpData.totalXP;
+      lastSyncedXpRef.current = syncKey;
       db.upsertXpData(user.id, xpData);
     }, 10000);
     return () => clearTimeout(timer);
   }, [xpData, user, loading]);
+
+  // Early Bird Tracker: triggers when today's accuracy is 100% before 8:00 AM local time
+  useEffect(() => {
+    if (loading) return;
+    if (accuracy === 100) {
+      const now = new Date();
+      const hour = now.getHours();
+      // Early morning check (4:00 AM to 8:00 AM)
+      if (hour >= 4 && hour < 8) {
+        const today = TODAY();
+        setXpData(prev => {
+          const dates = prev.earlyBirdDates ? [...prev.earlyBirdDates] : [];
+          if (!dates.includes(today)) {
+            return { ...prev, earlyBirdDates: [...dates, today] };
+          }
+          return prev;
+        });
+      }
+    }
+  }, [accuracy, loading]);
 
   // Gamification engine moved to top for initialization safety
 
@@ -3034,11 +3248,18 @@ export const AppProvider = ({ children }) => {
   const badgeState = useMemo(() => ({
     goals, tasks, notes,
     focusHistory, focusTime,
-    perfectDays: xpData.perfectDays || 0,
+    sessionLogs,
+    taskLogs,
+    accuracy,
+    memories,
+    disciplineScore,
     level: currentLevelInfo.level,
     comebackCount: xpData.comebackCount || 0,
     totalCompletions: xpData.totalCompletions || 0,
-  }), [goals, tasks, notes, focusHistory, focusTime, xpData.perfectDays, currentLevelInfo.level, xpData.comebackCount, xpData.totalCompletions]);
+    nightOwlDates: xpData.nightOwlDates || [],
+    earlyBirdDates: xpData.earlyBirdDates || [],
+    earnedBadges: xpData.earnedBadges || [],
+  }), [goals, tasks, notes, focusHistory, focusTime, sessionLogs, taskLogs, accuracy, memories, disciplineScore, currentLevelInfo.level, xpData.comebackCount, xpData.totalCompletions, xpData.nightOwlDates, xpData.earlyBirdDates, xpData.earnedBadges]);
 
   const currentlyEarnedBadges = useMemo(() => evaluateBadges(badgeState), [badgeState]);
 
@@ -3227,12 +3448,32 @@ export const AppProvider = ({ children }) => {
     }));
   }, []);
 
+  const updateAiSettings = useCallback((updates) => {
+    setSettings(prev => {
+      const updatedAi = {
+        ...(prev.aiSettings || DEFAULT_AI_SETTINGS),
+        ...updates
+      };
+      const newSettings = {
+        ...prev,
+        aiSettings: updatedAi
+      };
+      if (user) {
+        db.upsertUserSettings(user.id, newSettings).catch(err => {
+          console.error('[Firestore Sync] Failed to update AI settings:', err);
+        });
+      }
+      return newSettings;
+    });
+  }, [user]);
+
   const goalsValue = {
     goals: sortedGoals, addGoal, updateGoal, editGoalSystem, deleteGoal, extendGoalDeadline,
     setFocusGoal, reorderGoals, moveGoal,
     addHabit, deleteHabit, logHabitTime, toggleHabitCheck, updateHabitCount, updateHabitReminder,
     allHabits, completedGoalForCelebration, setCompletedGoalForCelebration,
-    loading, syncError, retrySync: syncFromCloud, clearProfileData
+    loading, syncError, retrySync: syncFromCloud, clearProfileData,
+    goalsAction, setGoalsAction
   };
 
   const tasksValue = {
@@ -3250,8 +3491,10 @@ export const AppProvider = ({ children }) => {
 
   const aiValue = {
     aiInsights, recoveryStrategies, dismissInsight, applyRecoveryPlan, smartSuggestions,
+    weeklyReview, monthlyReview,
     alerts, insights: getInsights(accuracy, avgStreak, focusTime), disciplineScore, userLevel,
-    loading, syncError
+    loading, syncError, updateAiSettings,
+    isAiAnalyzing, triggerNeuralAudit
   };
 
   const notesValue = {
@@ -3291,8 +3534,15 @@ export const AppProvider = ({ children }) => {
     dismissInsight,
     applyRecoveryPlan,
     smartSuggestions,
+    weeklyReview,
+    monthlyReview,
     settings,
     saveWeeklyIntention,
+    updateAiSettings,
+    isAiAnalyzing,
+    triggerNeuralAudit,
+    goalsAction,
+    setGoalsAction,
     // Memories & Completed Celebration Modal
     memories, addMemory, deleteMemory,
     // Quick Thoughts

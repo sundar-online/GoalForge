@@ -3,11 +3,11 @@ import { Home, Target, CalendarCheck, Timer, StickyNote } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 
 const NAV = [
-  { id: 'dashboard', icon: Home,         label: 'Home',  ariaLabel: 'Go to Dashboard'  },
-  { id: 'goals',     icon: Target,        label: 'Goals', ariaLabel: 'Go to Goals'       },
-  { id: 'tasks',     icon: CalendarCheck, label: 'Tasks', ariaLabel: 'Go to Daily Tasks' },
-  { id: 'notes',     icon: StickyNote,    label: 'Notes', ariaLabel: 'Go to Notes'       },
-  { id: 'focus',     icon: Timer,         label: 'Focus', ariaLabel: 'Go to Focus Mode'  },
+  { id: 'dashboard', icon: Home, label: 'Home', ariaLabel: 'Go to Dashboard' },
+  { id: 'goals', icon: Target, label: 'Goals', ariaLabel: 'Go to Goals' },
+  { id: 'tasks', icon: CalendarCheck, label: 'Tasks', ariaLabel: 'Go to Daily Tasks' },
+  { id: 'notes', icon: StickyNote, label: 'Notes', ariaLabel: 'Go to Notes' },
+  { id: 'focus', icon: Timer, label: 'Focus', ariaLabel: 'Go to Focus Mode' },
 ];
 
 export const Layout = ({ children, currentView, setView }) => {

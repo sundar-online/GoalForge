@@ -830,7 +830,7 @@ export const FocusMode = () => {
               </div>
               <div className="bg-accent-blue rounded-2xl p-2 sm:p-4 text-center shadow-lg shadow-accent-blue/15 flex flex-col items-center justify-center min-h-[80px] sm:min-h-[90px] min-w-0">
                 <Calendar size={16} className="text-white/80 mb-0.5 sm:mb-1" />
-                <p className="text-[7px] sm:text-[8px] font-black text-white/60 uppercase tracking-wider mb-0.5 truncate max-w-full">Lifetime</p>
+                <p className="text-[7px] sm:text-[8px] font-black text-white/60 uppercase tracking-wider mb-0.5 truncate max-w-full">Today</p>
                 <p className="text-[10px] sm:text-base font-black text-white leading-none mt-0.5 sm:mt-1 truncate">
                   {Math.floor(focusTime / 3600)}h{Math.floor((focusTime % 3600) / 60)}m
                 </p>

@@ -18,6 +18,7 @@ const AuthPage = React.lazy(() => import('./components/AuthPage').then(m => ({ d
 const ProfilePage = React.lazy(() => import('./components/ProfilePage').then(m => ({ default: m.ProfilePage })));
 const WeeklyPlan = React.lazy(() => import('./components/WeeklyPlan').then(m => ({ default: m.WeeklyPlan })));
 const ScheduledEvents = React.lazy(() => import('./components/ScheduledEvents').then(m => ({ default: m.ScheduledEvents })));
+const ForgeWorkspace = React.lazy(() => import('./components/ForgeWorkspace').then(m => ({ default: m.ForgeWorkspace })));
 
 // Premium fallback loading skeleton
 function ViewSkeleton() {
@@ -124,6 +125,7 @@ function AppInner() {
       case 'weeklyplan': return <WeeklyPlan />;
       case 'events': return <ScheduledEvents />;
       case 'profile': return <ProfilePage />;
+      case 'workspace': return <ForgeWorkspace setView={setCurrentView} />;
       default: return <Dashboard setView={setCurrentView} />;
     }
   };

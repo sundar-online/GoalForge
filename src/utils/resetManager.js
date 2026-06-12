@@ -143,7 +143,7 @@ export function computeGoalResetPayload(goal, updatedHabits, todayStr) {
   const updatedGoalDates = recalculateGoalCompletedDates(updatedGoalWithoutDates);
   const goalSchedule = getGoalScheduledDays(updatedGoalWithoutDates);
   // G5 fix: calculateGoalStreak returns { current, best }
-  const { current: newGoalStreak, best: newGoalBestStreak } = calculateGoalStreak(updatedGoalDates, goalSchedule);
+  const { current: newGoalStreak, best: newGoalBestStreak } = calculateGoalStreak(updatedGoalDates, goalSchedule, goal.startDate || goal.createdAt);
   const newGoalMissed = calculateGoalConsecutiveMissedDays(
     updatedGoalDates,
     goalSchedule,
