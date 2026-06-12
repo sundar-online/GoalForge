@@ -649,7 +649,7 @@ export const getTaskTrackingKey = (task) => {
   return `${titlePart}_${typePart}`;
 };
 
-export const calculateTaskStreak = (completedDates) => {
+export const calculateTaskStreak = (completedDates, scheduleDays = []) => {
   if (!completedDates || completedDates.length === 0) {
     return { current: 0, best: 0 };
   }
@@ -658,7 +658,9 @@ export const calculateTaskStreak = (completedDates) => {
   const todayStr = TODAY();
   const sortedDates = [...completedSet].sort();
 
-  // 1. Calculate Best Streak
+  if (sortedDates.length === 0) return { current: 0, best: 0 };
+
+  // 1. Calculate Best Streak (longest consecutive run in completedDates)
   let best = 0;
   let currentRun = 0;
   let lastDate = null;
@@ -679,23 +681,53 @@ export const calculateTaskStreak = (completedDates) => {
   }
   best = Math.max(best, currentRun);
 
-  // 2. Calculate Current Streak
-  let current = 0;
-  let checkDate = todayStr;
+  // 2. Calculate Current Streak using gradual decay (forward simulation)
+  //
+  // Rules (mirrors calculateStreakFromHistory for habits):
+  //   - Completing a task on a scheduled day  → streak + 1
+  //   - Missing 1–2 consecutive scheduled days → streak unchanged (grace period)
+  //   - Missing 3 consecutive scheduled days   → streak - 1
+  //   - Every additional 2 missed days after 3 → streak - 1
+  //   - Off-schedule / rest days               → ignored
+  //   - Today not yet completed                → not counted as missed
+  //   - Streak never goes below 0
 
-  if (completedSet.has(todayStr)) {
-    while (completedSet.has(checkDate)) {
+  const diff = diffDays(todayStr, sortedDates[0]);
+  const startDaysAgo = Math.min(1000, Math.max(30, diff));
+
+  let current = 0;
+  let consecutiveMissedDays = 0;
+
+  for (let i = startDaysAgo; i >= 0; i--) {
+    const currentDateStr = addDays(todayStr, -i);
+    const isCompleted = completedSet.has(currentDateStr);
+
+    // Determine whether this day is a scheduled day for the task
+    const dateObj = parseLocalDate(currentDateStr);
+    const dayName = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dateObj.getDay()];
+    const isScheduled = scheduleDays.length === 0 || scheduleDays.includes(dayName);
+
+    if (isCompleted) {
       current++;
-      checkDate = addDays(checkDate, -1);
+      consecutiveMissedDays = 0;
+    } else if (isScheduled) {
+      // Today is still in progress — do not penalise it yet
+      if (currentDateStr !== todayStr) {
+        consecutiveMissedDays++;
+        // Apply gradual decay:
+        //   1–2 missed days → protected (no change)
+        //   3rd missed day  → streak - 1
+        //   5th, 7th, ...   → streak - 1 each
+        if (consecutiveMissedDays >= 3 && (consecutiveMissedDays - 3) % 2 === 0) {
+          current = Math.max(0, current - 1);
+        }
+      }
     }
-  } else {
-    const yesterdayStr = addDays(todayStr, -1);
-    checkDate = yesterdayStr;
-    while (completedSet.has(checkDate)) {
-      current++;
-      checkDate = addDays(checkDate, -1);
-    }
+    // Off-schedule (rest) days are skipped entirely — no increment, no decrement
   }
+
+  // Best must be at least as large as the current decayed value
+  best = Math.max(best, current);
 
   return { current, best };
 };
