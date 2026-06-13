@@ -2889,8 +2889,9 @@ export const AppProvider = ({ children }) => {
 
   const addFocusTimeToHabit = (goalId, habitId, seconds) => {
     const mins = seconds / 60;
-    // Always accumulate toward daily focus total
-    addFocusTime(seconds);
+    // Note: do NOT call addFocusTime(seconds) here — the session total is already
+    // computed by calculatedFocusTimeToday from sessionLogs, and logFocusSession()
+    // syncs settings.focusTimeToday directly. Calling addFocusTime would double-count.
     if (goalId && habitId) {
       if (goalId === 'DAILY_TASK') logTaskTime(habitId, mins);
       else logHabitTime(goalId, habitId, mins);
