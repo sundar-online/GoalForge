@@ -120,7 +120,6 @@ const safeParse = (key, fallback) => {
 export const AppProvider = ({ children }) => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
-  const [isDeferredReady, setIsDeferredReady] = useState(false);
   const [syncError, setSyncError] = useState(null);
 
   // Track deleted goal IDs locally and persistently to ensure instant sync/offline support
@@ -694,6 +693,84 @@ export const AppProvider = ({ children }) => {
       });
       unsubscribes.push(unsubTasks);
 
+      // 2. Subscribe to Notes Collection
+      const notesQuery = collection(fireDb, 'users', user.id, 'notes');
+      const unsubNotes = onSnapshot(notesQuery, { includeMetadataChanges: true }, (snapshot) => {
+        const updatedNotes = snapshot.docs.map(doc => {
+          const n = doc.data();
+          db.updateCache(`users/${user.id}/notes/${doc.id}`, n);
+          return {
+            id: doc.id,
+            title: n.title || '',
+            content: n.content || '',
+            tags: n.tags || [],
+            color: n.color || '',
+            checklist: n.checklist || null,
+            pinned: n.pinned || false,
+            folder: n.folder || '',
+            created_at: n.created_at || n.createdAt || new Date().toISOString(),
+            updated_at: n.updated_at || n.updatedAt || n.created_at || new Date().toISOString(),
+            syncPending: doc.metadata.hasPendingWrites,
+          };
+        });
+
+        // Sort in memory by created_at desc (or fallbacks)
+        updatedNotes.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+        if (!isInitialNotesLoad.current) {
+          const prevIds = new Set(notesRef.current.map(n => n.id));
+          const newlySynced = updatedNotes.filter(n => !prevIds.has(n.id));
+          if (newlySynced.length > 0) {
+            newlySynced.forEach(n => {
+              scheduleLocalNotification("📓 New Note Added", {
+                body: `"${n.title || 'Untitled'}" was synchronized from the cloud.`,
+              });
+            });
+          }
+        } else {
+          isInitialNotesLoad.current = false;
+        }
+
+        setNotes(updatedNotes);
+      }, (error) => {
+        console.error('[Realtime Sync] Error in Notes subscription:', error);
+      });
+      unsubscribes.push(unsubNotes);
+
+      // X. Subscribe to Quick Thoughts Collection
+      const qtQuery = query(collection(fireDb, 'users', user.id, 'quick_thoughts'), orderBy('updated_at', 'desc'));
+      const unsubQt = onSnapshot(qtQuery, { includeMetadataChanges: true }, (snapshot) => {
+        const updatedQt = snapshot.docs.map(doc => {
+          const data = doc.data();
+          db.updateCache(`users/${user.id}/quick_thoughts/${doc.id}`, data);
+          return {
+            id: doc.id,
+            content: data.content || '',
+            emoji: data.emoji || '',
+            created_at: data.created_at,
+            updated_at: data.updated_at,
+            syncPending: doc.metadata.hasPendingWrites,
+          };
+        });
+
+        if (!isInitialQuickThoughtsLoad.current) {
+          const prevIds = new Set(quickThoughtsRef.current.map(q => q.id));
+          const newlySynced = updatedQt.filter(q => !prevIds.has(q.id));
+          if (newlySynced.length > 0) {
+            scheduleLocalNotification("💭 Thoughts Updated", {
+              body: "Your quick thoughts have been updated on another device.",
+            });
+          }
+        } else {
+          isInitialQuickThoughtsLoad.current = false;
+        }
+
+        setQuickThoughts(updatedQt);
+      }, (error) => {
+        console.error('[Realtime Sync] Error in Quick Thoughts subscription:', error);
+      });
+      unsubscribes.push(unsubQt);
+
       // 3. Subscribe to Goals with Reactive Habits Listener
       const goalsQuery = query(collection(fireDb, 'users', user.id, 'goals'), orderBy('created_at', 'desc'));
       const unsubGoals = onSnapshot(goalsQuery, { includeMetadataChanges: true }, (snapshot) => {
@@ -1088,6 +1165,62 @@ export const AppProvider = ({ children }) => {
         console.error('[Realtime Sync] Error in XP subscription:', error);
       });
       unsubscribes.push(unsubXp);
+
+      // 8.5 Subscribe to Scheduled Events Collection
+      const eventsQuery = query(collection(fireDb, 'users', user.id, 'scheduled_events'), orderBy('date', 'asc'));
+      const unsubEvents = onSnapshot(eventsQuery, { includeMetadataChanges: true }, (snapshot) => {
+        const updatedEvents = snapshot.docs.map(docSnap => {
+          const e = docSnap.data();
+          db.updateCache(`users/${user.id}/scheduled_events/${docSnap.id}`, e);
+          return {
+            id: docSnap.id,
+            title: e.title || '',
+            description: e.description || '',
+            date: e.date || '',
+            time: e.time || '',
+            category: e.category || 'general',
+            color: e.color || 'blue',
+            reminderEnabled: e.reminder_enabled ?? false,
+            reminderMinutes: e.reminder_minutes ?? 30,
+            linkedGoalId: e.linked_goal_id || null,
+            completed: e.completed ?? false,
+            createdAt: e.created_at || new Date().toISOString(),
+            syncPending: docSnap.metadata.hasPendingWrites,
+          };
+        });
+        setScheduledEvents(updatedEvents);
+      }, (error) => {
+        console.error('[Realtime Sync] Error in Scheduled Events subscription:', error);
+      });
+      unsubscribes.push(unsubEvents);
+
+      // 8. Subscribe to Memories Collection
+      const memoriesQuery = query(collection(fireDb, 'users', user.id, 'memories'), orderBy('createdAt', 'desc'));
+      const unsubMemories = onSnapshot(memoriesQuery, { includeMetadataChanges: true }, (snapshot) => {
+        const updatedMemories = snapshot.docs.map(doc => {
+          const m = doc.data();
+          db.updateCache(`users/${user.id}/memories/${doc.id}`, m);
+          return {
+            id: doc.id,
+            goalId: m.goalId || '',
+            title: m.title || '',
+            completionDate: m.completionDate || '',
+            streak: m.streak || 0,
+            consistency: m.consistency || 100,
+            userNote: m.userNote || '',
+            userPhoto: m.userPhoto || '',
+            achievementStats: m.achievementStats || {},
+            createdAt: m.createdAt || '',
+            syncPending: doc.metadata.hasPendingWrites,
+          };
+        });
+
+        setMemories(updatedMemories);
+        localStorage.setItem(STORAGE_KEYS.MEMORIES, JSON.stringify(updatedMemories));
+      }, (error) => {
+        console.error('[Realtime Sync] Error in Memories subscription:', error);
+      });
+      unsubscribes.push(unsubMemories);
 
     } catch (err) {
       console.error('[Realtime Sync] Error mounting realtime listeners:', err);
@@ -2756,8 +2889,9 @@ export const AppProvider = ({ children }) => {
 
   const addFocusTimeToHabit = (goalId, habitId, seconds) => {
     const mins = seconds / 60;
-    // Always accumulate toward daily focus total
-    addFocusTime(seconds);
+    // Note: do NOT call addFocusTime(seconds) here — the session total is already
+    // computed by calculatedFocusTimeToday from sessionLogs, and logFocusSession()
+    // syncs settings.focusTimeToday directly. Calling addFocusTime would double-count.
     if (goalId && habitId) {
       if (goalId === 'DAILY_TASK') logTaskTime(habitId, mins);
       else logHabitTime(goalId, habitId, mins);
