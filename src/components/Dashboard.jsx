@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { calculateGoalDailyProgress, isHabitDoneToday, calculateOverallProgress, isGoalDoneToday, calculateGoalStreak, getGoalScheduledDays, calculateGoalConsecutiveMissedDays, isTaskDone, getRecommendedNextGoal, isHabitScheduledToday } from '../utils/calculationUtils';
+import { calculateGoalDailyProgress, isHabitDoneToday, calculateOverallProgress, isGoalDoneToday, getGoalScheduledDays, calculateGoalConsecutiveMissedDays, isTaskDone, getRecommendedNextGoal, isHabitScheduledToday } from '../utils/calculationUtils';
 import { TODAY } from '../utils/dateUtils';
 import { BADGE_DEFINITIONS } from '../utils/gamificationEngine';
 import { useAuth } from '../context/AuthContext';
@@ -429,12 +429,15 @@ export const Dashboard = ({ setView }) => {
     .filter(g => !g.isMissingDream)
     .map(g => {
       const goalSchedule = getGoalScheduledDays(g);
-      const { current: currentStreak } = calculateGoalStreak(g.completedDates || [], goalSchedule, g.startDate || g.createdAt);
+      // Use completedDates.length — identical to what the Goals page displays (🔥 completedDays/totalGoalDays).
+      // Using calculateGoalStreak().current produces a different value because it applies decay rules
+      // that diverge from the stored completedDates count the Goals page renders.
+      const completedDaysCount = g.completedDates?.length || 0;
       const liveMissed = calculateGoalConsecutiveMissedDays(g.completedDates || [], goalSchedule, g.startDate || g.createdAt);
       return {
         name: g.title,
         tag: g.tag,
-        streak: currentStreak,
+        streak: completedDaysCount,
         missed: liveMissed || 0
       };
     })
