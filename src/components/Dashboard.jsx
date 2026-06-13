@@ -429,11 +429,12 @@ export const Dashboard = ({ setView }) => {
     .filter(g => !g.isMissingDream)
     .map(g => {
       const goalSchedule = getGoalScheduledDays(g);
+      const { current: currentStreak } = calculateGoalStreak(g.completedDates || [], goalSchedule, g.startDate || g.createdAt);
       const liveMissed = calculateGoalConsecutiveMissedDays(g.completedDates || [], goalSchedule, g.startDate || g.createdAt);
       return {
         name: g.title,
         tag: g.tag,
-        streak: g.completedDates?.length || 0,
+        streak: currentStreak,
         missed: liveMissed || 0
       };
     })
