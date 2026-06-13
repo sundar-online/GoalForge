@@ -40,8 +40,13 @@ function normalizeUser(fbUser) {
 // Provider
 // ─────────────────────────────────────────────────────────
 export const AuthProvider = ({ children }) => {
-  const [user, setUser]       = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState(() => {
+    try {
+      const cached = localStorage.getItem('gf_auth_user');
+      return cached ? JSON.parse(cached) : null;
+    } catch { return null; }
+  });
+  const [loading, setLoading] = useState(() => !localStorage.getItem('gf_auth_user'));
   const [authError, setAuthError] = useState(null);
   const [signingIn, setSigningIn] = useState(false);
 
@@ -94,7 +99,13 @@ export const AuthProvider = ({ children }) => {
       const unsub = onAuthStateChanged(auth, (fbUser) => {
         if (!alive) return;
         console.log('[Auth] onAuthStateChanged →', fbUser ? `✓ ${fbUser.uid}` : '✗ null');
-        setUser(normalizeUser(fbUser));
+        const normalized = normalizeUser(fbUser);
+        setUser(normalized);
+        if (normalized) {
+          localStorage.setItem('gf_auth_user', JSON.stringify(normalized));
+        } else {
+          localStorage.removeItem('gf_auth_user');
+        }
         setLoading(false);
 
         if (fbUser) {

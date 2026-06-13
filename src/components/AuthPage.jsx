@@ -34,6 +34,12 @@ export const AuthPage = () => {
       return;
     }
 
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      setAuthError('Invalid email format.');
+      return;
+    }
+
     if (isLogin) {
       const { error } = await signIn(email, password);
       if (error) setAuthError(error.message);
@@ -213,6 +219,7 @@ export const AuthPage = () => {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
+                  aria-pressed={showPassword}
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
                   aria-controls="mobile-password"
                   className="absolute right-4 top-1/2 -translate-y-1/2 text-text-muted hover:text-accent-blue transition-colors p-1"
@@ -425,6 +432,7 @@ export const AuthPage = () => {
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
+                    aria-pressed={showPassword}
                     aria-label={showPassword ? 'Hide password' : 'Show password'}
                     aria-controls="desktop-password"
                     className="absolute right-4 top-1/2 -translate-y-1/2 text-text-muted hover:text-accent-blue transition-colors p-1"

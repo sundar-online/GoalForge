@@ -116,8 +116,13 @@ export const FocusMode = () => {
   // ── Refs so stale-closure callbacks (setInterval, visibility) always see current IDs ──
   const selectedGoalIdRef = useRef(selectedGoalId);
   const selectedHabitIdRef = useRef(selectedHabitId);
+  const goalsRef = useRef(goals);
+  const todayTasksRef = useRef(todayTasks);
+
   useEffect(() => { selectedGoalIdRef.current = selectedGoalId; }, [selectedGoalId]);
   useEffect(() => { selectedHabitIdRef.current = selectedHabitId; }, [selectedHabitId]);
+  useEffect(() => { goalsRef.current = goals; }, [goals]);
+  useEffect(() => { todayTasksRef.current = todayTasks; }, [todayTasks]);
 
   // ── local countdown rendering state ───────────────────────────────
   const [time, setTime] = useState(duration * 60);
@@ -430,8 +435,11 @@ export const FocusMode = () => {
       || localStorage.getItem('gf_focus_selectedHabitId')
       || '';
     const liveIsDailyTask = liveGoalId === 'DAILY_TASK';
-    const liveGoal = liveIsDailyTask ? null : (goals || []).find(g => g.id === liveGoalId);
-    const liveList = liveIsDailyTask ? todayTasks : (liveGoal?.habits || []);
+    const liveGoals = goalsRef.current || [];
+    const liveTodayTasks = todayTasksRef.current || [];
+    
+    const liveGoal = liveIsDailyTask ? null : liveGoals.find(g => g.id === liveGoalId);
+    const liveList = liveIsDailyTask ? liveTodayTasks : (liveGoal?.habits || []);
     const liveItem = (liveList || []).find(h => h.id === liveHabitId);
     const routineTitle = liveItem ? liveItem.title : 'Deep Work Protocol';
 

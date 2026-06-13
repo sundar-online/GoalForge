@@ -683,6 +683,7 @@ export const GoalsPage = () => {
 
   const [newGoal, setNewGoal] = useState({
     title: '',
+    description: '',
     tag: 'General',
     deadline: '',
     mode: 'ANY',
@@ -733,6 +734,7 @@ export const GoalsPage = () => {
 
     setNewGoal({
       title: '',
+      description: '',
       tag: 'General',
       deadline: '',
       mode: 'ANY',
@@ -932,9 +934,15 @@ export const GoalsPage = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <p className="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] ml-1">Goal Name</p>
-              <input autoFocus required type="text" value={newGoal.title} onChange={e => setNewGoal({ ...newGoal, title: e.target.value })}
+              <input autoFocus required type="text" value={newGoal.title || ''} onChange={e => setNewGoal({ ...newGoal, title: e.target.value })}
                 placeholder="Goal Name"
                 className="w-full text-sm font-black text-text-main border-none bg-bg-input p-3 rounded-xl outline-none placeholder:text-text-muted/40 focus:ring-2 ring-accent-blue/20 transition-all" />
+            </div>
+            <div className="space-y-1.5">
+              <p className="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] ml-1">Goal Description</p>
+              <textarea value={newGoal.description || ''} onChange={e => setNewGoal({ ...newGoal, description: e.target.value })}
+                placeholder="What is the deeper purpose behind this goal?"
+                className="w-full text-sm font-black text-text-main border-none bg-bg-input p-3 rounded-xl outline-none placeholder:text-text-muted/40 focus:ring-2 ring-accent-blue/20 transition-all resize-none h-20" />
             </div>
             <div className="space-y-1.5">
               <p className="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] ml-1">Target Date (Optional)</p>

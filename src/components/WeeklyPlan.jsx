@@ -141,10 +141,10 @@ const DayColumn = ({ dateStr, dayAbbr, dayNum, monthName, isToday, goals, tasks,
         : 'border-border-light bg-bg-card'
     }`}>
       {/* Day header */}
-      <div className={`px-4 pt-4 pb-3 border-b ${isToday ? 'border-accent-blue/20' : 'border-border-light'}`}>
+      <div className={`px-4 pt-4 pb-3 border-b weekday ${isToday ? 'border-accent-blue/20' : 'border-border-light'}`}>
         <div className="flex items-center justify-between mb-2">
           <div>
-            <p className={`text-[9px] font-black uppercase tracking-[0.2em] ${isToday ? 'text-accent-blue' : 'text-text-muted'}`}>{dayAbbr}</p>
+            <p className={`day-label text-[9px] font-black uppercase tracking-[0.2em] ${isToday ? 'text-accent-blue' : 'text-text-muted'}`}>{dayAbbr}</p>
             <p className={`text-2xl font-black tracking-tighter leading-none ${isToday ? 'text-accent-blue' : 'text-text-main'}`}>{dayNum}</p>
             <p className="text-[10px] font-bold text-text-muted">{monthName}</p>
           </div>
