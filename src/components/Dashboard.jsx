@@ -7,51 +7,13 @@ import { useAuth } from '../context/AuthContext';
 import { AlertTriangle, AlertCircle, TrendingUp, TrendingDown, CheckCircle2, Clock, Zap, LogOut, Moon, Sun, Sparkles, Trophy, ChevronRight, Target, Award, CalendarDays, Brain, Plus, Trash2, ChevronDown, ChevronUp, Flame, Star, Calendar } from 'lucide-react';
 // eslint-disable-next-line no-unused-vars
 import { motion, AnimatePresence } from 'framer-motion';
-
-
+import { WeeklyHeatmap } from './WeeklyHeatmap';
+import { WeeklyReportCard } from './WeeklyReportCard';
 import { SkeletonLoader } from './SkeletonLoader';
-
-
+import AIInsights from './AIInsights';
+import { GoalActivityChart } from './GoalActivityChart';
 import ErrorBoundary from './ErrorBoundary';
-
-// Lazy loaded widgets to improve FCP/LCP
-const WeeklyHeatmap = React.lazy(() => import('./WeeklyHeatmap').then(m => ({ default: m.WeeklyHeatmap })));
-const WeeklyReportCard = React.lazy(() => import('./WeeklyReportCard').then(m => ({ default: m.WeeklyReportCard })));
-const GoalActivityChart = React.lazy(() => import('./GoalActivityChart').then(m => ({ default: m.GoalActivityChart })));
-const TaskAnalytics = React.lazy(() => import('./TaskAnalytics').then(m => ({ default: m.TaskAnalytics })));
-const AIInsights = React.lazy(() => import('./AIInsights'));
-
-const LazyWidget = ({ children, height = '300px' }) => {
-  const ref = React.useRef(null);
-  const [hasIntersected, setHasIntersected] = React.useState(false);
-
-  React.useEffect(() => {
-    if (hasIntersected) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setHasIntersected(true);
-          observer.disconnect();
-        }
-      },
-      { rootMargin: '200px' }
-    );
-    if (ref.current) observer.observe(ref.current);
-    return () => observer.disconnect();
-  }, [hasIntersected]);
-
-  return (
-    <div ref={ref} style={{ minHeight: hasIntersected ? 'auto' : height }}>
-      {hasIntersected ? (
-        <React.Suspense fallback={<SkeletonLoader height={parseInt(height, 10)} />}>
-          {children}
-        </React.Suspense>
-      ) : null}
-    </div>
-  );
-};
-
-
+import { TaskAnalytics } from './TaskAnalytics';
 
 const EVENT_CATEGORY_COLORS = {
   general: { dot: 'bg-blue-400', text: 'text-blue-400' },
@@ -959,7 +921,7 @@ export const Dashboard = ({ setView }) => {
 
           {/* Standalone Task Analytics Section */}
           <div className={activeDashboardTab === 'tasks' ? 'block' : 'hidden lg:block'}>
-            <LazyWidget height="500px"><TaskAnalytics setView={setView} /></LazyWidget>
+            <TaskAnalytics setView={setView} />
           </div>
 
           {/* Goal Progress List */}
@@ -1016,19 +978,19 @@ export const Dashboard = ({ setView }) => {
 
           {/* Weekly Performance Widget */}
           <div className={activeDashboardTab === 'intel' ? 'block' : 'hidden lg:block'}>
-            <LazyWidget height="250px"><WeeklyReportCard report={weeklyReport} /></LazyWidget>
+            <WeeklyReportCard report={weeklyReport} />
           </div>
 
           {/* Goal Activity Distribution Pie Chart */}
           <div className={activeDashboardTab === 'goals' ? 'block' : 'hidden lg:block'}>
             <ErrorBoundary fallbackType="widget" errorMessage="Goal activity distribution statistics could not be loaded. Please complete active habits to populate.">
-              <LazyWidget height="400px"><GoalActivityChart goals={goals} /></LazyWidget>
+              <GoalActivityChart goals={goals} />
             </ErrorBoundary>
           </div>
 
           {/* Consistency Heatmap Widget */}
           <div className={activeDashboardTab === 'goals' ? 'block' : 'hidden lg:block'}>
-            <LazyWidget height="300px"><WeeklyHeatmap focusHistory={focusHistory} taskLogs={taskLogs} accuracy={accuracy} /></LazyWidget>
+            <WeeklyHeatmap focusHistory={focusHistory} taskLogs={taskLogs} accuracy={accuracy} />
           </div>
 
           {/* Task Stats Widget */}
