@@ -271,6 +271,9 @@ export const AppProvider = ({ children }) => {
   const [xpData, setXpData] = useState(() => ({ ...DEFAULT_XP_DATA, ...safeParse(STORAGE_KEYS.XP, DEFAULT_XP_DATA) }));
   const lastSyncedXpRef = useRef(null);
   const lastSavedSummaryRef = useRef(null);
+  // xpLoadedRef: set to true the first time the XP onSnapshot delivers data.
+  // Guards the badge notification effect against running before Firestore XP is loaded.
+  const xpLoadedRef = useRef(false);
   const [levelUpEvent, setLevelUpEvent] = useState(null);   // { level, title }
   const [badgeUnlockEvent, setBadgeUnlockEvent] = useState(null); // badge definition object
   // Queue to handle multiple badge unlocks in sequence
@@ -588,6 +591,11 @@ export const AppProvider = ({ children }) => {
       localStorage.removeItem('gf_deleted_goal_ids');
       localStorage.removeItem('gf_deleted_habit_ids');
 
+      // Reset XP load flag and badge initialisation flag on logout
+      // so the next login's badge effect waits for fresh Firestore XP data.
+      xpLoadedRef.current = false;
+      initialLoadRef.current = true;
+
       setLoading(false);
       return;
     }
@@ -618,6 +626,11 @@ export const AppProvider = ({ children }) => {
     setSmartSuggestions(null);
     setDeletedGoalIds([]);
     setDeletedHabitIds([]);
+
+    // Reset XP load flag and badge initialisation flag for the incoming user
+    // so the badge effect waits for this user's XP data before evaluating notifications.
+    xpLoadedRef.current = false;
+    initialLoadRef.current = true;
 
     setLoading(true);
     setSyncError(null);
@@ -1141,6 +1154,10 @@ export const AppProvider = ({ children }) => {
           console.log("XP:", profile.totalXP);
           console.log("Level:", profile.level);
           setXpData(profile);
+          // Signal that XP data has been loaded from Firestore.
+          // The badge notification effect gates on this to prevent firing before
+          // earnedBadges/notifiedBadges are populated from the server.
+          xpLoadedRef.current = true;
         } else {
           // Document does not exist in DB yet (brand-new user), initialize local state to zero
           const defaultProfile = {
@@ -1163,6 +1180,9 @@ export const AppProvider = ({ children }) => {
           console.log("XP:", defaultProfile.totalXP);
           console.log("Level:", defaultProfile.level);
           setXpData(defaultProfile);
+          // Even for new users with no XP document, mark as loaded so the
+          // badge effect can run (it will correctly see empty earned/notified lists).
+          xpLoadedRef.current = true;
         }
       }, (error) => {
         console.error('[Realtime Sync] Error in XP subscription:', error);
@@ -3271,6 +3291,10 @@ export const AppProvider = ({ children }) => {
   const initialLoadRef = useRef(true);
   useEffect(() => {
     if (loading) return;
+    // Wait for the XP snapshot to arrive before evaluating badge state.
+    // Without this guard, the effect runs with empty earnedBadges/notifiedBadges
+    // while the XP onSnapshot is still in-flight, causing all badges to appear "new".
+    if (!xpLoadedRef.current) return;
 
     const savedBadges = xpData.earnedBadges || [];
     const notifiedBadges = xpData.notifiedBadges || [];
