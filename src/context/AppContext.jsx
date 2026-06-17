@@ -1086,6 +1086,9 @@ export const AppProvider = ({ children }) => {
               lastActiveDate: s.last_reset || prev.lastActiveDate,
               dailyResetProcessed: s.daily_reset_processed || prev.dailyResetProcessed,
               aiSettings: mergedAi,
+              // Fix: read weeklyIntentions back from Firestore so cross-device edits are picked up.
+              // Falls back to prev.weeklyIntentions (local) if the field doesn't exist yet in DB.
+              weeklyIntentions: s.weekly_intentions || prev.weeklyIntentions || {},
             };
           });
         } else {
@@ -3440,14 +3443,24 @@ export const AppProvider = ({ children }) => {
   };
 
   const saveWeeklyIntention = useCallback((weekKey, intentionText) => {
-    setSettings(prev => ({
-      ...prev,
-      weeklyIntentions: {
-        ...(prev.weeklyIntentions || {}),
-        [weekKey]: intentionText
+    setSettings(prev => {
+      const updatedSettings = {
+        ...prev,
+        weeklyIntentions: {
+          ...(prev.weeklyIntentions || {}),
+          [weekKey]: intentionText
+        }
+      };
+      // Fix: persist weeklyIntentions to Firestore immediately so the data
+      // survives page refresh and syncs to other devices.
+      if (user) {
+        db.upsertUserSettings(user.id, updatedSettings).catch(err => {
+          console.error('[Firestore Sync] Failed to save weekly intention:', err);
+        });
       }
-    }));
-  }, []);
+      return updatedSettings;
+    });
+  }, [user]);
 
   const updateAiSettings = useCallback((updates) => {
     setSettings(prev => {

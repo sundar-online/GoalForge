@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { calculateGoalDailyProgress, isHabitDoneToday, calculateOverallProgress, isGoalDoneToday, getGoalScheduledDays, calculateGoalConsecutiveMissedDays, isTaskDone, getRecommendedNextGoal, isHabitScheduledToday } from '../utils/calculationUtils';
+import { calculateGoalDailyProgress, isHabitDoneToday, calculateOverallProgress, isGoalDoneToday, getGoalScheduledDays, calculateGoalConsecutiveMissedDays, calculateGoalStreak, isTaskDone, getRecommendedNextGoal, isHabitScheduledToday } from '../utils/calculationUtils';
 import { TODAY } from '../utils/dateUtils';
 import { BADGE_DEFINITIONS } from '../utils/gamificationEngine';
 import { useAuth } from '../context/AuthContext';
@@ -429,15 +429,19 @@ export const Dashboard = ({ setView }) => {
     .filter(g => !g.isMissingDream)
     .map(g => {
       const goalSchedule = getGoalScheduledDays(g);
-      // Use completedDates.length — identical to what the Goals page displays (🔥 completedDays/totalGoalDays).
-      // Using calculateGoalStreak().current produces a different value because it applies decay rules
-      // that diverge from the stored completedDates count the Goals page renders.
-      const completedDaysCount = g.completedDates?.length || 0;
+      // Use calculateGoalStreak().current — the same source used by the Goals page streak display
+      // and the daily reset system. This ensures the Streak Power widget is always consistent
+      // with what the Goals page shows as the current streak.
+      const { current: currentStreak } = calculateGoalStreak(
+        g.completedDates || [],
+        goalSchedule,
+        g.startDate || g.createdAt
+      );
       const liveMissed = calculateGoalConsecutiveMissedDays(g.completedDates || [], goalSchedule, g.startDate || g.createdAt);
       return {
         name: g.title,
         tag: g.tag,
-        streak: completedDaysCount,
+        streak: currentStreak,
         missed: liveMissed || 0
       };
     })
@@ -537,7 +541,9 @@ export const Dashboard = ({ setView }) => {
 
               <div className="flex justify-between items-center pt-4 border-t border-border-light">
                 <span className="text-[9px] font-black text-text-muted uppercase tracking-widest">Mastery</span>
-                <span className="text-sm font-black text-text-main tracking-tighter">{goal.progress || 0}%</span>
+                {/* Use liveProgress (calculateOverallProgress) — not the stale Firestore-stored
+                    goal.progress field which only updates during the daily reset. */}
+                <span className="text-sm font-black text-text-main tracking-tighter">{Math.round(goal.progress)}%</span>
               </div>
             </div>
           );

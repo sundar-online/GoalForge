@@ -459,19 +459,30 @@ export async function deleteHabitDb(userId, goalId, habitId) {
 export async function updateHabitTime(userId, goalId, habitId, timeSpent) {
   const pathKey = `users/${userId}/goals/${goalId}/habits/${habitId}`;
   const docRef = doc(fireDb, 'users', userId, 'goals', goalId, 'habits', habitId);
-  return smartWrite(docRef, { time_spent: timeSpent }, pathKey, true, 1200);
+  // Fix: merge the partial field into the cached full document so the write cache
+  // always holds a complete document shape. Storing only { time_spent } would corrupt
+  // the cache and cause the next full upsertHabit call to over-write every field.
+  const cached = writeCache.get(pathKey) || {};
+  const mergedPayload = { ...cached, time_spent: timeSpent };
+  return smartWrite(docRef, mergedPayload, pathKey, true, 1200);
 }
 
 export async function updateHabitCount(userId, goalId, habitId, currentCount) {
   const pathKey = `users/${userId}/goals/${goalId}/habits/${habitId}`;
   const docRef = doc(fireDb, 'users', userId, 'goals', goalId, 'habits', habitId);
-  return smartWrite(docRef, { current_count: currentCount }, pathKey, true, 1200);
+  // Fix: same cache-integrity merge as updateHabitTime above
+  const cached = writeCache.get(pathKey) || {};
+  const mergedPayload = { ...cached, current_count: currentCount };
+  return smartWrite(docRef, mergedPayload, pathKey, true, 1200);
 }
 
 export async function updateHabitCheck(userId, goalId, habitId, completed) {
   const pathKey = `users/${userId}/goals/${goalId}/habits/${habitId}`;
   const docRef = doc(fireDb, 'users', userId, 'goals', goalId, 'habits', habitId);
-  return smartWrite(docRef, { completed }, pathKey, true, 1000);
+  // Fix: same cache-integrity merge for consistency
+  const cached = writeCache.get(pathKey) || {};
+  const mergedPayload = { ...cached, completed };
+  return smartWrite(docRef, mergedPayload, pathKey, true, 1000);
 }
 
 // ── Tasks ──────────────────────────────────────────────
@@ -705,6 +716,8 @@ export async function upsertUserSettings(userId, settings) {
     ...(settings.aiSettings !== undefined && {
       ai_settings: settings.aiSettings
     }),
+    // Fix: persist weeklyIntentions so they survive refresh and sync cross-device
+    weekly_intentions: settings.weeklyIntentions || {},
     updated_at: new Date().toISOString(),
   };
   const pathKey = `users/${userId}/settings/preferences`;
@@ -843,6 +856,8 @@ export async function fetchXpData(userId) {
       lastXPDate: data.last_xp_date || '',
       xpHistory: data.xp_history || [],
       notifiedBadges: data.notified_badges || [],
+      nightOwlDates: data.night_owl_dates || [],
+      earlyBirdDates: data.early_bird_dates || [],
     };
   } catch (err) {
     log('fetchXpData', err);
@@ -862,6 +877,9 @@ export async function upsertXpData(userId, xpData) {
     last_xp_date: xpData.lastXPDate || '',
     xp_history: (xpData.xpHistory || []).slice(0, 50),
     notified_badges: xpData.notifiedBadges || [],
+    // Fix: persist nightOwl/earlyBird dates so badge state survives refresh and device changes
+    night_owl_dates: xpData.nightOwlDates || [],
+    early_bird_dates: xpData.earlyBirdDates || [],
     updated_at: new Date().toISOString(),
   };
 
