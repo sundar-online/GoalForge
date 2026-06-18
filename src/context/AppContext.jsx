@@ -272,8 +272,12 @@ export const AppProvider = ({ children }) => {
   const lastSyncedXpRef = useRef(null);
   const lastSavedSummaryRef = useRef(null);
   // xpLoadedRef: set to true the first time the XP onSnapshot delivers data.
-  // Guards the badge notification effect against running before Firestore XP is loaded.
+  // Guards the badge notification effect and the daily XP effect against running
+  // before Firestore XP is loaded (prevents double-awards on remount / login).
   const xpLoadedRef = useRef(false);
+  // xpRecalcDoneRef: set to true after the one-time startup duplicate-milestone cleanup
+  // has run for the current session. Reset on logout/login so it re-runs for each user.
+  const xpRecalcDoneRef = useRef(false);
   const [levelUpEvent, setLevelUpEvent] = useState(null);   // { level, title }
   const [badgeUnlockEvent, setBadgeUnlockEvent] = useState(null); // badge definition object
   // Queue to handle multiple badge unlocks in sequence
@@ -601,9 +605,10 @@ export const AppProvider = ({ children }) => {
       localStorage.removeItem('gf_deleted_goal_ids');
       localStorage.removeItem('gf_deleted_habit_ids');
 
-      // Reset XP load flag and badge initialisation flag on logout
-      // so the next login's badge effect waits for fresh Firestore XP data.
+      // Reset XP load flag, recalc flag, and badge initialisation flag on logout
+      // so the next login's effects all wait for fresh Firestore XP data.
       xpLoadedRef.current = false;
+      xpRecalcDoneRef.current = false;
       initialLoadRef.current = true;
 
       setLoading(false);
@@ -642,9 +647,10 @@ export const AppProvider = ({ children }) => {
     setDeletedGoalIds([]);
     setDeletedHabitIds([]);
 
-    // Reset XP load flag and badge initialisation flag for the incoming user
-    // so the badge effect waits for this user's XP data before evaluating notifications.
+    // Reset XP load flag, recalc flag, and badge initialisation flag for the incoming user
+    // so all guarded effects wait for this user's XP data before running.
     xpLoadedRef.current = false;
+    xpRecalcDoneRef.current = false;
     initialLoadRef.current = true;
 
     setLoading(true);
@@ -3451,8 +3457,9 @@ export const AppProvider = ({ children }) => {
   }, [badgeUnlockEvent]);
 
   // ── Gamification: Daily XP Checks (in daily reset) ─────
-  // Perfect day check & streak milestone XP are awarded during daily reset.
-  // We hook into the existing daily reset effect by checking in the task summary effect.
+  // Perfect day check & streak milestone XP are awarded once per calendar day.
+  // Both effects are gated on xpLoadedRef so they cannot fire before Firestore XP
+  // arrives, which prevents double-awards on refresh, remount, or logout/login.
   const lastXPDateRef = useRef(xpData.lastXPDate || '');
   useEffect(() => {
     lastXPDateRef.current = xpData.lastXPDate || '';
@@ -3465,6 +3472,10 @@ export const AppProvider = ({ children }) => {
 
   useEffect(() => {
     if (loading) return;
+    // Guard: do not award XP before the Firestore XP profile has loaded.
+    // Without this, the effect fires with lastXPDate='' on every login/remount
+    // before the persisted lastXPDate arrives from Firestore, causing double-awards.
+    if (!xpLoadedRef.current) return;
     const today = TODAY();
     if (lastXPDateRef.current === today) return;
 
@@ -3476,23 +3487,79 @@ export const AppProvider = ({ children }) => {
       recordPerfectDay();
     }
 
-    // Check streak milestones (every 5 days)
+    // Check streak milestones (every 5 days).
+    // IMPORTANT: milestoneReason must exactly match what awardXP stores so the
+    // `alreadyAwarded` look-up works. Previously this used `streak_${maxStreak}`
+    // as the key but stored `${maxStreak}-day streak milestone` as the reason —
+    // those strings never matched, so the dedup check always failed.
     const allStreaks = [
       ...goals.flatMap(g => (g.habits || []).map(h => h.streak || 0)),
       ...tasks.map(t => t.currentStreak || 0)
     ];
     const maxStreak = Math.max(0, ...allStreaks);
     if (maxStreak > 0 && maxStreak % 5 === 0) {
-      const milestoneKey = `streak_${maxStreak}`;
-      const alreadyAwarded = (xpHistoryRef.current || []).some(e => e.reason === milestoneKey);
+      const milestoneReason = `${maxStreak}-day streak milestone`;
+      const alreadyAwarded = (xpHistoryRef.current || []).some(e => e.reason === milestoneReason);
       if (!alreadyAwarded) {
-        awardXP(XP_SOURCES.STREAK_MILESTONE, `${maxStreak}-day streak milestone`);
+        awardXP(XP_SOURCES.STREAK_MILESTONE, milestoneReason);
       }
     }
 
     lastXPDateRef.current = today;
     setXpData(prev => ({ ...prev, lastXPDate: today }));
   }, [loading, taskLogs, goals, tasks]);
+
+  // ── One-time XP Recalculation: strip duplicate streak milestone awards ────
+  // Runs once per login session after Firestore XP has loaded. Scans xpHistory
+  // for duplicate milestone entries caused by the previous reason-string mismatch
+  // bug, removes the extras, and adjusts totalXP accordingly.
+  useEffect(() => {
+    if (!xpLoadedRef.current) return;
+    if (xpRecalcDoneRef.current) return;
+    xpRecalcDoneRef.current = true;
+
+    const history = xpData.xpHistory || [];
+
+    // Walk history (newest-first) keeping only the first occurrence of each
+    // milestone reason. Any subsequent occurrence is a duplicate.
+    const seenMilestones = new Set();
+    let excessXP = 0;
+    const cleanedHistory = [];
+
+    history.forEach(entry => {
+      const isMilestone = entry.reason && /^\d+-day streak milestone$/.test(entry.reason);
+      if (isMilestone) {
+        if (seenMilestones.has(entry.reason)) {
+          // Duplicate — tally excess XP and drop from cleaned history
+          excessXP += XP_SOURCES.STREAK_MILESTONE;
+        } else {
+          seenMilestones.add(entry.reason);
+          cleanedHistory.push(entry);
+        }
+      } else {
+        cleanedHistory.push(entry);
+      }
+    });
+
+    if (excessXP === 0) return; // Nothing to fix — history is clean
+
+    const correctedTotalXP = Math.max(0, xpData.totalXP - excessXP);
+    const newLevelInfo = getLevelFromXP(correctedTotalXP);
+
+    console.warn(
+      `[XP Recalc] Found duplicate streak milestone awards. ` +
+      `Removing ${excessXP} XP (${excessXP / XP_SOURCES.STREAK_MILESTONE} duplicate entries). ` +
+      `totalXP: ${xpData.totalXP} → ${correctedTotalXP}. ` +
+      `Level: ${xpData.level} → ${newLevelInfo.level}.`
+    );
+
+    setXpData(prev => ({
+      ...prev,
+      totalXP: correctedTotalXP,
+      level: newLevelInfo.level,
+      xpHistory: cleanedHistory,
+    }));
+  }, [xpData.xpHistory]);
 
   // ── Weekly Intentions ──────────────────────────────────────────
   // ── Scheduled Events CRUD ──────────────────────────────────
