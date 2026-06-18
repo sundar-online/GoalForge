@@ -694,6 +694,7 @@ export async function fetchUserSettings(userId) {
 
     return {
       theme: data.theme || 'dark',
+      themeSource: data.theme_source || 'manual',
       focusTimeToday: data.focus_time_today || 0,
       lastReset: data.last_reset || null,
       dailyResetProcessed: data.daily_reset_processed || '',
@@ -708,6 +709,7 @@ export async function fetchUserSettings(userId) {
 export async function upsertUserSettings(userId, settings) {
   const payload = {
     theme: settings.theme,
+    theme_source: settings.themeSource || 'manual',
     focus_time_today: settings.focusTimeToday ?? 0,
     last_reset: settings.lastReset,
     ...(settings.dailyResetProcessed !== undefined && {

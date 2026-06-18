@@ -4,7 +4,7 @@ import { calculateGoalDailyProgress, isHabitDoneToday, calculateOverallProgress,
 import { TODAY } from '../utils/dateUtils';
 import { BADGE_DEFINITIONS } from '../utils/gamificationEngine';
 import { useAuth } from '../context/AuthContext';
-import { AlertTriangle, AlertCircle, TrendingUp, TrendingDown, CheckCircle2, Clock, Zap, LogOut, Moon, Sun, Sparkles, Trophy, ChevronRight, Target, Award, CalendarDays, Brain, Plus, Trash2, ChevronDown, ChevronUp, Flame, Star, Calendar } from 'lucide-react';
+import { AlertTriangle, AlertCircle, TrendingUp, TrendingDown, CheckCircle2, Clock, Zap, LogOut, Moon, Sun, Monitor, Sparkles, Trophy, ChevronRight, Target, Award, CalendarDays, Brain, Plus, Trash2, ChevronDown, ChevronUp, Flame, Star, Calendar } from 'lucide-react';
 // eslint-disable-next-line no-unused-vars
 import { motion, AnimatePresence } from 'framer-motion';
 import { WeeklyHeatmap } from './WeeklyHeatmap';
@@ -359,7 +359,7 @@ export const Dashboard = ({ setView }) => {
     todayTasks, allHabits,
     focusTime, focusHistory, taskLogs,
     disciplineScore, insights,
-    theme, toggleTheme, loading, weeklyReport, syncError, retrySync,
+    theme, toggleTheme, setTheme, themeSource, loading, weeklyReport, syncError, retrySync,
     xpData: rawXpData, currentLevelInfo: rawLevelInfo,
     tasks,
     setFocusGoal,
@@ -612,17 +612,35 @@ export const Dashboard = ({ setView }) => {
             <Sparkles size={18} className="group-hover:scale-110 transition-transform duration-200" aria-hidden="true" />
           </button>
 
-          {/* Theme Toggle */}
-          <button
-            onClick={toggleTheme}
-            aria-label={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
-            className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-bg-card border border-border-light flex items-center justify-center text-text-main hover:bg-bg-input transition-all active:scale-90 shadow-sm shrink-0 group"
-          >
-            {theme === 'light'
-              ? <Moon size={18} className="group-hover:scale-110 transition-transform duration-200" aria-hidden="true" />
-              : <Sun size={18} className="group-hover:scale-110 transition-transform duration-200" aria-hidden="true" />
-            }
-          </button>
+          {/* Theme Toggle — cycles: dark → light → system → dark */}
+          {(() => {
+            const isSystem = themeSource === 'system';
+            const nextLabel = isSystem
+              ? 'Switch to dark mode'
+              : theme === 'dark'
+                ? 'Switch to light mode'
+                : 'Follow system theme';
+            const handleCycle = () => {
+              if (isSystem) setTheme('dark', 'manual');
+              else if (theme === 'dark') setTheme('light', 'manual');
+              else setTheme(null, 'system');
+            };
+            return (
+              <button
+                onClick={handleCycle}
+                aria-label={nextLabel}
+                title={nextLabel}
+                className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-bg-card border border-border-light flex items-center justify-center text-text-main hover:bg-bg-input transition-all active:scale-90 shadow-sm shrink-0 group"
+              >
+                {isSystem
+                  ? <Monitor size={18} className="group-hover:scale-110 transition-transform duration-200 text-accent-blue" aria-hidden="true" />
+                  : theme === 'light'
+                    ? <Moon size={18} className="group-hover:scale-110 transition-transform duration-200" aria-hidden="true" />
+                    : <Sun size={18} className="group-hover:scale-110 transition-transform duration-200" aria-hidden="true" />
+                }
+              </button>
+            );
+          })()}
 
           {/* Profile Avatar */}
           <div className="relative shrink-0">

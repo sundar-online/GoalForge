@@ -283,6 +283,7 @@ export const AppProvider = ({ children }) => {
   const [settings, setSettings] = useState(() => {
     const s = safeParse(STORAGE_KEYS.SETTINGS, {
       theme: 'dark',
+      themeSource: 'manual',
       focusTimeToday: 0,
       lastActiveDate: '',
       focusHistory: {},
@@ -293,6 +294,8 @@ export const AppProvider = ({ children }) => {
     });
     return {
       ...s,
+      // Ensure themeSource always exists even for older saved settings
+      themeSource: s.themeSource || 'manual',
       aiSettings: {
         ...DEFAULT_AI_SETTINGS,
         ...(s.aiSettings || {})
@@ -551,6 +554,11 @@ export const AppProvider = ({ children }) => {
 
   useEffect(() => {
     if (!user) {
+      // Preserve theme preference across logout — it is a device-level choice
+      // and should not be tied to the user's account session lifecycle.
+      const preservedTheme = settings.theme || 'dark';
+      const preservedThemeSource = settings.themeSource || 'manual';
+
       setGoals([]);
       setTasks([]);
       setTaskLogs({});
@@ -562,7 +570,8 @@ export const AppProvider = ({ children }) => {
       setSessionLogs([]);
       setXpData(DEFAULT_XP_DATA);
       setSettings({
-        theme: 'dark',
+        theme: preservedTheme,
+        themeSource: preservedThemeSource,
         focusTimeToday: 0,
         lastActiveDate: '',
         focusHistory: {},
@@ -577,7 +586,8 @@ export const AppProvider = ({ children }) => {
       setDeletedGoalIds([]);
       setDeletedHabitIds([]);
 
-      // Clear local storage keys on user logout to prevent data leakage between sessions
+      // Clear local storage keys on user logout to prevent data leakage between sessions.
+      // Theme preference is intentionally re-saved after clearing (see localStorage effect).
       localStorage.removeItem(STORAGE_KEYS.GOALS);
       localStorage.removeItem(STORAGE_KEYS.TASKS);
       localStorage.removeItem(STORAGE_KEYS.LOGS);
@@ -611,8 +621,13 @@ export const AppProvider = ({ children }) => {
     setScheduledEvents([]);
     setSessionLogs([]);
     setXpData(DEFAULT_XP_DATA);
+    // Seed theme from localStorage so there is no 'dark' flash while waiting for
+    // the Firestore snapshot to arrive. The snapshot will override with the
+    // correct per-user value once it lands.
+    const storedSettings = safeParse(STORAGE_KEYS.SETTINGS, {});
     setSettings({
-      theme: 'dark',
+      theme: storedSettings.theme || 'dark',
+      themeSource: storedSettings.themeSource || 'manual',
       focusTimeToday: 0,
       lastActiveDate: '',
       focusHistory: {},
@@ -1095,6 +1110,11 @@ export const AppProvider = ({ children }) => {
             return {
               ...prev,
               theme: s.theme || prev.theme,
+              // Respect the user's explicit themeSource from Firestore.
+              // 'manual' means a specific theme was chosen; 'system' means follow OS.
+              // Falls back to prev to avoid overwriting a just-set local choice
+              // before the Firestore write has propagated back.
+              themeSource: s.theme_source || prev.themeSource || 'manual',
               focusTimeToday: s.focus_time_today || prev.focusTimeToday,
               lastActiveDate: s.last_reset || prev.lastActiveDate,
               dailyResetProcessed: s.daily_reset_processed || prev.dailyResetProcessed,
@@ -1105,9 +1125,12 @@ export const AppProvider = ({ children }) => {
             };
           });
         } else {
-          // New user has no preferences in DB yet, initialize local settings state to safe default values
+          // New user has no preferences in DB yet — initialize to safe defaults.
+          // Seed theme from localStorage in case there is a value from a prior session.
+          const storedSettings = safeParse(STORAGE_KEYS.SETTINGS, {});
           setSettings({
-            theme: 'dark',
+            theme: storedSettings.theme || 'dark',
+            themeSource: storedSettings.themeSource || 'manual',
             focusTimeToday: 0,
             lastActiveDate: '',
             focusHistory: {},
@@ -1286,11 +1309,64 @@ export const AppProvider = ({ children }) => {
     return () => clearInterval(itv);
   }, [currentDate, accuracy, settings, user]);
 
-  const toggleTheme = () => {
-    const newTheme = settings.theme === 'light' ? 'dark' : 'light';
-    setSettings(prev => ({ ...prev, theme: newTheme }));
-    if (user) db.upsertUserSettings(user.id, { theme: newTheme, focusTimeToday: focusTime, lastReset: settings.lastActiveDate, aiSettings: settings.aiSettings });
-  };
+  // setTheme: the canonical way to change the theme. source is 'manual' or 'system'.
+  // - 'manual': user picked a specific theme; never auto-override until changed again.
+  // - 'system': follow the OS prefers-color-scheme media query.
+  const setTheme = useCallback((newTheme, source = 'manual') => {
+    // When following the system, resolve the actual theme value right now.
+    const effectiveTheme = source === 'system'
+      ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+      : newTheme;
+
+    setSettings(prev => ({ ...prev, theme: effectiveTheme, themeSource: source }));
+    document.documentElement.setAttribute('data-theme', effectiveTheme);
+
+    if (user) {
+      db.upsertUserSettings(user.id, {
+        theme: effectiveTheme,
+        themeSource: source,
+        focusTimeToday: focusTime,
+        lastReset: settings.lastActiveDate,
+        aiSettings: settings.aiSettings
+      });
+    }
+  }, [user, focusTime, settings.lastActiveDate, settings.aiSettings]);
+
+  // Keep backward compat: old 2-state toggle used by any callers not yet updated.
+  const toggleTheme = useCallback(() => {
+    if (settings.themeSource === 'system') {
+      // system → manual dark
+      setTheme('dark', 'manual');
+    } else if (settings.theme === 'dark') {
+      // dark → light
+      setTheme('light', 'manual');
+    } else if (settings.theme === 'light') {
+      // light → system
+      setTheme(null, 'system');
+    } else {
+      setTheme('dark', 'manual');
+    }
+  }, [settings.theme, settings.themeSource, setTheme]);
+
+  // ── System Theme Listener ─────────────────────────────────
+  // When the user chooses 'System', reactively apply the OS dark/light preference.
+  useEffect(() => {
+    if (settings.themeSource !== 'system') return;
+
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+
+    const handleChange = (e) => {
+      const systemTheme = e.matches ? 'dark' : 'light';
+      setSettings(prev => prev.theme === systemTheme ? prev : { ...prev, theme: systemTheme });
+      document.documentElement.setAttribute('data-theme', systemTheme);
+    };
+
+    // Apply immediately in case the OS theme changed while the app was backgrounded.
+    handleChange(mq);
+
+    mq.addEventListener('change', handleChange);
+    return () => mq.removeEventListener('change', handleChange);
+  }, [settings.themeSource]);
 
   // ── Stable refs for daily reset to avoid stale closure deps ──
   const settingsRef = useRef(settings);
@@ -1328,6 +1404,7 @@ export const AppProvider = ({ children }) => {
       }));
       db.upsertUserSettings(user.id, {
         theme,
+        themeSource: currentSettings.themeSource || 'manual',
         focusTimeToday: 0,
         lastReset: todayStr,
         dailyResetProcessed: todayStr,
@@ -1375,6 +1452,7 @@ export const AppProvider = ({ children }) => {
       setSettings(prev => ({ ...prev, dailyResetProcessed: todayStr }));
       db.upsertUserSettings(user.id, {
         theme: currentSettings.theme,
+        themeSource: currentSettings.themeSource || 'manual',
         focusTimeToday: currentSettings.focusTimeToday,
         lastReset: currentSettings.lastActiveDate,
         dailyResetProcessed: todayStr,
@@ -2967,9 +3045,10 @@ export const AppProvider = ({ children }) => {
       try {
         await db.upsertFocusSession(user.id, finalSession);
         await db.upsertFocusHistory(user.id, dateStr, newTotalSecondsToday);
-        // Also sync userSettings to keep theme and focusTimeToday updated
+        // Also sync userSettings to keep theme, themeSource and focusTimeToday updated
         await db.upsertUserSettings(user.id, {
           theme: settings.theme,
+          themeSource: settings.themeSource || 'manual',
           focusTimeToday: newTotalSecondsToday,
           lastReset: settings.lastActiveDate,
           aiSettings: settings.aiSettings
@@ -2986,13 +3065,14 @@ export const AppProvider = ({ children }) => {
     const timer = setTimeout(() => {
       db.upsertUserSettings(user.id, {
         theme: settings.theme,
+        themeSource: settings.themeSource || 'manual',
         focusTimeToday: settings.focusTimeToday,
         lastReset: settings.lastActiveDate,
         aiSettings: settings.aiSettings
       });
     }, 15000);
     return () => clearTimeout(timer);
-  }, [settings.focusTimeToday, settings.theme, user]);
+  }, [settings.focusTimeToday, settings.theme, settings.themeSource, user]);
 
   // Sync focus history today to DB on change (debounced)
   useEffect(() => {
@@ -3523,7 +3603,7 @@ export const AppProvider = ({ children }) => {
   const focusValue = {
     focusTime, focusHistory, addFocusTime, addFocusTimeToHabit,
     sessionLogs, logFocusSession,
-    theme, toggleTheme, settings, saveWeeklyIntention,
+    theme, toggleTheme, setTheme, themeSource: settings.themeSource || 'manual', settings, saveWeeklyIntention,
     loading, syncError, retrySync: syncFromCloud
   };
 
@@ -3557,7 +3637,7 @@ export const AppProvider = ({ children }) => {
     tasks, addTask, updateTask, deleteTask, logTaskTime, toggleTaskComplete, updateTaskCount,
     focusTime, focusHistory, addFocusTime, addFocusTimeToHabit,
     sessionLogs, logFocusSession,
-    theme, toggleTheme,
+    theme, toggleTheme, setTheme, themeSource: settings.themeSource || 'manual',
     accuracy, alerts, weeklyReport, disciplineScore, userLevel, insights: getInsights(accuracy, avgStreak, focusTime),
     notes, addNote, updateNote, deleteNote,
     loading, taskLogs, syncError, retrySync: syncFromCloud,
