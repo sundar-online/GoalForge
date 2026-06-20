@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { calculateGoalDailyProgress, isHabitDoneToday, calculateOverallProgress, isGoalDoneToday, getGoalScheduledDays, calculateGoalConsecutiveMissedDays, calculateGoalStreak, isTaskDone, getRecommendedNextGoal, isHabitScheduledToday } from '../utils/calculationUtils';
+import { calculateGoalDailyProgress, isHabitDoneToday, calculateOverallProgress, isGoalDoneToday, isTaskDone, getRecommendedNextGoal, isHabitScheduledToday } from '../utils/calculationUtils';
 import { TODAY } from '../utils/dateUtils';
 import { BADGE_DEFINITIONS } from '../utils/gamificationEngine';
 import { useAuth } from '../context/AuthContext';
 import { AlertTriangle, AlertCircle, TrendingUp, TrendingDown, CheckCircle2, Clock, Zap, LogOut, Moon, Sun, Monitor, Sparkles, Trophy, ChevronRight, Target, Award, CalendarDays, Brain, Plus, Trash2, ChevronDown, ChevronUp, Flame, Star, Calendar } from 'lucide-react';
 // eslint-disable-next-line no-unused-vars
 import { motion, AnimatePresence } from 'framer-motion';
-import { WeeklyHeatmap } from './WeeklyHeatmap';
+import { ActivityHeatmap } from './ActivityHeatmap';
+import { GoalConsistencyHeatmap } from './GoalConsistencyHeatmap';
 import { WeeklyReportCard } from './WeeklyReportCard';
 import { SkeletonLoader } from './SkeletonLoader';
 import AIInsights from './AIInsights';
@@ -358,6 +359,7 @@ export const Dashboard = ({ setView }) => {
     goals, accuracy, alerts,
     todayTasks, allHabits,
     focusTime, focusHistory, taskLogs,
+    sessionLogs,
     disciplineScore, insights,
     theme, toggleTheme, setTheme, themeSource, loading, weeklyReport, syncError, retrySync,
     xpData: rawXpData, currentLevelInfo: rawLevelInfo,
@@ -425,24 +427,19 @@ export const Dashboard = ({ setView }) => {
   else if (accuracy > 0) accColor = '#faba2c';
   else accColor = '#ef4444';
 
+  // topStreaks reads goal.completedDates.length — the exact same value the Goals page
+  // renders as the 🔥 completedDays/totalGoalDays badge on each goal card (line 1388).
+  // Do NOT use calculateGoalStreak here — that function counts consecutive scheduled days
+  // and resets on any missed day, producing a completely different number to what the
+  // Goals page shows. Reading completedDates.length keeps both pages in perfect sync.
   const topStreaks = (goals || [])
     .filter(g => !g.isMissingDream)
     .map(g => {
-      const goalSchedule = getGoalScheduledDays(g);
-      // Use calculateGoalStreak().current — the same source used by the Goals page streak display
-      // and the daily reset system. This ensures the Streak Power widget is always consistent
-      // with what the Goals page shows as the current streak.
-      const { current: currentStreak } = calculateGoalStreak(
-        g.completedDates || [],
-        goalSchedule,
-        g.startDate || g.createdAt
-      );
-      const liveMissed = calculateGoalConsecutiveMissedDays(g.completedDates || [], goalSchedule, g.startDate || g.createdAt);
+      const completedDays = (g.completedDates || []).length;
       return {
         name: g.title,
         tag: g.tag,
-        streak: currentStreak,
-        missed: liveMissed || 0
+        streak: completedDays,
       };
     })
     .filter(g => g.streak > 0)
@@ -1016,9 +1013,26 @@ export const Dashboard = ({ setView }) => {
             </ErrorBoundary>
           </div>
 
-          {/* Consistency Heatmap Widget */}
+          {/* Consistency Heatmap Widget - Task Activity */}
           <div className={activeDashboardTab === 'goals' ? 'block' : 'hidden lg:block'}>
-            <WeeklyHeatmap focusHistory={focusHistory} taskLogs={taskLogs} accuracy={accuracy} />
+            <ActivityHeatmap
+              taskLogs={taskLogs}
+              goals={goals}
+              sessionLogs={sessionLogs}
+              focusHistory={focusHistory}
+              accuracy={accuracy}
+            />
+          </div>
+
+          {/* Goal Consistency Heatmap Widget */}
+          <div className={activeDashboardTab === 'goals' ? 'block' : 'hidden lg:block'}>
+            <GoalConsistencyHeatmap
+              goals={goals}
+              taskLogs={taskLogs}
+              sessionLogs={sessionLogs}
+              focusHistory={focusHistory}
+              accuracy={accuracy}
+            />
           </div>
 
           {/* Task Stats Widget */}
@@ -1083,9 +1097,6 @@ export const Dashboard = ({ setView }) => {
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        {s.missed >= 2 && (
-                          <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" title="Vulnerable" />
-                        )}
                         <span className="text-base font-black text-orange-500 group-hover:scale-110 transition-transform">🔥 {s.streak}d</span>
                       </div>
                     </div>
