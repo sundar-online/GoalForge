@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 // eslint-disable-next-line no-unused-vars
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTasks } from '../context/AppContext';
-import { CalendarCheck, Plus, Clock, Trash2, Check, CalendarRange, Calendar, Cloud } from 'lucide-react';
+import { CalendarCheck, Plus, Clock, Trash2, Check, CalendarRange, Calendar, Cloud, AlertCircle, Target, Pause, Play } from 'lucide-react';
 import { isTaskDone } from '../utils/calculationUtils';
 import { TODAY } from '../utils/dateUtils';
 import { DeleteConfirmationModal } from './DeleteConfirmationModal';
@@ -15,6 +15,24 @@ const SCHEDULE_ICONS = {
 
 const SCHEDULE_LABELS = { daily: 'Daily', single: 'Single', range: 'Range' };
 const TYPE_LABELS = { time: 'Time', check: 'Check', count: 'Count' };
+
+// ── Info Bar Helpers ─────────────────────────────────────────
+/** Format an ISO timestamp to a readable date, e.g. "12 Jul 2026" */
+const formatStartDate = (isoString) => {
+  if (!isoString) return '—';
+  const d = new Date(isoString);
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+};
+
+/** Per-task accuracy: completed dates ÷ days active × 100 (display-only, no logic change) */
+const calcTaskAccuracy = (task) => {
+  const created = task.createdAt ? new Date(task.createdAt) : null;
+  if (!created) return null;
+  const today = new Date();
+  const daysSince = Math.max(1, Math.round((today - created) / 86400000) + 1);
+  const done = (task.completedDates || []).length;
+  return Math.min(100, Math.round((done / daysSince) * 100));
+};
 
 // ── Log Time Modal ──────────────────────────────────────────
 const LogTaskTimeModal = ({ task, onClose, logTaskTime }) => {
@@ -65,6 +83,17 @@ export const DailyTasks = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [completedLimit, setCompletedLimit] = useState(5);
+  // Ephemeral UI-only pause state — resets on reload, no backend changes
+  const [pausedTaskIds, setPausedTaskIds] = useState(() => new Set());
+
+  const togglePause = (taskId) => {
+    setPausedTaskIds(prev => {
+      const next = new Set(prev);
+      if (next.has(taskId)) next.delete(taskId);
+      else next.add(taskId);
+      return next;
+    });
+  };
 
   const { tasks, addTask, deleteTask, logTaskTime, toggleTaskComplete, updateTaskCount } = useTasks();
 
@@ -322,20 +351,26 @@ export const DailyTasks = () => {
             }
             const pct = isCheck ? 0 : Math.min(100, Math.round((current / (target || 1)) * 100));
             const sType = task.type || 'daily';
+            const isPaused = pausedTaskIds.has(task.id);
+            const taskMissedDays = task.missedDays || 0;
+            const taskAccuracy = calcTaskAccuracy(task);
 
             return (
               <motion.div layout key={task.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }}
                 className="bg-bg-card rounded-[28px] p-3.5 sm:p-5 border border-border-light shadow-sm hover:border-border-med transition-all duration-300 flex flex-col gap-3 sm:gap-4"
               >
-                <div className="flex items-center gap-2.5 sm:gap-4">
+                {/* ── Card Header Row ──────────────────────────────── */}
+                <div className="flex items-center gap-2.5 sm:gap-3">
                   <button onClick={() => toggleTaskComplete(task.id)}
-                    className="w-8 h-8 sm:w-10 sm:h-10 shrink-0 rounded-xl border-2 flex items-center justify-center bg-bg-input border-border-med hover:border-accent-blue transition-all duration-200"
+                    aria-label={`Mark "${task.title}" as complete`}
+                    className="w-8 h-8 sm:w-10 sm:h-10 shrink-0 rounded-xl border-2 flex items-center justify-center bg-bg-input border-border-med hover:border-accent-blue transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-blue/50"
                   >
                     {isCheck ? null : <div className="w-1.5 h-1.5 rounded-full bg-text-muted/20" />}
                   </button>
 
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center flex-wrap gap-1.5 sm:gap-2 mb-1">
+                    {/* Badge row */}
+                    <div className="flex items-center flex-wrap gap-1.5 mb-0.5">
                       <span className="text-[9px] font-black uppercase tracking-widest bg-accent-blue-light text-accent-blue px-1.5 py-0.5 rounded-md flex items-center gap-1">
                         {SCHEDULE_ICONS[sType]} {SCHEDULE_LABELS[sType]}
                       </span>
@@ -346,30 +381,118 @@ export const DailyTasks = () => {
                         </span>
                       )}
                     </div>
-                    <p className="text-sm sm:text-base font-black tracking-tight truncate text-text-main">{task.title}</p>
+
+                    {/* ── Single inline row: Title · Metadata · Actions ── */}
+                    <div className="flex items-center gap-2 min-w-0">
+                      {/* Task name — truncates to yield space for chips + buttons */}
+                      <p className="text-sm sm:text-base font-black tracking-tight truncate min-w-0 shrink text-text-main">
+                        {task.title}
+                      </p>
+
+                      {/* Metadata chips — visible on sm+ only to avoid mobile overflow */}
+                      <div className="hidden sm:flex items-center gap-2 shrink-0">
+                        <span className="w-px h-3 rounded-full bg-border-med/60" aria-hidden="true" />
+                        {/* Started date */}
+                        <span
+                          className="flex items-center gap-1 text-[10px] font-bold text-text-muted"
+                          title="Task start date"
+                          aria-label={`Started ${formatStartDate(task.createdAt)}`}
+                        >
+                          <Calendar size={10} className="opacity-60 shrink-0" />
+                          {formatStartDate(task.createdAt)}
+                        </span>
+                        {/* Missing days */}
+                        <span
+                          className={`flex items-center gap-1 text-[10px] font-bold ${
+                            taskMissedDays === 0 ? 'text-emerald-500' : 'text-amber-500'
+                          }`}
+                          title={`Consecutive missed days: ${taskMissedDays}`}
+                          aria-label={`Missing ${taskMissedDays} ${taskMissedDays === 1 ? 'day' : 'days'}`}
+                        >
+                          <AlertCircle size={10} className="shrink-0" />
+                          {taskMissedDays} {taskMissedDays === 1 ? 'Day' : 'Days'}
+                        </span>
+                        {/* Accuracy */}
+                        {taskAccuracy !== null && (
+                          <span
+                            className={`flex items-center gap-1 text-[10px] font-bold ${
+                              taskAccuracy >= 80 ? 'text-emerald-500'
+                              : taskAccuracy >= 50 ? 'text-amber-500'
+                              : 'text-rose-500'
+                            }`}
+                            title={`Completion accuracy: ${taskAccuracy}%`}
+                            aria-label={`Accuracy ${taskAccuracy}%`}
+                          >
+                            <Target size={10} className="shrink-0" />
+                            {taskAccuracy}%
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Action buttons — ml-auto pushes them to the far right */}
+                      <div className="ml-auto flex items-center gap-1 sm:gap-1.5 shrink-0 pl-1">
+                        {/* Count +/− */}
+                        {isCount && (
+                          <div className="flex bg-bg-input rounded-xl border border-border-light overflow-hidden h-7 sm:h-8">
+                            {/* Bug 3 Fix: disable − button at zero */}
+                            <button
+                              onClick={() => updateTaskCount(task.id, -1)}
+                              disabled={(task.currentCount || 0) === 0}
+                              aria-label="Decrease count"
+                              className="px-2 py-0.5 sm:px-2.5 text-text-main font-black hover:bg-border-light text-xs sm:text-sm disabled:opacity-30 disabled:cursor-not-allowed"
+                            >−</button>
+                            <button
+                              onClick={() => updateTaskCount(task.id, 1)}
+                              aria-label="Increase count"
+                              className="px-2 py-0.5 sm:px-2.5 text-accent-blue font-black border-l border-border-light hover:bg-border-light transition-colors text-xs sm:text-sm"
+                            >+</button>
+                          </div>
+                        )}
+                        {/* Log time */}
+                        {isTime && !tDone && (
+                          <button
+                            onClick={() => setShowLog(task)}
+                            className="px-2.5 py-1 rounded-lg bg-accent-blue text-white text-[10px] font-black shadow-md shadow-accent-blue/20 active:scale-95 transition-all"
+                          >+ Log</button>
+                        )}
+                        {/* Pause/Resume — daily tasks only, per spec */}
+                        {isDaily && (
+                          <button
+                            onClick={() => togglePause(task.id)}
+                            aria-label={isPaused ? `Resume "${task.title}"` : `Pause "${task.title}"`}
+                            title={isPaused ? 'Resume task' : 'Pause task'}
+                            className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-[10px] font-black transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-blue/50 ${
+                              isPaused
+                                ? 'bg-accent-blue/10 border-accent-blue/30 text-accent-blue'
+                                : 'bg-bg-input border-border-light text-text-muted hover:border-border-med hover:text-text-main'
+                            }`}
+                          >
+                            {isPaused
+                              ? <><Play size={10} strokeWidth={3} /><span>Resume</span></>
+                              : <><Pause size={10} strokeWidth={3} /><span>Pause</span></>
+                            }
+                          </button>
+                        )}
+                        {/* Delete */}
+                        <button
+                          onClick={() => setDeletingTaskItem(task)}
+                          aria-label={`Delete "${task.title}"`}
+                          title="Delete task"
+                          className="w-7 h-7 rounded-lg text-text-muted hover:text-rose-500 hover:bg-rose-500/10 transition-all flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/50"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Subtitle — position unchanged */}
                     <p className="text-[10px] sm:text-[11px] font-bold text-text-muted uppercase tracking-wide mt-0.5">
                       {isCheck ? 'Priority Task' : `${current} / ${target} ${isCount ? 'units' : 'mins'}`}
                     </p>
                   </div>
-
-                  <div className="flex gap-1.5 sm:gap-2 items-center shrink-0">
-                    {isCount ? (
-                      <div className="flex bg-bg-input rounded-xl border border-border-light overflow-hidden h-7 sm:h-9">
-                        {/* Bug 3 Fix: disable − button at zero */}
-                        <button
-                          onClick={() => updateTaskCount(task.id, -1)}
-                          disabled={(task.currentCount || 0) === 0}
-                          className="px-2 py-0.5 sm:px-3 sm:py-1.5 text-text-main font-black hover:bg-border-light text-xs sm:text-sm disabled:opacity-30 disabled:cursor-not-allowed"
-                        >−</button>
-                        <button onClick={() => updateTaskCount(task.id, 1)} className="px-2 py-0.5 sm:px-3 sm:py-1.5 text-accent-blue font-black border-l border-border-light hover:bg-border-light transition-colors text-xs sm:text-sm">+</button>
-                      </div>
-                    ) : (isTime && !tDone) && (
-                      <button onClick={() => setShowLog(task)} className="px-2.5 py-1.5 sm:px-4 sm:py-2 rounded-lg sm:rounded-xl bg-accent-blue text-white text-[10px] sm:text-[11px] font-black shadow-md shadow-accent-blue/20 active:scale-95 transition-all">+ Log</button>
-                    )}
-                    <button onClick={() => setDeletingTaskItem(task)} className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl text-text-muted hover:text-rose-500 hover:bg-rose-500/10 transition-all flex items-center justify-center" title="Delete Task"><Trash2 size={16} /></button>
-                  </div>
                 </div>
 
+                {/* Progress bar */}
                 {!isCheck && (
                   <div className="bg-bg-input rounded-full h-1.5 overflow-hidden">
                     <div className="h-full transition-all duration-700 bg-accent-blue" style={{ width: `${pct}%` }} />
