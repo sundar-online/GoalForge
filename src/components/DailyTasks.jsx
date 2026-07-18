@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 // eslint-disable-next-line no-unused-vars
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTasks } from '../context/AppContext';
-import { CalendarCheck, Plus, Clock, Trash2, Check, CalendarRange, Calendar, Cloud, AlertCircle, Target, Pause, Play } from 'lucide-react';
+import { CalendarCheck, Plus, Clock, Trash2, Check, CalendarRange, Calendar, Cloud } from 'lucide-react';
 import { isTaskDone } from '../utils/calculationUtils';
 import { TODAY } from '../utils/dateUtils';
 import { DeleteConfirmationModal } from './DeleteConfirmationModal';
@@ -16,7 +16,7 @@ const SCHEDULE_ICONS = {
 const SCHEDULE_LABELS = { daily: 'Daily', single: 'Single', range: 'Range' };
 const TYPE_LABELS = { time: 'Time', check: 'Check', count: 'Count' };
 
-// ── Info Bar Helpers ─────────────────────────────────────────
+// ── Info Bar Helpers ────────────────────────────────────────────
 /** Format an ISO timestamp to a readable date, e.g. "12 Jul 2026" */
 const formatStartDate = (isoString) => {
   if (!isoString) return '—';
@@ -24,14 +24,11 @@ const formatStartDate = (isoString) => {
   return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 };
 
-/** Per-task accuracy: completed dates ÷ days active × 100 (display-only, no logic change) */
-const calcTaskAccuracy = (task) => {
-  const created = task.createdAt ? new Date(task.createdAt) : null;
-  if (!created) return null;
-  const today = new Date();
-  const daysSince = Math.max(1, Math.round((today - created) / 86400000) + 1);
-  const done = (task.completedDates || []).length;
-  return Math.min(100, Math.round((done / daysSince) * 100));
+/** Days Active = Current Date − Started Date + 1 (display-only, no logic change) */
+const calcDaysActive = (createdAt) => {
+  if (!createdAt) return null;
+  const days = Math.round((Date.now() - new Date(createdAt)) / 86400000) + 1;
+  return Math.max(1, days);
 };
 
 // ── Log Time Modal ──────────────────────────────────────────
@@ -83,18 +80,6 @@ export const DailyTasks = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [completedLimit, setCompletedLimit] = useState(5);
-  // Ephemeral UI-only pause state — resets on reload, no backend changes
-  const [pausedTaskIds, setPausedTaskIds] = useState(() => new Set());
-
-  const togglePause = (taskId) => {
-    setPausedTaskIds(prev => {
-      const next = new Set(prev);
-      if (next.has(taskId)) next.delete(taskId);
-      else next.add(taskId);
-      return next;
-    });
-  };
-
   const { tasks, addTask, deleteTask, logTaskTime, toggleTaskComplete, updateTaskCount } = useTasks();
 
   // Debounce search input + Bug 5 Fix: reset completedLimit when query changes
@@ -351,9 +336,7 @@ export const DailyTasks = () => {
             }
             const pct = isCheck ? 0 : Math.min(100, Math.round((current / (target || 1)) * 100));
             const sType = task.type || 'daily';
-            const isPaused = pausedTaskIds.has(task.id);
-            const taskMissedDays = task.missedDays || 0;
-            const taskAccuracy = calcTaskAccuracy(task);
+            const daysActive = calcDaysActive(task.createdAt);
 
             return (
               <motion.div layout key={task.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }}
@@ -389,7 +372,7 @@ export const DailyTasks = () => {
                         {task.title}
                       </p>
 
-                      {/* Metadata chips — visible on sm+ only to avoid mobile overflow */}
+                      {/* Metadata chips: Started date + Days Active — sm+ only */}
                       <div className="hidden sm:flex items-center gap-2 shrink-0">
                         <span className="w-px h-3 rounded-full bg-border-med/60" aria-hidden="true" />
                         {/* Started date */}
@@ -399,32 +382,17 @@ export const DailyTasks = () => {
                           aria-label={`Started ${formatStartDate(task.createdAt)}`}
                         >
                           <Calendar size={10} className="opacity-60 shrink-0" />
-                          {formatStartDate(task.createdAt)}
+                          <span className="opacity-70">Started:</span> {formatStartDate(task.createdAt)}
                         </span>
-                        {/* Missing days */}
-                        <span
-                          className={`flex items-center gap-1 text-[10px] font-bold ${
-                            taskMissedDays === 0 ? 'text-emerald-500' : 'text-amber-500'
-                          }`}
-                          title={`Consecutive missed days: ${taskMissedDays}`}
-                          aria-label={`Missing ${taskMissedDays} ${taskMissedDays === 1 ? 'day' : 'days'}`}
-                        >
-                          <AlertCircle size={10} className="shrink-0" />
-                          {taskMissedDays} {taskMissedDays === 1 ? 'Day' : 'Days'}
-                        </span>
-                        {/* Accuracy */}
-                        {taskAccuracy !== null && (
+                        {/* Days Active */}
+                        {daysActive !== null && (
                           <span
-                            className={`flex items-center gap-1 text-[10px] font-bold ${
-                              taskAccuracy >= 80 ? 'text-emerald-500'
-                              : taskAccuracy >= 50 ? 'text-amber-500'
-                              : 'text-rose-500'
-                            }`}
-                            title={`Completion accuracy: ${taskAccuracy}%`}
-                            aria-label={`Accuracy ${taskAccuracy}%`}
+                            className="flex items-center gap-1 text-[10px] font-bold text-text-muted"
+                            title={`Days since task was created`}
+                            aria-label={`Active for ${daysActive} days`}
                           >
-                            <Target size={10} className="shrink-0" />
-                            {taskAccuracy}%
+                            <Clock size={10} className="opacity-60 shrink-0" />
+                            <span className="opacity-70">Active:</span> {daysActive} {daysActive === 1 ? 'Day' : 'Days'}
                           </span>
                         )}
                       </div>
@@ -454,24 +422,6 @@ export const DailyTasks = () => {
                             onClick={() => setShowLog(task)}
                             className="px-2.5 py-1 rounded-lg bg-accent-blue text-white text-[10px] font-black shadow-md shadow-accent-blue/20 active:scale-95 transition-all"
                           >+ Log</button>
-                        )}
-                        {/* Pause/Resume — daily tasks only, per spec */}
-                        {isDaily && (
-                          <button
-                            onClick={() => togglePause(task.id)}
-                            aria-label={isPaused ? `Resume "${task.title}"` : `Pause "${task.title}"`}
-                            title={isPaused ? 'Resume task' : 'Pause task'}
-                            className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-[10px] font-black transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-blue/50 ${
-                              isPaused
-                                ? 'bg-accent-blue/10 border-accent-blue/30 text-accent-blue'
-                                : 'bg-bg-input border-border-light text-text-muted hover:border-border-med hover:text-text-main'
-                            }`}
-                          >
-                            {isPaused
-                              ? <><Play size={10} strokeWidth={3} /><span>Resume</span></>
-                              : <><Pause size={10} strokeWidth={3} /><span>Pause</span></>
-                            }
-                          </button>
                         )}
                         {/* Delete */}
                         <button
