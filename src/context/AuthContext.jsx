@@ -232,6 +232,27 @@ export const AuthProvider = ({ children }) => {
   // ── Sign Out ───────────────────────────────────────────
   const signOut = async () => {
     try {
+      // Synchronously clear all user-data keys from localStorage BEFORE calling
+      // firebaseSignOut. This guarantees a clean slate regardless of React's
+      // scheduling — the AppContext useEffect cleanup runs after re-render and
+      // can be missed if AppProvider unmounts before the effect fires.
+      const DATA_KEYS = [
+        'goalforge_goals',
+        'goalforge_tasks',
+        'goalforge_logs',
+        'goalforge_settings',
+        'goalforge_notes',
+        'goalforge_xp',
+        'goalforge_memories',
+        'goalforge_quick_thoughts',
+        'goalforge_scheduled_events',
+        'gf_focus_completed_sessions',
+        'gf_recurring_history',
+        'gf_deleted_goal_ids',
+        'gf_deleted_habit_ids',
+      ];
+      DATA_KEYS.forEach(key => localStorage.removeItem(key));
+
       localStorage.removeItem(REDIRECT_KEY);
       await firebaseSignOut(auth);
       setUser(null);
@@ -239,6 +260,8 @@ export const AuthProvider = ({ children }) => {
       console.error('[Auth] signOut error:', err);
     }
   };
+
+
 
   return (
     <AuthContext.Provider value={{

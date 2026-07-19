@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import * as db from '../lib/firebaseDb';
+import { clearWriteCache } from '../lib/firebaseDb';
 import { fireDb } from '../lib/firebase';
 import { onSnapshot, query, collection, doc, orderBy, getDocs } from 'firebase/firestore';
 import { useAuth } from './AuthContext';
@@ -605,6 +606,11 @@ export const AppProvider = ({ children }) => {
       localStorage.removeItem('gf_deleted_goal_ids');
       localStorage.removeItem('gf_deleted_habit_ids');
 
+      // Flush the module-level Firestore write cache so no pending or cached writes
+      // from this session can influence the next user's data or be silently skipped
+      // by the deduplication guard when the new user's values match old cached ones.
+      clearWriteCache();
+
       // Reset XP load flag, recalc flag, and badge initialisation flag on logout
       // so the next login's effects all wait for fresh Firestore XP data.
       xpLoadedRef.current = false;
@@ -646,6 +652,11 @@ export const AppProvider = ({ children }) => {
     setSmartSuggestions(null);
     setDeletedGoalIds([]);
     setDeletedHabitIds([]);
+
+    // Flush the module-level Firestore write cache before subscribing with the new user.
+    // This prevents the deduplication guard from suppressing valid writes for the
+    // incoming user whose initial data might match the previous user's cached values.
+    clearWriteCache();
 
     // Reset XP load flag, recalc flag, and badge initialisation flag for the incoming user
     // so all guarded effects wait for this user's XP data before running.

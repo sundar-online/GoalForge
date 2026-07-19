@@ -131,7 +131,12 @@ function AppInner() {
   };
 
   return (
-    <AppProvider>
+    // key={user.uid} ensures AppProvider fully remounts whenever the authenticated
+    // user changes. This guarantees all useState initializers re-run from a clean
+    // slate and all Firestore subscriptions are torn down and rebuilt for the new
+    // user. Without this, a persistent AppProvider could serve stale state from a
+    // previous session during the brief window between logout and new Firestore data.
+    <AppProvider key={user.uid}>
       <GamificationOverlays />
       <Layout currentView={currentView} setView={setCurrentView}>
         <React.Suspense fallback={<ViewSkeleton />}>

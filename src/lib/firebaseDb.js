@@ -63,6 +63,38 @@ export function updateCache(pathKey, payload) {
   writeCache.set(pathKey, cleanPayload(payload));
 }
 
+/**
+ * Clears the entire write cache, pending timers, and batch queue.
+ *
+ * MUST be called on user logout. These structures are module-level singletons
+ * that survive across React re-renders and even across user sessions within the
+ * same browser tab. If not cleared, the deduplication logic in smartWrite() can
+ * incorrectly skip writes for a newly-logged-in user whose data happens to share
+ * the same field values as the previous user's cached writes. It also prevents
+ * any in-flight debounced writes from a previous session from landing after the
+ * next user has logged in.
+ */
+export function clearWriteCache() {
+  // Cancel all pending debounced single writes
+  pendingWriteTimers.forEach((pending) => {
+    clearTimeout(pending.timerId);
+    pending.resolves.forEach(r => r.resolve());
+  });
+  pendingWriteTimers.clear();
+
+  // Cancel any pending batch write timer and drain the batch queue
+  if (batchTimer) {
+    clearTimeout(batchTimer);
+    batchTimer = null;
+  }
+  batchQueue.length = 0;
+
+  // Clear the deduplication cache
+  writeCache.clear();
+
+  console.log('[FirestoreDB] Write cache cleared on user session change.');
+}
+
 function invalidateCache(pathKey) {
   writeCache.delete(pathKey);
   if (pendingWriteTimers.has(pathKey)) {
