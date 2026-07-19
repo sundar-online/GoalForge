@@ -270,12 +270,20 @@ export const AppProvider = ({ children }) => {
   }, [goals, loading]);
 
   const [xpData, setXpData] = useState(() => ({ ...DEFAULT_XP_DATA, ...safeParse(STORAGE_KEYS.XP, DEFAULT_XP_DATA) }));
+  // xpDataRef always mirrors the latest xpData so the sync timeout can write the
+  // current snapshot rather than the stale closure value captured at effect run time.
+  const xpDataRef = useRef(xpData);
+  useEffect(() => { xpDataRef.current = xpData; }, [xpData]);
   const lastSyncedXpRef = useRef(null);
   const lastSavedSummaryRef = useRef(null);
   // xpLoadedRef: set to true the first time the XP onSnapshot delivers data.
   // Guards the badge notification effect and the daily XP effect against running
   // before Firestore XP is loaded (prevents double-awards on remount / login).
   const xpLoadedRef = useRef(false);
+  // xpLoaded: state version of xpLoadedRef. React effects don't re-run when refs
+  // change, so we need a state variable to re-trigger the daily XP effect when the
+  // Firestore XP snapshot arrives after taskLogs/goals have already settled.
+  const [xpLoaded, setXpLoaded] = useState(false);
   // xpRecalcDoneRef: set to true after the one-time startup duplicate-milestone cleanup
   // has run for the current session. Reset on logout/login so it re-runs for each user.
   const xpRecalcDoneRef = useRef(false);
@@ -616,6 +624,7 @@ export const AppProvider = ({ children }) => {
       xpLoadedRef.current = false;
       xpRecalcDoneRef.current = false;
       initialLoadRef.current = true;
+      setXpLoaded(false);
 
       setLoading(false);
       return;
@@ -663,6 +672,7 @@ export const AppProvider = ({ children }) => {
     xpLoadedRef.current = false;
     xpRecalcDoneRef.current = false;
     initialLoadRef.current = true;
+    setXpLoaded(false);
 
     setLoading(true);
     setSyncError(null);
@@ -1173,16 +1183,30 @@ export const AppProvider = ({ children }) => {
           const serverEarnedCount = (x.earned_badges || []).length;
           const serverNightCount = (x.night_owl_dates || []).length;
           const serverEarlyCount = (x.early_bird_dates || []).length;
-          lastSyncedXpRef.current = `${serverXP}_${serverEarnedCount}_${serverNightCount}_${serverEarlyCount}`; // Shield against echo write loops
+          const serverNotifiedCount = (x.notified_badges || []).length;
+          const serverTotalCompletions = x.total_completions || 0;
+          const serverLastXPDate = x.last_xp_date || '';
+
+          // Bug 3 fix: always re-derive level from totalXP using getLevelFromXP() rather
+          // than trusting the stored level field. The stored field can lag behind totalXP
+          // by up to 13 seconds (the old outer sync delay), causing the displayed level
+          // to show the previous tier on other devices / after a page refresh.
+          const derivedLevelInfo = getLevelFromXP(serverXP);
+
+          // Bug 2 fix: include notifiedBadges, totalCompletions, and lastXPDate in the
+          // echo-guard key so changes to those fields also trigger a Firestore write.
+          lastSyncedXpRef.current = `${serverXP}_${serverEarnedCount}_${serverNightCount}_${serverEarlyCount}_${serverNotifiedCount}_${serverTotalCompletions}_${serverLastXPDate}`;
+
           const profile = {
             totalXP: serverXP,
-            level: x.level || 1,
+            // Bug 3 fix: use re-derived level as the authoritative value.
+            level: derivedLevelInfo.level,
             earnedBadges: x.earned_badges || [],
             badgeUnlockDates: x.badge_unlock_dates || {},
             perfectDays: x.perfect_days || 0,
             comebackCount: x.comeback_count || 0,
-            totalCompletions: x.total_completions || 0,
-            lastXPDate: x.last_xp_date || '',
+            totalCompletions: serverTotalCompletions,
+            lastXPDate: serverLastXPDate,
             xpHistory: x.xp_history || [],
             notifiedBadges: x.notified_badges || [],
             nightOwlDates: x.night_owl_dates || [],
@@ -1191,13 +1215,15 @@ export const AppProvider = ({ children }) => {
           console.log("Current UID:", user.id);
           console.log("Loaded Profile:", profile);
           console.log("Profile Source:", docSnap.metadata.fromCache ? "Local Cache" : "Server");
-          console.log("XP:", profile.totalXP);
-          console.log("Level:", profile.level);
+          console.log("XP:", profile.totalXP, "Level (re-derived):", profile.level);
           setXpData(profile);
           // Signal that XP data has been loaded from Firestore.
           // The badge notification effect gates on this to prevent firing before
           // earnedBadges/notifiedBadges are populated from the server.
           xpLoadedRef.current = true;
+          // Bug 4 fix: also set xpLoaded state so the daily XP effect re-triggers
+          // if the XP snapshot arrives after taskLogs/goals have already settled.
+          setXpLoaded(true);
         } else {
           // Document does not exist in DB yet (brand-new user), initialize local state to zero
           const defaultProfile = {
@@ -1223,6 +1249,7 @@ export const AppProvider = ({ children }) => {
           // Even for new users with no XP document, mark as loaded so the
           // badge effect can run (it will correctly see empty earned/notified lists).
           xpLoadedRef.current = true;
+          setXpLoaded(true);
         }
       }, (error) => {
         console.error('[Realtime Sync] Error in XP subscription:', error);
@@ -3327,17 +3354,40 @@ export const AppProvider = ({ children }) => {
   };
 
 
-  // Sync XP data to DB on change (debounced and guarded against echo loops)
+  // Sync XP data to DB on change (debounced and guarded against echo loops).
+  //
+  // Bug 1 fix: reduced outer debounce from 10,000 ms → 1,500 ms. upsertXpData()
+  // already applies smartWrite()'s own 3-second inner debounce, so the combined
+  // minimum write latency is 4.5 s — enough for rapid state updates to coalesce
+  // while being short enough to survive a tab close or browser crash without losing
+  // the user's XP data.
+  //
+  // Bug 2 fix: syncKey now includes notifiedBadges.length, totalCompletions, and
+  // lastXPDate so that changes to those fields (badge dismissal, completions counter,
+  // daily XP stamp) always trigger a Firestore write even when totalXP is unchanged.
+  //
+  // Bug 6 fix: use xpDataRef.current inside the timeout (not the closure value) so
+  // the write always contains the latest xpData, not a snapshot from when the effect ran.
   useEffect(() => {
     if (!user || loading) return;
 
-    const syncKey = `${xpData.totalXP}_${(xpData.earnedBadges || []).length}_${(xpData.nightOwlDates || []).length}_${(xpData.earlyBirdDates || []).length}`;
+    const syncKey = [
+      xpData.totalXP,
+      (xpData.earnedBadges || []).length,
+      (xpData.nightOwlDates || []).length,
+      (xpData.earlyBirdDates || []).length,
+      (xpData.notifiedBadges || []).length,
+      xpData.totalCompletions || 0,
+      xpData.lastXPDate || '',
+    ].join('_');
+
     if (syncKey === lastSyncedXpRef.current) return;
 
     const timer = setTimeout(() => {
       lastSyncedXpRef.current = syncKey;
-      db.upsertXpData(user.id, xpData);
-    }, 10000);
+      // Use the ref so we write the freshest state, not the closure snapshot.
+      db.upsertXpData(user.id, xpDataRef.current);
+    }, 1500);
     return () => clearTimeout(timer);
   }, [xpData, user, loading]);
 
@@ -3483,9 +3533,11 @@ export const AppProvider = ({ children }) => {
 
   useEffect(() => {
     if (loading) return;
-    // Guard: do not award XP before the Firestore XP profile has loaded.
-    // Without this, the effect fires with lastXPDate='' on every login/remount
-    // before the persisted lastXPDate arrives from Firestore, causing double-awards.
+    // Bug 4 fix: guard using both the ref (synchronous check) and the xpLoaded state
+    // (reactive trigger). React effects do not re-run when refs change, so if the
+    // Firestore XP snapshot arrives AFTER taskLogs/goals have already settled, this
+    // effect would never re-trigger without the state dependency. The ref is still
+    // checked first so we avoid any work before the snapshot arrives.
     if (!xpLoadedRef.current) return;
     const today = TODAY();
     if (lastXPDateRef.current === today) return;
@@ -3518,7 +3570,9 @@ export const AppProvider = ({ children }) => {
 
     lastXPDateRef.current = today;
     setXpData(prev => ({ ...prev, lastXPDate: today }));
-  }, [loading, taskLogs, goals, tasks]);
+  // xpLoaded added so this re-runs when the Firestore XP snapshot arrives after
+  // the other collections have already settled on slow networks.
+  }, [loading, taskLogs, goals, tasks, xpLoaded]);
 
   // ── One-time XP Recalculation: strip duplicate streak milestone awards ────
   // Runs once per login session after Firestore XP has loaded. Scans xpHistory

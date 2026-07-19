@@ -9,7 +9,7 @@ import { useAppContext } from '../context/AppContext';
  * @param {{ goal: object, onClose: () => void }} props
  */
 export const GoalCompletionModal = ({ goal, onClose }) => {
-  const { addMemory, awardXP } = useAppContext();
+  const { addMemory, awardXP, xpData } = useAppContext();
   const [phase, setPhase] = useState('enter'); // enter → show → save_flow
   const [userNote, setUserNote] = useState('');
   const [selectedPhoto, setSelectedPhoto] = useState('🏆'); // Preset emojis/stickers for the story moment
@@ -94,9 +94,15 @@ export const GoalCompletionModal = ({ goal, onClose }) => {
   const tag = goal.tag || 'General';
 
   const handleSaveMemory = () => {
-    // Award bonus completion XP
-    awardXP(150, `Unlocked Story Moment Memory for "${goal.title}"`);
-
+    // Award bonus completion XP — guarded against duplicate awards.
+    // If the user somehow re-opens the modal for the same goal (e.g. after an edit
+    // that temporarily un-completes then re-completes it), we must not fire 150 XP again.
+    const xpReason = `Unlocked Story Moment Memory for "${goal.title}"`;
+    const alreadyAwarded = (xpData?.xpHistory || []).some(e => e.reason === xpReason);
+    if (!alreadyAwarded) {
+      awardXP(150, xpReason);
+    }
+    
     // Create memory object
     const memory = {
       goalId: goal.id,
