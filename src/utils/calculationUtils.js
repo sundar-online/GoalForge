@@ -593,8 +593,18 @@ export const calculateGoalStreak = (completedDates, scheduleDays = [], createdAt
   const diff = diffDays(todayStr, earliestDate);
   const startDaysAgo = Math.min(1000, Math.max(30, diff));
 
-  // 1. Current streak (forward pass, reset on missed scheduled day)
+  // 1. Current streak (forward pass, gradual decay — mirrors calculateStreakFromHistory / calculateTaskStreak)
+  //
+  // Decay rules (consistent with habits and tasks):
+  //   - Completed scheduled day          → streak + 1, reset missed counter
+  //   - 1–2 consecutive missed days      → streak unchanged (grace period)
+  //   - 3rd consecutive missed day       → streak - 1
+  //   - Every additional 2 missed days   → streak - 1
+  //   - Off-schedule (rest) days         → ignored entirely
+  //   - Today not yet completed          → not counted as missed
+  //   - Streak never goes below 0
   let current = 0;
+  let consecutiveMissedDays = 0;
 
   for (let i = startDaysAgo; i >= 0; i--) {
     const currentDateStr = addDays(todayStr, -i);
@@ -610,11 +620,21 @@ export const calculateGoalStreak = (completedDates, scheduleDays = [], createdAt
 
     if (isCompleted) {
       current++;
+      consecutiveMissedDays = 0;
     } else if (isScheduled) {
+      // Today is still in progress — do not penalise it yet
       if (currentDateStr !== todayStr) {
-        current = 0; // reset on missed scheduled day (excluding today which is still in progress)
+        consecutiveMissedDays++;
+        // Gradual decay:
+        //   1–2 missed days → protected (no change)
+        //   3rd missed day  → streak - 1
+        //   5th, 7th, ...   → streak - 1 each
+        if (consecutiveMissedDays >= 3 && (consecutiveMissedDays - 3) % 2 === 0) {
+          current = Math.max(0, current - 1);
+        }
       }
     }
+    // Off-schedule (rest) days are skipped — no increment, no decrement
   }
 
   // 2. Best streak: scan sorted completed dates for longest consecutive run
