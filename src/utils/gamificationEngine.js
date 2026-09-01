@@ -14,6 +14,8 @@ export const XP_SOURCES = {
 };
 
 // ── Level Thresholds ──────────────────────────────────────
+// Named tiers 1–12 with hand-crafted XP gates and flavour titles.
+// For levels 13+ the formula in getLevelFromXP takes over (see below).
 export const LEVEL_THRESHOLDS = [
   { level: 1,  title: 'Recruit',      xpRequired: 0 },
   { level: 2,  title: 'Initiate',     xpRequired: 100 },
@@ -29,14 +31,56 @@ export const LEVEL_THRESHOLDS = [
   { level: 12, title: 'Ascendant',    xpRequired: 8000 },
 ];
 
+// XP cost for every level beyond the named table (level 13+).
+// Set to continue the growth momentum from the last two named tiers
+// (L11→L12 delta = 2 000, bumped to 2 500 for a gentle ongoing curve).
+// Formula: xpRequired(n) = 8000 + (n - 12) * XP_PER_EXTRA_LEVEL  for n >= 13.
+export const XP_PER_EXTRA_LEVEL = 2500;
+
 /**
- * Get level info from total XP.
+ * Derive level info from a cumulative XP total.
+ *
+ * Levels 1–12 are looked up in LEVEL_THRESHOLDS (preserving exact XP gates
+ * and flavour titles for all existing users). Levels 13 and above are
+ * computed via the constant-increment formula so the system scales
+ * indefinitely without any hard cap.
+ *
  * @param {number} totalXP
- * @returns {{ level: number, title: string, xpForCurrent: number, xpForNext: number, progress: number, xpInLevel: number }}
+ * @returns {{
+ *   level: number,
+ *   title: string,
+ *   xpForCurrent: number,
+ *   xpForNext: number,
+ *   xpInLevel: number,
+ *   progress: number,
+ *   isMaxLevel: false
+ * }}
  */
 export function getLevelFromXP(totalXP) {
-  let currentTier = LEVEL_THRESHOLDS[0];
+  const maxTier = LEVEL_THRESHOLDS[LEVEL_THRESHOLDS.length - 1]; // level 12, 8 000 XP
 
+  // ── Levels 13+ : formula-based, scales indefinitely ───────────────────────
+  // Each level beyond the named table costs XP_PER_EXTRA_LEVEL XP.
+  if (totalXP >= maxTier.xpRequired) {
+    const extraLevels  = Math.floor((totalXP - maxTier.xpRequired) / XP_PER_EXTRA_LEVEL);
+    const level        = maxTier.level + extraLevels;
+    const xpForCurrent = maxTier.xpRequired + extraLevels * XP_PER_EXTRA_LEVEL;
+    const xpForNext    = xpForCurrent + XP_PER_EXTRA_LEVEL;
+    const xpInLevel    = totalXP - xpForCurrent;
+    const progress     = Math.min(100, Math.round((xpInLevel / XP_PER_EXTRA_LEVEL) * 100));
+    return {
+      level,
+      title: `Level ${level}`,  // generic title for un-named tiers
+      xpForCurrent,
+      xpForNext,
+      xpInLevel,
+      progress,
+      isMaxLevel: false,        // no longer a hard cap
+    };
+  }
+
+  // ── Levels 1–12 : backward scan through the named threshold table ─────────
+  let currentTier = LEVEL_THRESHOLDS[0];
   for (let i = LEVEL_THRESHOLDS.length - 1; i >= 0; i--) {
     if (totalXP >= LEVEL_THRESHOLDS[i].xpRequired) {
       currentTier = LEVEL_THRESHOLDS[i];
@@ -44,12 +88,14 @@ export function getLevelFromXP(totalXP) {
     }
   }
 
-  const nextTier = LEVEL_THRESHOLDS.find(t => t.level === currentTier.level + 1);
+  const nextTier     = LEVEL_THRESHOLDS.find(t => t.level === currentTier.level + 1);
   const xpForCurrent = currentTier.xpRequired;
-  const xpForNext = nextTier ? nextTier.xpRequired : currentTier.xpRequired;
-  const xpInLevel = totalXP - xpForCurrent;
-  const xpNeeded = xpForNext - xpForCurrent;
-  const progress = nextTier ? Math.min(100, Math.round((xpInLevel / xpNeeded) * 100)) : 100;
+  // When currentTier is the last named tier (level 12), the "next" gate is the
+  // first formula step — not 0 — so xpNeeded is always > 0.
+  const xpForNext    = nextTier ? nextTier.xpRequired : maxTier.xpRequired + XP_PER_EXTRA_LEVEL;
+  const xpInLevel    = totalXP - xpForCurrent;
+  const xpNeeded     = xpForNext - xpForCurrent;   // always > 0
+  const progress     = Math.min(100, Math.round((xpInLevel / xpNeeded) * 100));
 
   return {
     level: currentTier.level,
@@ -58,7 +104,7 @@ export function getLevelFromXP(totalXP) {
     xpForNext,
     xpInLevel,
     progress,
-    isMaxLevel: !nextTier,
+    isMaxLevel: false,
   };
 }
 

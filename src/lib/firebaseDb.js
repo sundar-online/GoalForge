@@ -881,7 +881,7 @@ export async function fetchXpData(userId) {
 
     return {
       totalXP: data.total_xp || 0,
-      level: data.level || 1,
+      level: data.level ?? 1,
       earnedBadges: data.earned_badges || [],
       badgeUnlockDates: data.badge_unlock_dates || {},
       perfectDays: data.perfect_days || 0,
@@ -902,7 +902,7 @@ export async function fetchXpData(userId) {
 export async function upsertXpData(userId, xpData) {
   const payload = {
     total_xp: xpData.totalXP || 0,
-    level: xpData.level || 1,
+    level: xpData.level ?? 1,
     earned_badges: xpData.earnedBadges || [],
     badge_unlock_dates: xpData.badgeUnlockDates || {},
     perfect_days: xpData.perfectDays || 0,
