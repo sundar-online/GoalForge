@@ -46,7 +46,7 @@ const completionRateOverDays = (goal, days) => {
  */
 export const analyzeGoalIntelligence = (goals) => {
   const insights = [];
-  const activeGoals = (goals || []).filter(g => !g.isMissingDream);
+  const activeGoals = (goals || []).filter(g => !g.isMissingDream && (g.status || 'active') === 'active');
 
   if (activeGoals.length === 0) return insights;
 

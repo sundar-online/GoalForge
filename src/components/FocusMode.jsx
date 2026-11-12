@@ -80,6 +80,7 @@ const triggerCompletionHaptics = () => {
 
 export const FocusMode = () => {
   const { goals = [] } = useGoals();
+  const activeGoals = useMemo(() => goals.filter(g => !g.isMissingDream && (g.status || 'active') === 'active'), [goals]);
   const { tasks = [] } = useTasks();
   const { focusTime, addFocusTimeToHabit, sessionLogs, logFocusSession } = useFocus();
   const { awardFocusXP } = useGamification();
@@ -148,22 +149,22 @@ export const FocusMode = () => {
   });
 
   const isDailyTaskMode = selectedGoalId === 'DAILY_TASK';
-  const selectedGoal = isDailyTaskMode ? null : (goals || []).find(g => g.id === selectedGoalId);
+  const selectedGoal = isDailyTaskMode ? null : (activeGoals || []).find(g => g.id === selectedGoalId);
   const activeList = isDailyTaskMode ? todayTasks : (selectedGoal?.habits || []);
   const selectedItem = (activeList || []).find(h => h.id === selectedHabitId);
 
   // ── Synchronize selections dynamically if empty ────────────────────
   useEffect(() => {
-    if (!selectedGoalId && (goals || todayTasks)) {
-      if (goals?.length > 0) {
-        setSelectedGoalId(goals[0].id);
-        localStorage.setItem('gf_focus_selectedGoalId', goals[0].id);
+    if ((!selectedGoalId || (selectedGoalId !== 'DAILY_TASK' && timerState === 'idle' && (goals || []).length > 0 && !activeGoals.some(g => g.id === selectedGoalId))) && (activeGoals || todayTasks)) {
+      if (activeGoals?.length > 0) {
+        setSelectedGoalId(activeGoals[0].id);
+        localStorage.setItem('gf_focus_selectedGoalId', activeGoals[0].id);
       } else if (todayTasks?.length > 0) {
         setSelectedGoalId('DAILY_TASK');
         localStorage.setItem('gf_focus_selectedGoalId', 'DAILY_TASK');
       }
     }
-  }, [goals, todayTasks, selectedGoalId]);
+  }, [goals, activeGoals, todayTasks, selectedGoalId, timerState]);
 
   useEffect(() => {
     if (selectedGoalId && activeList.length > 0 && !selectedHabitId) {
@@ -586,9 +587,9 @@ export const FocusMode = () => {
                       className="w-full bg-bg-input border border-border-med rounded-2xl px-4 py-3.5 text-sm font-bold text-text-main shadow-xs appearance-none cursor-pointer outline-hidden focus:border-accent-blue transition-all disabled:opacity-50 disabled:cursor-not-allowed pr-10"
                     >
                       <option value="">— Choose Active Target —</option>
-                      {goals.length > 0 && (
+                      {activeGoals.length > 0 && (
                         <optgroup label="Primary Objectives" className="font-bold bg-bg-card">
-                          {goals.map(g => <option key={g.id} value={g.id}>{g.title}</option>)}
+                          {activeGoals.map(g => <option key={g.id} value={g.id}>{g.title}</option>)}
                         </optgroup>
                       )}
                       {todayTasks.length > 0 && (

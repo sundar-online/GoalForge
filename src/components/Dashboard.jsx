@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { calculateGoalDailyProgress, isHabitDoneToday, calculateOverallProgress, isGoalDoneToday, isTaskDone, getRecommendedNextGoal, isHabitScheduledToday } from '../utils/calculationUtils';
+import { calculateGoalDailyProgress, isHabitDoneToday, calculateOverallProgress, isGoalDoneToday, isTaskDone, getRecommendedNextGoal, isGoalActive, isHabitScheduledToday } from '../utils/calculationUtils';
 import { TODAY } from '../utils/dateUtils';
 import { BADGE_DEFINITIONS } from '../utils/gamificationEngine';
 import { useAuth } from '../context/AuthContext';
@@ -373,12 +373,12 @@ export const Dashboard = ({ setView }) => {
     addQuickThought
   } = useAppContext();
 
-  const focusGoal = goals.find(g => g.isFocusGoal && !g.isMissingDream);
+  const focusGoal = goals.find(g => g.isFocusGoal && isGoalActive(g));
   const activeCalculatedGoals = goals.map(g => {
     const liveProgress = calculateOverallProgress(g);
     const isFinished = liveProgress === 100;
     return { ...g, progress: liveProgress, isFinished };
-  }).filter(g => !g.isMissingDream && !g.isFinished);
+  }).filter(g => isGoalActive(g) && !g.isFinished);
 
   const fallbackActiveGoal = activeCalculatedGoals[0];
   const todayMainTarget = focusGoal || fallbackActiveGoal;
@@ -433,7 +433,7 @@ export const Dashboard = ({ setView }) => {
   // and resets on any missed day, producing a completely different number to what the
   // Goals page shows. Reading completedDates.length keeps both pages in perfect sync.
   const topStreaks = (goals || [])
-    .filter(g => !g.isMissingDream)
+    .filter(isGoalActive)
     .map(g => {
       const completedDays = (g.completedDates || []).length;
       return {
@@ -485,7 +485,7 @@ export const Dashboard = ({ setView }) => {
           isDoneToday
         };
       })
-      .filter(goal => !goal.isFinished && !goal.isMissingDream)
+      .filter(goal => !goal.isFinished && isGoalActive(goal))
       .sort((a, b) => {
         // Place completed goals today at the end of the list, matching GoalsPage ordering consistency
         if (a.isDoneToday !== b.isDoneToday) return a.isDoneToday ? 1 : -1;

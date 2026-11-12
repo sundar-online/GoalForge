@@ -5,6 +5,7 @@ import { Layout } from './components/Layout';
 import { LevelUpModal } from './components/LevelUpModal';
 import { BadgeToast } from './components/BadgeToast';
 import { GoalCompletionModal } from './components/GoalCompletionModal';
+import { ExpiredGoalModal } from './components/ExpiredGoalModal';
 import { registerServiceWorker } from './utils/notificationUtils';
 import ErrorBoundary from './components/ErrorBoundary';
 
@@ -152,7 +153,8 @@ function GamificationOverlays() {
   const {
     levelUpEvent, setLevelUpEvent,
     badgeUnlockEvent, dismissBadgeEvent,
-    completedGoalForCelebration, setCompletedGoalForCelebration
+    completedGoalForCelebration, setCompletedGoalForCelebration,
+    expiredGoals, continueExpiredGoal, finalizeExpiredGoal
   } = useAppContext();
   return (
     <>
@@ -167,6 +169,14 @@ function GamificationOverlays() {
         <BadgeToast
           badge={badgeUnlockEvent}
           onClose={dismissBadgeEvent}
+        />
+      )}
+      {expiredGoals && expiredGoals.length > 0 && (
+        <ExpiredGoalModal
+          goal={expiredGoals[0]}
+          totalExpiredCount={expiredGoals.length}
+          onContinueGoal={continueExpiredGoal}
+          onEndGoal={finalizeExpiredGoal}
         />
       )}
       {completedGoalForCelebration && (

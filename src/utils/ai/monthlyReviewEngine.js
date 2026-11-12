@@ -63,7 +63,7 @@ export const generateMonthlyReview = (goals, taskLogs, userCreatedAt = null) => 
   const totalTasks = logs30.reduce((s, l) => s + (l.total_tasks || 0), 0);
   const monthlyAccuracy = totalTasks > 0 ? Math.round((totalCompleted / totalTasks) * 100) : 0;
 
-  const activeGoals = (goals || []).filter(g => !g.isMissingDream);
+  const activeGoals = (goals || []).filter(g => !g.isMissingDream && (g.status || 'active') === 'active');
   const allHabits = activeGoals.flatMap(g => g.habits || []);
 
   // ── Goal Mastery Trends ───────────────────────────────────────────────────

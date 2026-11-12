@@ -131,7 +131,7 @@ export const GoalActivityChart = ({ goals = [] }) => {
 
   // Build scored, filtered slice data
   const chartData = useMemo(() => {
-    const active = goals.filter(g => !g.isMissingDream && (g.habits || []).length > 0);
+    const active = goals.filter(g => !g.isMissingDream && (g.status || 'active') === 'active' && (g.habits || []).length > 0);
     const scored = active
       .map(g => ({
         id: g.id,

@@ -12,7 +12,7 @@ const NAV = [
 
 export const Layout = ({ children, currentView, setView }) => {
   const { goals } = useAppContext();
-  const focusGoal = goals.find(g => g.isFocusGoal && !g.isMissingDream);
+  const focusGoal = goals.find(g => g.isFocusGoal && !g.isMissingDream && (g.status || 'active') === 'active');
 
   return (
     <div className="min-h-screen bg-bg-app font-sans transition-colors duration-300 flex flex-col lg:flex-row">

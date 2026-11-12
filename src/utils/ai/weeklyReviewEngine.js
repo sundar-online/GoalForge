@@ -28,7 +28,7 @@ export const generateWeeklyReview = (goals, taskLogs) => {
   for (let i = 1; i <= 7; i++) last7.push(addDays(today, -i));
 
   const logs7 = last7.map(d => taskLogs[d] || { date: d, completed_tasks: 0, total_tasks: 0 });
-  const activeGoals = (goals || []).filter(g => !g.isMissingDream);
+  const activeGoals = (goals || []).filter(g => !g.isMissingDream && (g.status || 'active') === 'active');
   const allHabits = activeGoals.flatMap(g => g.habits || []);
 
   // ── Overall accuracy this week ────────────────────────────────────────────

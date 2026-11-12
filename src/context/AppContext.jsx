@@ -28,8 +28,16 @@ import {
   getTaskTrackingKey,
   calculateTaskStreak,
   sanitizeAndValidateCompletedDates,
-  logStreakDebug
+  logStreakDebug,
+  isGoalActive,
+  isGoalFinalized
 } from '../utils/calculationUtils';
+import {
+  DEFAULT_PROFILE_STATS,
+  isGoalExpired,
+  evaluateGoalPerformance,
+  reconcileProfileStats
+} from '../utils/goalEvaluation';
 // ── Service modules (reset / analytics / recurring task orchestration) ────
 import { shouldRunReset, computeHabitResetPayload, computeGoalResetPayload, computeTaskResetPayload } from '../utils/resetManager';
 import { buildTaskLogSummary, hasTaskLogChanged } from '../utils/analyticsEngine';
@@ -71,7 +79,8 @@ const STORAGE_KEYS = {
   MEMORIES: 'goalforge_memories',
   QUICK_THOUGHTS: 'goalforge_quick_thoughts',
   SCHEDULED_EVENTS: 'goalforge_scheduled_events',
-  COMPLETED_SESSIONS: 'gf_focus_completed_sessions'
+  COMPLETED_SESSIONS: 'gf_focus_completed_sessions',
+  PROFILE_STATS: 'goalforge_profile_stats'
 };
 
 const DEFAULT_XP_DATA = {
@@ -166,7 +175,8 @@ export const AppProvider = ({ children }) => {
       .filter(g => g && g.id && !parsedDeletedIds.includes(String(g.id)) && !g.deleted && !g.isDeleted)
       .map(g => ({
         ...g,
-        habits: (g.habits || []).filter(h => h && h.id && !parsedDeletedHabitIds.includes(String(h.id)))
+        habits: (g.habits || []).filter(h => h && h.id && !parsedDeletedHabitIds.includes(String(h.id))),
+        habitsLoaded: true
       }));
   });
   const [tasks, setTasks] = useState(() => safeParse(STORAGE_KEYS.TASKS, []));
@@ -200,11 +210,13 @@ export const AppProvider = ({ children }) => {
   useEffect(() => {
     if (loading) return;
     goals.forEach(goal => {
+      if (!isGoalActive(goal)) return;
       const prevProgress = prevGoalsProgressRef.current[goal.id];
       const currentProgress = goal.progress || 0;
 
       // If progress newly transitions to 100%
-      if (currentProgress === 100 && prevProgress !== undefined && prevProgress < 100) {
+      // If progress newly transitions to 100% on an active goal
+      if (isGoalActive(goal) && currentProgress === 100 && prevProgress !== undefined && prevProgress < 100) {
         // Trigger completion celebration modal!
         setCompletedGoalForCelebration(goal);
       }
@@ -220,6 +232,7 @@ export const AppProvider = ({ children }) => {
     const currentHabitIds = new Set();
 
     goals.forEach(goal => {
+      if (!isGoalActive(goal)) return;
       (goal.habits || []).forEach(habit => {
         currentHabitIds.add(String(habit.id));
 
@@ -270,6 +283,12 @@ export const AppProvider = ({ children }) => {
   }, [goals, loading]);
 
   const [xpData, setXpData] = useState(() => ({ ...DEFAULT_XP_DATA, ...safeParse(STORAGE_KEYS.XP, DEFAULT_XP_DATA) }));
+  const [profileStats, setProfileStats] = useState(() => ({ ...DEFAULT_PROFILE_STATS, ...safeParse(STORAGE_KEYS.PROFILE_STATS, DEFAULT_PROFILE_STATS) }));
+  const profileStatsRef = useRef(profileStats);
+  useEffect(() => { profileStatsRef.current = profileStats; }, [profileStats]);
+  const profileStatsLoadedRef = useRef(false);
+  const [profileStatsLoaded, setProfileStatsLoaded] = useState(false);
+  const finalizingGoalIdsRef = useRef(new Set());
   // xpDataRef always mirrors the latest xpData so the sync timeout can write the
   // current snapshot rather than the stale closure value captured at effect run time.
   const xpDataRef = useRef(xpData);
@@ -429,9 +448,9 @@ export const AppProvider = ({ children }) => {
     });
   }, [goals]);
 
-  const allHabits = useMemo(() => (sortedGoals || []).filter(g => !g.isMissingDream).flatMap(g => g.habits || []), [sortedGoals]);
+  const allHabits = useMemo(() => (sortedGoals || []).filter(isGoalActive).flatMap(g => g.habits || []), [sortedGoals]);
   const todayGoals = useMemo(() => (sortedGoals || []).filter(g => {
-    if (g.isMissingDream) return false;
+    if (!isGoalActive(g)) return false;
     const habits = g.habits || [];
     if (habits.length === 0) return false;
     return habits.some(isHabitScheduledToday);
@@ -442,7 +461,7 @@ export const AppProvider = ({ children }) => {
 
   const todayHabits = useMemo(() => {
     return (sortedGoals || [])
-      .filter(g => !g.isMissingDream)
+      .filter(isGoalActive)
       .flatMap(g => g.habits || [])
       .filter(isHabitScheduledToday);
   }, [sortedGoals]);
@@ -460,7 +479,7 @@ export const AppProvider = ({ children }) => {
     // scheduled today. This ensures CUSTOM/ANY goals are not penalised for habits
     // that don't count toward their completion requirement.
     const goalsWithScheduledHabits = (sortedGoals || []).filter(g => {
-      if (g.isMissingDream) return false;
+      if (!isGoalActive(g)) return false;
       return (g.habits || []).some(isHabitScheduledToday);
     });
 
@@ -474,7 +493,7 @@ export const AppProvider = ({ children }) => {
   }, [sortedGoals]);
 
   const avgStreak = useMemo(() => {
-    const activeGoals = (sortedGoals || []).filter(g => !g.isMissingDream);
+    const activeGoals = (sortedGoals || []).filter(isGoalActive);
     if (activeGoals.length === 0) return 0;
     const totalBestStreaks = activeGoals.reduce((acc, goal) => {
       const habits = goal.habits || [];
@@ -511,6 +530,7 @@ export const AppProvider = ({ children }) => {
   useEffect(() => { localStorage.setItem('gf_recurring_history', JSON.stringify(recurringHistory)); }, [recurringHistory]);
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.NOTES, JSON.stringify(notes)); }, [notes]);
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.XP, JSON.stringify(xpData)); }, [xpData]);
+  useEffect(() => { localStorage.setItem(STORAGE_KEYS.PROFILE_STATS, JSON.stringify(profileStats)); }, [profileStats]);
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.QUICK_THOUGHTS, JSON.stringify(quickThoughts)); }, [quickThoughts]);
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.SCHEDULED_EVENTS, JSON.stringify(scheduledEvents)); }, [scheduledEvents]);
   useEffect(() => {
@@ -582,6 +602,7 @@ export const AppProvider = ({ children }) => {
       setScheduledEvents([]);
       setSessionLogs([]);
       setXpData(DEFAULT_XP_DATA);
+      setProfileStats(DEFAULT_PROFILE_STATS);
       setSettings({
         theme: preservedTheme,
         themeSource: preservedThemeSource,
@@ -607,6 +628,7 @@ export const AppProvider = ({ children }) => {
       localStorage.removeItem(STORAGE_KEYS.SETTINGS);
       localStorage.removeItem(STORAGE_KEYS.NOTES);
       localStorage.removeItem(STORAGE_KEYS.XP);
+      localStorage.removeItem(STORAGE_KEYS.PROFILE_STATS);
       localStorage.removeItem(STORAGE_KEYS.MEMORIES);
       localStorage.removeItem(STORAGE_KEYS.QUICK_THOUGHTS);
       localStorage.removeItem(STORAGE_KEYS.COMPLETED_SESSIONS);
@@ -624,7 +646,13 @@ export const AppProvider = ({ children }) => {
       xpLoadedRef.current = false;
       xpRecalcDoneRef.current = false;
       initialLoadRef.current = true;
+    profileStatsLoadedRef.current = false;
+    setProfileStatsLoaded(false);
+    finalizingGoalIdsRef.current.clear();
       setXpLoaded(false);
+
+
+
 
       setLoading(false);
       return;
@@ -641,6 +669,7 @@ export const AppProvider = ({ children }) => {
     setScheduledEvents([]);
     setSessionLogs([]);
     setXpData(DEFAULT_XP_DATA);
+    setProfileStats(DEFAULT_PROFILE_STATS);
     // Seed theme from localStorage so there is no 'dark' flash while waiting for
     // the Firestore snapshot to arrive. The snapshot will override with the
     // correct per-user value once it lands.
@@ -672,6 +701,9 @@ export const AppProvider = ({ children }) => {
     xpLoadedRef.current = false;
     xpRecalcDoneRef.current = false;
     initialLoadRef.current = true;
+    profileStatsLoadedRef.current = false;
+    setProfileStatsLoaded(false);
+    finalizingGoalIdsRef.current.clear();
     setXpLoaded(false);
 
     setLoading(true);
@@ -866,6 +898,13 @@ export const AppProvider = ({ children }) => {
             order: orderVal,
             isFocusGoal: g.is_focus_goal ?? false,
             status: g.status ?? 'active',
+            finalResult: g.final_result ?? null,
+            finalCompletionPercentage: g.final_completion_percentage ?? null,
+            completedTasksCount: g.completed_tasks_count ?? null,
+            totalPlannedTasksCount: g.total_planned_tasks_count ?? null,
+            failedTasksCount: g.failed_tasks_count ?? null,
+            finalizedAt: g.finalized_at || null,
+            evaluatedDate: g.evaluated_date || null,
             dependencies: g.dependencies || [],
             syncPending: docSnap.metadata.hasPendingWrites,
             habits: [] // Will be populated in real-time by nested listeners below
@@ -891,19 +930,22 @@ export const AppProvider = ({ children }) => {
         setGoals(prev => {
           return goalsList.map(g => {
             const existing = prev.find(p => p.id === g.id);
-            if (!existing) return { ...g, habits: [] };
+            if (!existing) return { ...g, habits: [], habitsLoaded: false };
 
             if (g.syncPending) {
               return {
                 ...g,
                 ...existing,
                 habits: existing.habits || [],
+              habitsLoaded: existing.habitsLoaded ?? false,
+
                 syncPending: true
               };
             }
             return {
               ...g,
-              habits: existing.habits || []
+              habits: existing.habits || [],
+              habitsLoaded: existing.habitsLoaded ?? false
             };
           });
         });
@@ -950,7 +992,7 @@ export const AppProvider = ({ children }) => {
                   // Guard: Prevent initial empty snapshot from wiping out staged habits during creation/sync
                   if (habitsList.length === 0 && g.habits && g.habits.length > 0) {
                     if (g.syncPending || habitsSnapshot.metadata.hasPendingWrites || habitsSnapshot.metadata.fromCache) {
-                      return g;
+                      return g.habitsLoaded ? g : { ...g, habitsLoaded: true };
                     }
                   }
 
@@ -994,6 +1036,15 @@ export const AppProvider = ({ children }) => {
                     }
                   }
 
+                  if (isGoalFinalized(g)) {
+                    return {
+                      ...g,
+                      habits: merged,
+                    habitsLoaded: true,
+
+                    };
+                  }
+
                   // Recalculate goal completedDates and streak from fresh habits
                   const goalWithMerged = { ...g, habits: merged };
                   const recalcDates = recalculateGoalCompletedDates(goalWithMerged);
@@ -1003,6 +1054,7 @@ export const AppProvider = ({ children }) => {
                   return {
                     ...g,
                     habits: merged,
+                    habitsLoaded: true,
                     completedDates: recalcDates,
                     streak: recalcStreak,
                     bestStreak: Math.max(recalcBest, g.bestStreak || 0),
@@ -1256,6 +1308,40 @@ export const AppProvider = ({ children }) => {
       });
       unsubscribes.push(unsubXp);
 
+      // 7b. Subscribe to Goal Performance Profile Stats
+      const statsDocRef = doc(fireDb, 'users', user.id, 'stats', 'profile');
+      const unsubStats = onSnapshot(statsDocRef, { includeMetadataChanges: true }, (docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          db.updateCache(`users/${user.id}/stats/profile`, data);
+          const loaded = {
+            totalGoals: data.total_goals ?? 0,
+            passedGoals: data.passed_goals ?? 0,
+            failedGoals: data.failed_goals ?? 0,
+            averageGoalCompletion: data.average_goal_completion ?? 0,
+            totalTasksCompleted: data.total_tasks_completed ?? 0,
+            totalTasksFailed: data.total_tasks_failed ?? 0,
+            evaluatedGoals: data.evaluated_goals || {},
+          };
+          setProfileStats(prev => reconcileProfileStats({
+            ...loaded,
+            evaluatedGoals: {
+              ...(loaded.evaluatedGoals || {}),
+              ...(docSnap.metadata.hasPendingWrites ? (prev.evaluatedGoals || {}) : {})
+            }
+          }, goalsRef.current));
+        } else {
+          setProfileStats(reconcileProfileStats(DEFAULT_PROFILE_STATS, goalsRef.current));
+        }
+        profileStatsLoadedRef.current = true;
+        setProfileStatsLoaded(true);
+      }, (error) => {
+        console.error('[Realtime Sync] Error in Profile Stats subscription:', error);
+        profileStatsLoadedRef.current = true;
+        setProfileStatsLoaded(true);
+      });
+      unsubscribes.push(unsubStats);
+
       // 8.5 Subscribe to Scheduled Events Collection
       const eventsQuery = query(collection(fireDb, 'users', user.id, 'scheduled_events'), orderBy('date', 'asc'));
       const unsubEvents = onSnapshot(eventsQuery, { includeMetadataChanges: true }, (snapshot) => {
@@ -1328,6 +1414,37 @@ export const AppProvider = ({ children }) => {
   }, [user]);
 
   const [currentDate, setCurrentDate] = useState(TODAY());
+
+  const computedProfileStats = useMemo(
+    () => reconcileProfileStats(profileStats, goals),
+    [profileStats, goals]
+  );
+
+  useEffect(() => {
+    if (loading || !user || !profileStatsLoaded) return;
+    const evalCountChanged =
+      Object.keys(computedProfileStats.evaluatedGoals || {}).length !==
+      Object.keys(profileStats.evaluatedGoals || {}).length;
+    const summaryChanged =
+      computedProfileStats.totalGoals !== profileStats.totalGoals ||
+      computedProfileStats.passedGoals !== profileStats.passedGoals ||
+      computedProfileStats.failedGoals !== profileStats.failedGoals ||
+      computedProfileStats.averageGoalCompletion !== profileStats.averageGoalCompletion ||
+      computedProfileStats.totalTasksCompleted !== profileStats.totalTasksCompleted ||
+      computedProfileStats.totalTasksFailed !== profileStats.totalTasksFailed;
+
+    if (evalCountChanged || summaryChanged) {
+      setProfileStats(computedProfileStats);
+      db.upsertProfileStats(user.id, computedProfileStats).catch(err => {
+        console.error('[Realtime Sync] Failed to sync reconciled profile stats:', err);
+      });
+    }
+  }, [computedProfileStats, profileStats, loading, user, profileStatsLoaded]);
+
+  const expiredGoals = useMemo(() => {
+    if (loading) return [];
+    return (sortedGoals || []).filter(g => isGoalExpired(g, currentDate) && g.habitsLoaded !== false);
+  }, [sortedGoals, currentDate, loading]);
 
   useEffect(() => {
     const itv = setInterval(() => {
@@ -1460,6 +1577,7 @@ export const AppProvider = ({ children }) => {
     if (hasHabitNeed) {
       const fallbackLastActive = currentSettings.lastActiveDate || yesterdayStr;
       setGoals(prevGoals => prevGoals.map(goal => {
+        if ((goal.status || 'active') !== 'active') return goal;
         let goalNeedsUpdate = false;
         const updatedHabits = (goal.habits || []).map(h => {
           const result = computeHabitResetPayload(h, goal, todayStr, fallbackLastActive);
@@ -1657,6 +1775,7 @@ export const AppProvider = ({ children }) => {
 
       // 2. Sync Habit Reminders
       goals.forEach(goal => {
+      if (!isGoalActive(goal)) return;
         (goal.habits || []).forEach(habit => {
           if (habit.reminderEnabled && habit.reminderTime) {
             scheduleReminder(
@@ -1747,6 +1866,7 @@ export const AppProvider = ({ children }) => {
     const initialHabits = (goal.habits || []).map(h => ({
       ...h,
       id: String(h.id || (Date.now() + Math.random())),
+      createdAt: h.createdAt || new Date().toISOString(),
       timeSpent: 0,
       currentCount: 0,
       completed: false,
@@ -1771,6 +1891,7 @@ export const AppProvider = ({ children }) => {
       isFocusGoal: !!goal.isFocusGoal,
       status: 'active',
       dependencies: goal.dependencies || [],
+      habitsLoaded: true,
       habits: initialHabits
     };
 
@@ -1805,6 +1926,9 @@ export const AppProvider = ({ children }) => {
     console.log(`%c[Diagnostic Log] ACTION START: updateGoal [id=${id}]`, 'color: #3b82f6; font-weight: bold;');
     setGoals(prev => prev.map(g => {
       if (g.id === id) {
+        if (isGoalFinalized(g) && !updates.deleted && !updates.isDeleted) {
+          return g;
+        }
         const updated = {
           ...g,
           ...updates,
@@ -1838,6 +1962,8 @@ export const AppProvider = ({ children }) => {
   };
 
   const editGoalSystem = async (goalId, goalUpdates, finalHabits) => {
+    const targetGoalCheck = goals.find(g => g.id === goalId);
+    if (!targetGoalCheck || isGoalFinalized(targetGoalCheck)) return;
     const targetGoal = goals.find(g => g.id === goalId);
     if (!targetGoal) return;
 
@@ -1984,21 +2110,107 @@ export const AppProvider = ({ children }) => {
 
 
   const extendGoalDeadline = (id, newDeadline) => {
-    const goal = goals.find(g => g.id === id);
+    const goal = goalsRef.current.find(g => g.id === id);
+    if (!goal || isGoalFinalized(goal) || !newDeadline) return;
     if (!goal) return;
 
     const extension = { old_date: goal.deadline, new_date: newDeadline, extended_on: TODAY() };
-    const updated = { ...goal, deadline: newDeadline, extensions: [...(goal.extensions || []), extension] };
+    const updated = { ...goal, deadline: newDeadline, status: 'active', isMissingDream: false, extensions: [...(goal.extensions || []), extension], lastActionTimestamp: new Date().toISOString() };
     updated.progress = calculateOverallProgress(updated);
 
-    setGoals(prev => prev.map(g => g.id === id ? updated : g));
+    const nextGoals = goalsRef.current.map(g => g.id === id ? updated : g);
+    goalsRef.current = nextGoals;
+    setGoals(nextGoals);
+    localStorage.setItem(STORAGE_KEYS.GOALS, JSON.stringify(nextGoals));
 
     if (user) {
-      db.upsertGoal(user.id, updated).catch(err => console.error('[Firestore Sync] Extend deadline failed:', err));
+      db.upsertGoal(user.id, updated, true).catch(err => console.error('[Firestore Sync] Extend deadline failed:', err));
     }
   };
 
+  const continueExpiredGoal = (id, newDeadline) => {
+    if (!newDeadline || newDeadline < TODAY()) return false;
+    const goal = goalsRef.current.find(g => g.id === id);
+    if (!goal || isGoalFinalized(goal)) return false;
+    extendGoalDeadline(id, newDeadline);
+    return true;
+  };
+
+  const finalizeExpiredGoal = (goalId) => {
+    const gIdStr = String(goalId);
+    const goal = goalsRef.current.find(g => String(g.id) === gIdStr);
+    if (!goal) return null;
+
+    // Idempotency guards: never evaluate or count a finalized goal twice
+    if (isGoalFinalized(goal)) {
+      return null;
+    }
+    if (finalizingGoalIdsRef.current.has(gIdStr)) {
+      return null;
+    }
+    finalizingGoalIdsRef.current.add(gIdStr);
+
+    const todayStr = TODAY();
+    const existingEvaluated = profileStatsRef.current?.evaluatedGoals?.[gIdStr];
+    const evaluation = existingEvaluated
+      ? {
+          goalId: gIdStr,
+          goalTitle: existingEvaluated.goalTitle || goal.title || '',
+          completedTasks: existingEvaluated.completedTasks ?? 0,
+          totalPlannedTasks: existingEvaluated.totalPlannedTasks ?? 0,
+          failedTasks: existingEvaluated.failedTasks ?? 0,
+          completionPercentage: existingEvaluated.completionPercentage ?? 0,
+          finalResult: existingEvaluated.finalResult || 'FAILED',
+          newStatus: existingEvaluated.finalResult === 'PASSED' ? 'completed' : 'failed',
+        }
+      : evaluateGoalPerformance(goal, todayStr);
+
+    const finalizedGoal = {
+      ...goal,
+      status: evaluation.newStatus,
+      isFocusGoal: false,
+      isMissingDream: false,
+      progress: evaluation.completionPercentage,
+      finalResult: evaluation.finalResult,
+      finalCompletionPercentage: evaluation.completionPercentage,
+      completedTasksCount: evaluation.completedTasks,
+      totalPlannedTasksCount: evaluation.totalPlannedTasks,
+      failedTasksCount: evaluation.failedTasks,
+      finalizedAt: new Date().toISOString(),
+      evaluatedDate: todayStr,
+      lastActionTimestamp: new Date().toISOString(),
+    };
+
+    // Cancel reminders for all habits under this finalized goal
+    (goal.habits || []).forEach(h => cancelReminder(h.id));
+
+    const nextGoals = goalsRef.current.map(g => String(g.id) === gIdStr ? finalizedGoal : g);
+    goalsRef.current = nextGoals;
+    setGoals(nextGoals);
+    localStorage.setItem(STORAGE_KEYS.GOALS, JSON.stringify(nextGoals));
+
+    const nextStats = reconcileProfileStats(profileStatsRef.current, nextGoals);
+    profileStatsRef.current = nextStats;
+    setProfileStats(nextStats);
+    localStorage.setItem(STORAGE_KEYS.PROFILE_STATS, JSON.stringify(nextStats));
+
+    if (user) {
+      db.upsertGoal(user.id, finalizedGoal, true).catch(err => {
+        console.error('[Firestore Sync] Finalize goal failed:', err);
+      });
+      db.upsertProfileStats(user.id, nextStats, true).catch(err => {
+        console.error('[Firestore Sync] Update profile stats failed:', err);
+      });
+    }
+
+    return { finalizedGoal, evaluation, stats: nextStats };
+  };
+
   const setFocusGoal = async (goalId) => {
+    if (goalId) {
+      const target = goalsRef.current.find(g => g.id === goalId);
+      if (target && !isGoalActive(target)) return;
+    }
     setGoals(prev => prev.map(g => {
       const isNowFocus = g.id === goalId;
       if (g.isFocusGoal !== isNowFocus) {
@@ -2123,6 +2335,8 @@ export const AppProvider = ({ children }) => {
   };
 
   const addHabit = (goalId, habit) => {
+    const targetGoalCheck = goalsRef.current.find(g => g.id === goalId);
+    if (targetGoalCheck && (isGoalFinalized(targetGoalCheck) || targetGoalCheck.status === 'archived')) return;
     const targetGoal = goals.find(g => g.id === goalId);
     if (!targetGoal) {
       console.warn(`[Habit Creator] Cannot create habit; parent Goal ID "${goalId}" does not exist.`);
@@ -2183,6 +2397,8 @@ export const AppProvider = ({ children }) => {
   };
 
   const deleteHabit = (goalId, habitId) => {
+    const goalCheck = goalsRef.current.find(g => g.id === goalId);
+    if (goalCheck && (isGoalFinalized(goalCheck) || goalCheck.status === 'archived')) return;
     const goal = goals.find(g => g.id === goalId);
     if (!goal) return;
 
@@ -2223,6 +2439,8 @@ export const AppProvider = ({ children }) => {
   };
 
   const logHabitTime = (goalId, habitId, minutes) => {
+    const goalCheck = goalsRef.current.find(g => g.id === goalId);
+    if (goalCheck && (isGoalFinalized(goalCheck) || goalCheck.status === 'archived' || isGoalExpired(goalCheck, TODAY()))) return;
     console.log(`%c[Diagnostic Log] ACTION START: logHabitTime [goalId=${goalId}, habitId=${habitId}, minutes=${minutes}]`, 'color: #3b82f6; font-weight: bold;');
     const goal = goalsRef.current.find(g => g.id === goalId);
     if (!goal) {
@@ -2382,6 +2600,8 @@ export const AppProvider = ({ children }) => {
 
 
   const toggleHabitCheck = (goalId, habitId) => {
+    const goalCheck = goalsRef.current.find(g => g.id === goalId);
+    if (goalCheck && (isGoalFinalized(goalCheck) || goalCheck.status === 'archived' || isGoalExpired(goalCheck, TODAY()))) return;
     console.log(`%c[Diagnostic Log] ACTION START: toggleHabitCheck [goalId=${goalId}, habitId=${habitId}]`, 'color: #3b82f6; font-weight: bold;');
     const goal = goals.find(g => g.id === goalId);
     if (!goal) {
@@ -2534,6 +2754,8 @@ export const AppProvider = ({ children }) => {
   };
 
   const updateHabitCount = (goalId, habitId, delta) => {
+    const goalCheck = goalsRef.current.find(g => g.id === goalId);
+    if (goalCheck && (isGoalFinalized(goalCheck) || goalCheck.status === 'archived' || isGoalExpired(goalCheck, TODAY()))) return;
     console.log(`%c[Diagnostic Log] ACTION START: updateHabitCount [goalId=${goalId}, habitId=${habitId}, delta=${delta}]`, 'color: #3b82f6; font-weight: bold;');
     const goal = goals.find(g => g.id === goalId);
     if (!goal) {
@@ -3033,6 +3255,10 @@ export const AppProvider = ({ children }) => {
   };
 
   const addFocusTimeToHabit = (goalId, habitId, seconds) => {
+    if (goalId && goalId !== 'DAILY_TASK') {
+      const goalCheck = goalsRef.current.find(g => g.id === goalId);
+      if (goalCheck && (isGoalFinalized(goalCheck) || goalCheck.status === 'archived' || isGoalExpired(goalCheck, TODAY()))) return;
+    }
     const mins = seconds / 60;
     // Note: do NOT call addFocusTime(seconds) here — the session total is already
     // computed by calculatedFocusTimeToday from sessionLogs, and logFocusSession()
@@ -3303,6 +3529,7 @@ export const AppProvider = ({ children }) => {
       setRecoveryStrategies([]);
       setSmartSuggestions(null);
       setXpData(DEFAULT_XP_DATA);
+      setProfileStats(DEFAULT_PROFILE_STATS);
       setSettings(prev => ({
         theme: prev.theme || 'dark',
         focusTimeToday: 0,
@@ -3329,6 +3556,9 @@ export const AppProvider = ({ children }) => {
       localStorage.setItem(STORAGE_KEYS.QUICK_THOUGHTS, JSON.stringify([]));
       localStorage.setItem(STORAGE_KEYS.COMPLETED_SESSIONS, JSON.stringify([]));
       localStorage.setItem(STORAGE_KEYS.XP, JSON.stringify(DEFAULT_XP_DATA));
+      localStorage.setItem(STORAGE_KEYS.PROFILE_STATS, JSON.stringify(DEFAULT_PROFILE_STATS));
+      finalizingGoalIdsRef.current.clear();
+
       localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify({
         theme: settings.theme || 'dark',
         focusTimeToday: 0,
@@ -3719,6 +3949,7 @@ export const AppProvider = ({ children }) => {
 
   const goalsValue = {
     goals: sortedGoals, addGoal, updateGoal, editGoalSystem, deleteGoal, extendGoalDeadline,
+    continueExpiredGoal, finalizeExpiredGoal, expiredGoals,
     setFocusGoal, reorderGoals, moveGoal,
     addHabit, deleteHabit, logHabitTime, toggleHabitCheck, updateHabitCount, updateHabitReminder,
     allHabits, completedGoalForCelebration, setCompletedGoalForCelebration,
@@ -3755,7 +3986,7 @@ export const AppProvider = ({ children }) => {
   };
 
   const gamificationValue = {
-    xpData, awardXP, incrementCompletions, awardFocusXP, recordComeback,
+    xpData, profileStats: computedProfileStats, awardXP, incrementCompletions, awardFocusXP, recordComeback,
     currentLevelInfo, levelUpEvent, setLevelUpEvent,
     badgeUnlockEvent, setBadgeUnlockEvent, dismissBadgeEvent,
     currentlyEarnedBadges,
@@ -3764,6 +3995,7 @@ export const AppProvider = ({ children }) => {
 
   const value = {
     goals: sortedGoals, addGoal, updateGoal, editGoalSystem, deleteGoal, extendGoalDeadline,
+    continueExpiredGoal, finalizeExpiredGoal, expiredGoals,
     setFocusGoal, reorderGoals, moveGoal,
     addHabit, deleteHabit, logHabitTime, toggleHabitCheck, updateHabitCount, updateHabitReminder,
     tasks, addTask, updateTask, deleteTask, logTaskTime, toggleTaskComplete, updateTaskCount,
@@ -3775,7 +4007,7 @@ export const AppProvider = ({ children }) => {
     loading, taskLogs, syncError, retrySync: syncFromCloud,
     totalItems, completedItems, todayTasks, allHabits, taskStreak,
     // Gamification
-    xpData, awardXP, incrementCompletions, awardFocusXP, recordComeback,
+    xpData, profileStats: computedProfileStats, awardXP, incrementCompletions, awardFocusXP, recordComeback,
     currentLevelInfo, levelUpEvent, setLevelUpEvent,
     badgeUnlockEvent, setBadgeUnlockEvent, dismissBadgeEvent,
     currentlyEarnedBadges,

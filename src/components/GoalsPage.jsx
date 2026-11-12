@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useGoals } from '../context/AppContext';
-import { Target, Plus, ChevronDown, ChevronUp, Trash2, Clock, Check, Layers, Calendar, History, Edit3, Maximize2, Minimize2, Moon, Star, ArrowUp, ArrowDown, GripVertical, Settings, MoreVertical, Copy, Archive } from 'lucide-react';
-import { isGoalDoneToday, calculateGoalDailyProgress, isHabitScheduledToday, calculateOverallProgress } from '../utils/calculationUtils';
-import { addDays, TODAY } from '../utils/dateUtils';
+import { Target, Plus, ChevronDown, ChevronUp, Trash2, Clock, Check, Layers, Calendar, History, Edit3, Maximize2, Minimize2, Moon, Star, ArrowUp, ArrowDown, GripVertical, Settings, MoreVertical, Copy, Archive, CheckCircle2, XCircle, Lock } from 'lucide-react';
+import { isGoalDoneToday, calculateGoalDailyProgress, isHabitScheduledToday, calculateOverallProgress, isGoalActive, isGoalFinalized } from '../utils/calculationUtils';
+import { addDays, TODAY, parseLocalDate } from '../utils/dateUtils';
+import { isGoalExpired, getGoalFinalEvaluation } from '../utils/goalEvaluation';
+
+
 import { DeleteConfirmationModal } from './DeleteConfirmationModal';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 
@@ -64,7 +67,8 @@ const TAG_COLORS = {
 // ── Extend Deadline Modal ──────────────────────────────────
 const ExtendDeadlineModal = ({ goal, onClose, onExtend }) => {
   const [selectedDays, setSelectedDays] = useState(7);
-  const currentDeadline = goal.deadline || new Date().toISOString().split('T')[0];
+  const todayStr = TODAY();
+  const currentDeadline = goal.deadline && goal.deadline >= todayStr ? goal.deadline : todayStr;
   const newDeadline = addDays(currentDeadline, selectedDays);
 
   return (
@@ -388,7 +392,7 @@ const LogTimeModal = ({ habit, goalId, onClose, logHabitTime }) => {
   );
 };
 
-const HabitRow = ({ habit, goalId, logHabitTime, deleteHabit, toggleHabitCheck, updateHabitCount, updateHabitReminder }) => {
+const HabitRow = ({ habit, goalId, logHabitTime, deleteHabit, toggleHabitCheck, updateHabitCount, updateHabitReminder, isReadOnly = false }) => {
   const [showLog, setShowLog] = useState(false);
   const isCheck = habit.type === 'check';
   const isCount = habit.type === 'count';
@@ -447,12 +451,13 @@ const HabitRow = ({ habit, goalId, logHabitTime, deleteHabit, toggleHabitCheck, 
         <div className="flex items-center justify-between gap-1.5 w-full">
           <div className="flex items-center gap-2 flex-1 min-w-0">
             <button
-              onClick={() => toggleHabitCheck(goalId, habit.id)}
+              onClick={() => !isReadOnly && toggleHabitCheck(goalId, habit.id)}
+              disabled={isReadOnly}
               aria-label={done ? `Mark "${habit.title}" as incomplete` : `Mark "${habit.title}" as complete`}
               aria-pressed={done}
               className={`
                  w-8 h-8 shrink-0 rounded-lg border-2 flex items-center justify-center transition-all duration-200
-                 ${done ? 'bg-emerald-500 border-emerald-500 scale-95' : 'bg-bg-card border-border-med cursor-pointer hover:border-accent-blue'}
+                 ${done ? 'bg-emerald-500 border-emerald-500 scale-95' : isReadOnly ? 'bg-bg-card border-border-med opacity-50 cursor-not-allowed' : 'bg-bg-card border-border-med cursor-pointer hover:border-accent-blue'}
                `}
             >
               {done ? <Check size={14} className="text-white animate-in zoom-in-50" strokeWidth={3} aria-hidden="true" /> : (isCheck ? null : <Icon size={12} className="text-text-muted" aria-hidden="true" />)}
@@ -470,6 +475,12 @@ const HabitRow = ({ habit, goalId, logHabitTime, deleteHabit, toggleHabitCheck, 
           </div>
 
           <div className="flex items-center gap-1 shrink-0">
+            {isReadOnly ? (
+              <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-wider text-text-muted/70 bg-bg-card px-2 py-1 rounded-lg border border-border-light" title="Task completion locked for finalized/expired goal">
+                <Lock size={10} /> Locked
+              </span>
+            ) : (
+              <>
             {isCount ? (
               <div className="flex bg-bg-card rounded-lg border border-border-light overflow-hidden shadow-sm h-7">
                 <button
@@ -493,6 +504,8 @@ const HabitRow = ({ habit, goalId, logHabitTime, deleteHabit, toggleHabitCheck, 
             >
               <Trash2 size={12} aria-hidden="true" />
             </button>
+              </>
+            )}
           </div>
         </div>
 
@@ -509,7 +522,8 @@ const HabitRow = ({ habit, goalId, logHabitTime, deleteHabit, toggleHabitCheck, 
           </div>
         )}
 
-        <div className="flex items-center justify-between pt-1.5 border-t border-border-light/35 mt-0.5">
+        {!isReadOnly && (
+          <div className="flex items-center justify-between pt-1.5 border-t border-border-light/35 mt-0.5">
           <div className="flex items-center gap-1.5">
             <div className="flex items-center gap-1 opacity-60">
               <Clock size={9} className="text-text-muted" />
@@ -541,9 +555,10 @@ const HabitRow = ({ habit, goalId, logHabitTime, deleteHabit, toggleHabitCheck, 
               />
             </div>
           )}
-        </div>
+          </div>
+        )}
       </div>
-      {showLog && !isCheck && !isCount && <LogTimeModal habit={habit} goalId={goalId} onClose={() => setShowLog(false)} logHabitTime={logHabitTime} />}
+      {!isReadOnly && showLog && !isCheck && !isCount && <LogTimeModal habit={habit} goalId={goalId} onClose={() => setShowLog(false)} logHabitTime={logHabitTime} />}
     </>
   );
 };
@@ -614,10 +629,12 @@ export const GoalsPage = () => {
     };
   });
 
-  const activeCalculatedGoals = calculatedGoals.filter(g => !g.isMissingDream && g.status !== 'archived');
-  const missingCalculatedGoals = calculatedGoals.filter(g => g.isMissingDream && g.status !== 'archived');
+  const activeCalculatedGoals = calculatedGoals.filter(g => isGoalActive(g));
+  const completedCalculatedGoals = calculatedGoals.filter(g => !g.deleted && !g.isDeleted && g.status === 'completed');
+  const failedCalculatedGoals = calculatedGoals.filter(g => !g.deleted && !g.isDeleted && g.status === 'failed');
+  const missingCalculatedGoals = calculatedGoals.filter(g => g.isMissingDream && (g.status || 'active') === 'active');
 
-  const doneGoals = activeCalculatedGoals.filter(g => g.isFinished).length;
+  const doneGoals = completedCalculatedGoals.length + activeCalculatedGoals.filter(g => g.isFinished).length;
   const activeGoals = activeCalculatedGoals.filter(g => !g.isFinished).length;
   const avgProgress = activeCalculatedGoals.length === 0 ? 0 : Math.round(activeCalculatedGoals.reduce((s, g) => s + (g.progress || 0), 0) / activeCalculatedGoals.length);
   const missingDreamGoalsCount = missingCalculatedGoals.length;
@@ -1113,7 +1130,7 @@ export const GoalsPage = () => {
 
       {/* Segmented Tab Selector */}
       {calculatedGoals.length > 0 && (
-        <div className="flex bg-bg-input/60 rounded-2xl p-1 max-w-[360px] border border-border-light shadow-sm mb-2">
+        <div className="flex flex-wrap sm:flex-nowrap bg-bg-input/60 rounded-2xl p-1 max-w-2xl border border-border-light shadow-sm mb-2 gap-1">
           <button
             type="button"
             onClick={() => setActiveTab('active')}
@@ -1123,6 +1140,26 @@ export const GoalsPage = () => {
               }`}
           >
             <Target size={13} /> Active Targets ({activeCalculatedGoals.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('completed')}
+            className={`flex-1 min-w-[130px] py-2 px-3 rounded-xl font-black text-xs transition-all flex items-center justify-center gap-1.5 active:scale-[0.98] whitespace-nowrap ${activeTab === 'completed'
+                ? 'bg-emerald-500 text-white shadow-md'
+                : 'text-text-muted hover:text-text-main hover:bg-bg-input'
+              }`}
+          >
+            <CheckCircle2 size={13} /> Completed Goals ({completedCalculatedGoals.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('failed')}
+            className={`flex-1 min-w-[130px] py-2 px-3 rounded-xl font-black text-xs transition-all flex items-center justify-center gap-1.5 active:scale-[0.98] whitespace-nowrap ${activeTab === 'failed'
+                ? 'bg-rose-500 text-white shadow-md'
+                : 'text-text-muted hover:text-text-main hover:bg-bg-input'
+              }`}
+          >
+            <XCircle size={13} /> Failed Goals ({failedCalculatedGoals.length})
           </button>
           <button
             type="button"
@@ -1139,7 +1176,28 @@ export const GoalsPage = () => {
 
       {/* Goal Cards Masonry Grid / Accordion List */}
       {(() => {
-        const goalsToRender = activeTab === 'active' ? activeCalculatedGoals : missingCalculatedGoals;
+        const goalsToRender =
+          activeTab === 'active'
+            ? activeCalculatedGoals
+            : activeTab === 'completed'
+              ? completedCalculatedGoals
+              : activeTab === 'failed'
+                ? failedCalculatedGoals
+                : missingCalculatedGoals;
+
+        if (goalsToRender.length === 0) {
+          const emptyLabels = {
+            active: 'No active targets right now.',
+            completed: 'No completed goals yet. Finish a goal with 75%+ completion to pass!',
+            failed: 'No failed goals recorded.',
+            missing: 'No missing dreams shelved.',
+          };
+          return (
+            <div className="py-12 text-center border-2 border-dashed border-border-light rounded-[28px] bg-bg-card/40">
+              <p className="text-sm font-black text-text-muted">{emptyLabels[activeTab]}</p>
+            </div>
+          );
+        }
 
         if (isReorderMode) {
           return (
@@ -1254,6 +1312,11 @@ export const GoalsPage = () => {
                   const dailyProgress = calculateGoalDailyProgress(goal);
                   const doneToday = isGoalDoneToday(goal);
                   const isFirstIncomplete = firstIncompleteGoal && firstIncompleteGoal.id === goal.id;
+                  const isFinalized = isGoalFinalized(goal);
+                  const isExpired = !isFinalized && isGoalExpired(goal, TODAY());
+                  const finalEval = isFinalized ? getGoalFinalEvaluation(goal) : null;
+                  const ringPct = isFinalized ? finalEval.completionPercentage : (goal.progress || 0);
+                  const barPct = isFinalized ? finalEval.completionPercentage : dailyProgress;
 
                   // Format deadline as "Due: 31 Dec 2026"
                   const formatDeadline = (dateStr) => {
@@ -1278,10 +1341,10 @@ export const GoalsPage = () => {
                     const startStr = goal.startDate || goal.createdAt;
                     const deadlineStr = goal.deadline;
                     if (!startStr || !deadlineStr) return 90;
-                    const start = new Date(startStr);
-                    const end = new Date(deadlineStr);
+                    const start = parseLocalDate(startStr);
+                    const end = parseLocalDate(deadlineStr);
                     const diffTime = end.getTime() - start.getTime();
-                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
                     return diffDays > 0 ? diffDays : 90;
                   };
                   const totalGoalDays = getGoalTotalDays();
@@ -1289,41 +1352,62 @@ export const GoalsPage = () => {
                   return (
                     <div key={goal.id} className={`
                       relative bg-bg-card rounded-2xl sm:rounded-[32px] overflow-hidden border-2 h-fit w-full transition-all duration-300
-                      ${doneToday ? 'border-emerald-500 shadow-lg shadow-emerald-500/5' : 'border-border-light hover:border-border-med shadow-sm'}
+                      ${isFinalized ? (finalEval.finalResult === 'PASSED' ? 'border-emerald-500/40 shadow-sm' : 'border-rose-500/40 shadow-sm') : isExpired ? 'border-amber-500/50 shadow-sm' : doneToday ? 'border-emerald-500 shadow-lg shadow-emerald-500/5' : 'border-border-light hover:border-border-med shadow-sm'}
                     `}>
                       <div className="px-3.5 py-3 sm:p-5 cursor-pointer group" onClick={() => toggleGoalExpanded(goal.id)}>
                         {/* 1. Top Row: Category badge on Left + Action Icons on Right */}
-                        <div className="flex justify-between items-center w-full mb-3.5">
-                          <span className={`text-[8px] sm:text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md ${tc.bg} ${tc.color} shrink-0`}>
-                            {goal.tag}
-                          </span>
+                        <div className="flex justify-between items-center w-full mb-3.5 gap-2">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className={`text-[8px] sm:text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md ${tc.bg} ${tc.color} shrink-0`}>
+                              {goal.tag}
+                            </span>
+                            {isFinalized && (
+                              <span className={`inline-flex items-center gap-1 text-[8px] sm:text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md shrink-0 ${
+                                finalEval.finalResult === 'PASSED'
+                                  ? 'bg-emerald-500/15 text-emerald-500 border border-emerald-500/20'
+                                  : 'bg-rose-500/15 text-rose-500 border border-rose-500/20'
+                              }`}>
+                                {finalEval.finalResult === 'PASSED' ? <CheckCircle2 size={10} /> : <XCircle size={10} />}
+                                {finalEval.finalResult}
+                              </span>
+                            )}
+                            {isExpired && (
+                              <span className="inline-flex items-center gap-1 text-[8px] sm:text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md bg-amber-500/15 text-amber-500 border border-amber-500/20 shrink-0">
+                                Deadline Reached
+                              </span>
+                            )}
+                          </div>
 
                           <div className="flex items-center gap-0.5 shrink-0" onClick={e => e.stopPropagation()}>
-                            {/* ⭐ Focus Toggle */}
-                            <button
-                                onClick={e => { e.stopPropagation(); setFocusGoal(goal.isFocusGoal ? null : goal.id); }}
-                                className="w-7 h-7 rounded-lg text-text-muted hover:text-amber-400 hover:bg-amber-400/10 transition-all flex items-center justify-center"
-                                title={goal.isFocusGoal ? 'Remove Focus' : 'Set as Focus Goal'}
-                            >
-                              <Star size={12} fill={goal.isFocusGoal ? 'currentColor' : 'none'} className={goal.isFocusGoal ? 'text-amber-400' : ''} />
-                            </button>
+                            {!isFinalized && (
+                              <>
+                                {/* ⭐ Focus Toggle */}
+                                <button
+                                    onClick={e => { e.stopPropagation(); setFocusGoal(goal.isFocusGoal ? null : goal.id); }}
+                                    className="w-7 h-7 rounded-lg text-text-muted hover:text-amber-400 hover:bg-amber-400/10 transition-all flex items-center justify-center"
+                                    title={goal.isFocusGoal ? 'Remove Focus' : 'Set as Focus Goal'}
+                                >
+                                  <Star size={12} fill={goal.isFocusGoal ? 'currentColor' : 'none'} className={goal.isFocusGoal ? 'text-amber-400' : ''} />
+                                </button>
 
-                            {/* 🌙 Move to Missing Dreams / Restore */}
-                            <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  updateGoal(goal.id, { isMissingDream: !goal.isMissingDream });
-                                }}
-                                className="w-7 h-7 rounded-lg text-text-muted hover:text-purple-400 hover:bg-purple-400/10 transition-all flex items-center justify-center"
-                                title={goal.isMissingDream ? 'Restore to Main Targets' : 'Move to Missing Dreams'}
-                            >
-                              <Moon size={12} fill={goal.isMissingDream ? 'currentColor' : 'none'} className={goal.isMissingDream ? 'text-purple-400' : ''} />
-                            </button>
+                                {/* 🌙 Move to Missing Dreams / Restore */}
+                                <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      updateGoal(goal.id, { isMissingDream: !goal.isMissingDream });
+                                    }}
+                                    className="w-7 h-7 rounded-lg text-text-muted hover:text-purple-400 hover:bg-purple-400/10 transition-all flex items-center justify-center"
+                                    title={goal.isMissingDream ? 'Restore to Main Targets' : 'Move to Missing Dreams'}
+                                >
+                                  <Moon size={12} fill={goal.isMissingDream ? 'currentColor' : 'none'} className={goal.isMissingDream ? 'text-purple-400' : ''} />
+                                </button>
 
-                            {/* ✏️ Edit */}
-                            <button onClick={e => { e.stopPropagation(); setEditingGoal(goal); }} className="w-7 h-7 rounded-lg text-text-muted hover:text-accent-blue hover:bg-accent-blue/10 transition-all flex items-center justify-center" title="Edit Goal System">
-                              <Edit3 size={12} />
-                            </button>
+                                {/* ✏️ Edit */}
+                                <button onClick={e => { e.stopPropagation(); setEditingGoal(goal); }} className="w-7 h-7 rounded-lg text-text-muted hover:text-accent-blue hover:bg-accent-blue/10 transition-all flex items-center justify-center" title="Edit Goal System">
+                                  <Edit3 size={12} />
+                                </button>
+                              </>
+                            )}
 
                             {/* 🗑️ Delete */}
                             <button onClick={e => { e.stopPropagation(); setDeletingGoalItem(goal); }} className="w-7 h-7 rounded-lg text-text-muted hover:text-rose-500 hover:bg-rose-500/10 transition-all flex items-center justify-center" title="Delete Goal System">
@@ -1344,14 +1428,16 @@ export const GoalsPage = () => {
                             <svg className="w-full h-full -rotate-90" viewBox="0 0 68 68">
                               <circle cx="34" cy="34" r={R} fill="none" className="stroke-bg-input" strokeWidth="6" />
                               <circle
-                                cx="34" cy="34" r={R} fill="none" className="stroke-accent-blue" strokeWidth="6"
-                                strokeDasharray={CIRC} strokeDashoffset={CIRC - (CIRC * (goal.progress || 0)) / 100}
+                                cx="34" cy="34" r={R} fill="none"
+                                className={isFinalized ? (finalEval.finalResult === 'PASSED' ? 'stroke-emerald-500' : 'stroke-rose-500') : 'stroke-accent-blue'}
+                                strokeWidth="6"
+                                strokeDasharray={CIRC} strokeDashoffset={CIRC - (CIRC * Math.min(100, Math.max(0, ringPct))) / 100}
                                 strokeLinecap="round"
                               />
                             </svg>
                             <div className="absolute inset-0 flex flex-col items-center justify-center">
-                              <span className="text-[10px] sm:text-[13px] font-black text-text-main tracking-tighter leading-none">{goal.progress || 0}%</span>
-                              <span className="hidden sm:block text-[6px] sm:text-[7px] font-black text-text-muted uppercase tracking-widest mt-0.5">Mastery</span>
+                              <span className="text-[10px] sm:text-[13px] font-black text-text-main tracking-tighter leading-none">{ringPct}%</span>
+                              <span className="hidden sm:block text-[6px] sm:text-[7px] font-black text-text-muted uppercase tracking-widest mt-0.5">{isFinalized ? 'Final' : 'Mastery'}</span>
                             </div>
                           </div>
 
@@ -1365,8 +1451,12 @@ export const GoalsPage = () => {
                             {/* Progress Bar (directly below Goal Title) */}
                             <div className="w-full bg-bg-input h-1.5 rounded-full overflow-hidden">
                               <div
-                                className={`h-full transition-all duration-700 ${dailyProgress === 100 ? 'bg-emerald-500' : 'bg-accent-blue'}`}
-                                style={{ width: `${dailyProgress}%` }}
+                                className={`h-full transition-all duration-700 ${
+                                  isFinalized
+                                    ? (finalEval.finalResult === 'PASSED' ? 'bg-emerald-500' : 'bg-rose-500')
+                                    : (dailyProgress === 100 ? 'bg-emerald-500' : 'bg-accent-blue')
+                                }`}
+                                style={{ width: `${Math.min(100, Math.max(0, barPct))}%` }}
                               />
                             </div>
                           </div>
@@ -1375,12 +1465,18 @@ export const GoalsPage = () => {
                         {/* 3. Bottom Meta Row (Compact, Single line, Centered) */}
                         <div className="flex flex-wrap items-center justify-center gap-x-5 sm:gap-x-8 gap-y-2 mt-4 pt-1.5 border-t border-border-light/20 text-text-muted text-[10px] sm:text-[11px] font-bold w-full">
                           {/* Due Date */}
-                          <button
-                            onClick={(e) => { e.stopPropagation(); setExtendingGoal(goal); }}
-                            className="flex items-center gap-1 hover:text-accent-blue transition-colors cursor-pointer shrink-0"
-                          >
-                            📅 {formattedDeadline ? formattedDeadline.replace('Due: ', '') : 'No Deadline'}
-                          </button>
+                          {isFinalized ? (
+                            <span className="flex items-center gap-1 shrink-0">
+                              📅 {formattedDeadline ? formattedDeadline.replace('Due: ', '') : 'No Deadline'}
+                            </span>
+                          ) : (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setExtendingGoal(goal); }}
+                              className="flex items-center gap-1 hover:text-accent-blue transition-colors cursor-pointer shrink-0"
+                            >
+                              📅 {formattedDeadline ? formattedDeadline.replace('Due: ', '') : 'No Deadline'}
+                            </button>
+                          )}
                           {goal.extensions?.length > 0 && <History size={11} className="text-accent-blue opacity-50 -ml-2.5 sm:-ml-5 shrink-0" />}
 
                           {/* Goal Duration Days progress */}
@@ -1388,18 +1484,24 @@ export const GoalsPage = () => {
                             🔥 {completedDays}/{totalGoalDays}
                           </span>
 
-                          {/* Today Progress */}
-                          <span className="flex items-center gap-1 shrink-0">
-                            📋 {doneHabits}/{totalHabits}
-                          </span>
+                          {/* Today Progress or Final Task Count */}
+                          {isFinalized ? (
+                            <span className="flex items-center gap-1 shrink-0">
+                              ✅ {finalEval.completedTasks}/{finalEval.totalPlannedTasks} Tasks
+                            </span>
+                          ) : (
+                            <span className="flex items-center gap-1 shrink-0">
+                              📋 {doneHabits}/{totalHabits}
+                            </span>
+                          )}
 
-                          {dailyProgress === 100 && (
+                          {!isFinalized && dailyProgress === 100 && (
                             <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-500 flex items-center gap-1 shrink-0">
                               ✅ DONE
                             </span>
                           )}
                           
-                          {goal.progress >= 100 && (
+                          {!isFinalized && goal.progress >= 100 && (
                             <button
                               onClick={(e) => { e.stopPropagation(); setCompletedGoalForCelebration(goal); }}
                               className="text-[8px] sm:text-[9px] font-black bg-amber-400/15 text-amber-500 border border-amber-400/20 px-1.5 py-0.5 rounded hover:scale-105 active:scale-[0.98] transition-all flex items-center gap-0.5 shrink-0"
@@ -1415,7 +1517,7 @@ export const GoalsPage = () => {
                       {isOpen && (
                         <div className="px-3.5 py-3 sm:px-5 sm:pb-5 pt-2.5 border-t border-border-light/50 space-y-3 bg-linear-to-b from-bg-input/10 to-transparent">
                           <div className="flex flex-col gap-2">
-                            {goal.habits
+                            {[...(goal.habits || [])]
                               .sort((a, b) => {
                                 const todayStr = TODAY();
                                 const isHabitDoneVisual = (h) => {
@@ -1430,10 +1532,18 @@ export const GoalsPage = () => {
                                 if (aDone !== bDone) return aDone ? 1 : -1;
                                 return 0;
                               })
-                              .map(h => <HabitRow key={h.id} habit={h} goalId={goal.id} logHabitTime={logHabitTime} deleteHabit={deleteHabit} toggleHabitCheck={toggleHabitCheck} updateHabitCount={updateHabitCount} updateHabitReminder={updateHabitReminder} />)}
+                              .map(h => <HabitRow key={h.id} habit={h} goalId={goal.id} isReadOnly={isFinalized || isExpired} logHabitTime={logHabitTime} deleteHabit={deleteHabit} toggleHabitCheck={toggleHabitCheck} updateHabitCount={updateHabitCount} updateHabitReminder={updateHabitReminder} />)}
                           </div>
 
-                          {showAddHabit === goal.id ? (
+                          {isFinalized ? (
+                            <div className="w-full py-2.5 px-3 rounded-xl bg-bg-input/50 border border-border-light text-text-muted font-bold text-xs flex items-center justify-center gap-2">
+                              <Lock size={12} /> Finalized goals are read-only ({finalEval.finalResult === 'PASSED' ? 'Passed' : 'Failed'} at {finalEval.completionPercentage}%).
+                            </div>
+                          ) : isExpired ? (
+                            <div className="w-full py-2.5 px-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-500 font-bold text-xs flex items-center justify-center gap-2">
+                              <Lock size={12} /> Deadline passed — choose Continue Goal or End Goal to unlock or finalize.
+                            </div>
+                          ) : showAddHabit === goal.id ? (
                             <form onSubmit={e => submitHabit(e, goal.id)} className="bg-bg-input/50 p-4 rounded-xl border border-border-light space-y-3 animate-in zoom-in-95">
                               <input autoFocus required type="text" value={newHabit.title} onChange={e => setNewHabit({ ...newHabit, title: e.target.value })} placeholder="New habit name..." className="w-full bg-transparent border-b border-accent-blue py-1.5 font-bold text-text-main outline-none placeholder:text-text-muted/40 text-xs" />
                               <div className="flex gap-2">

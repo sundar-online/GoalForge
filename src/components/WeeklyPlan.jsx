@@ -111,6 +111,7 @@ const QuickAddModal = ({ dateStr, dayLabel, onClose, addTask }) => {
 const DayColumn = ({ dateStr, dayAbbr, dayNum, monthName, isToday, goals, tasks, onAddTask }) => {
   // Habits scheduled this day
   const scheduledHabits = goals
+    .filter(g => !g.isMissingDream && (g.status || 'active') === 'active')
     .flatMap(g => (g.habits || []).map(h => ({ ...h, goalTitle: g.title, goalId: g.id })))
     .filter(h => {
       if (!h.scheduleDays || h.scheduleDays.length === 0) return true;
@@ -269,7 +270,7 @@ export const WeeklyPlan = () => {
   }, [weekDays, taskLogs]);
 
   // Count habits per day for schedule summary
-  const weekHabitCount = goals.flatMap(g => g.habits || []).length;
+  const weekHabitCount = goals.filter(g => !g.isMissingDream && (g.status || 'active') === 'active').flatMap(g => g.habits || []).length;
 
   const handleSaveIntention = () => {
     saveWeeklyIntention(weekKey, intentionDraft.trim());

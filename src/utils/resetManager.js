@@ -51,6 +51,7 @@ export function shouldRunReset(currentSettings, currentTasks, currentGoals, toda
   );
 
   const hasHabitNeed = (currentGoals || []).some(goal =>
+    (goal.status || 'active') === 'active' &&
     (goal.habits || []).some(h => h.lastActiveDate !== todayStr)
   );
 

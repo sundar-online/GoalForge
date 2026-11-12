@@ -109,7 +109,7 @@ export const analyzeUserBehavior = (goals, tasks, taskLogs, focusTime) => {
   }
 
   // Also celebrate high-streak habits
-  const activeGoals = (goals || []).filter((g) => !g.isMissingDream);
+  const activeGoals = (goals || []).filter((g) => !g.isMissingDream && (g.status || 'active') === 'active');
   const allHabits = activeGoals.flatMap((g) => g.habits || []);
   const topHabit = [...allHabits].sort((a, b) => (b.streak || 0) - (a.streak || 0))[0];
 
@@ -220,7 +220,7 @@ export const analyzeUserBehavior = (goals, tasks, taskLogs, focusTime) => {
   }
   // ── 5. Missing Dream Recommendations (Shelve Inactive Goals) ───────────────
   (goals || []).forEach(g => {
-    if (g.isMissingDream) return; // Already shelved
+    if (g.isMissingDream || (g.status || 'active') !== 'active') return; // Already shelved or closed
     const missed = g.missedDays || 0;
     const habits = g.habits || [];
     const maxHabitMissed = habits.length === 0 ? 0 : Math.max(...habits.map(h => h.missedDays || 0));
@@ -258,7 +258,7 @@ const isItemDoneToday = (item) => {
 export const generateRecoveryStrategies = (goals, tasks) => {
   const strategies = [];
   const today = TODAY();
-  const activeGoals = (goals || []).filter((g) => !g.isMissingDream);
+  const activeGoals = (goals || []).filter((g) => !g.isMissingDream && (g.status || 'active') === 'active');
 
   // Aggregate all tracker items
   const allItems = [

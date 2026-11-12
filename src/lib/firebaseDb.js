@@ -136,6 +136,43 @@ export function isDeepEqual(obj1, obj2) {
 }
 
 // Centralized Write Router: Buffers, Debounces, and Batches Writes
+export async function immediateWrite(docRef, payload, pathKey) {
+  const clean = cleanPayload(payload);
+
+  // Cancel any older pending debounced or batched writes for the same pathKey
+  if (pendingWriteTimers.has(pathKey)) {
+    const pending = pendingWriteTimers.get(pathKey);
+    clearTimeout(pending.timerId);
+    pendingWriteTimers.delete(pathKey);
+    pending.resolves.forEach(r => r.resolve());
+  }
+  for (let i = batchQueue.length - 1; i >= 0; i--) {
+    if (batchQueue[i].pathKey === pathKey) {
+      const removed = batchQueue.splice(i, 1)[0];
+      removed.resolves.forEach(r => r.resolve());
+    }
+  }
+
+  const cached = writeCache.get(pathKey);
+  const deltaPayload = getDeltaPayload(cached, clean);
+  if (cached && Object.keys(deltaPayload).length === 0) {
+    debugLog(`[Immediate Write] Skipped (No delta changes): ${pathKey}`);
+    return;
+  }
+
+  // Prime cache optimistically so subsequent calls don't double-write while offline
+  writeCache.set(pathKey, clean);
+  try {
+    debugLog(`[Immediate Write] Committing to Firestore: ${pathKey}`, deltaPayload);
+    await setDoc(docRef, deltaPayload, { merge: true });
+    debugLog(`[Immediate Write] SUCCESS: ${pathKey}`);
+  } catch (err) {
+    writeCache.delete(pathKey);
+    errorLog(`[Immediate Write] FAILURE: ${pathKey}`, err);
+    throw err;
+  }
+}
+
 export async function smartWrite(docRef, payload, pathKey, useBatch = false, delay = 1500) {
   return new Promise((resolve, reject) => {
     const clean = cleanPayload(payload);
@@ -381,6 +418,13 @@ export async function fetchGoals(userId) {
         order: g.order ?? 1,
         isFocusGoal: g.is_focus_goal ?? false,
         status: g.status ?? 'active',
+        finalResult: g.final_result ?? null,
+        finalCompletionPercentage: g.final_completion_percentage ?? null,
+        completedTasksCount: g.completed_tasks_count ?? null,
+        totalPlannedTasksCount: g.total_planned_tasks_count ?? null,
+        failedTasksCount: g.failed_tasks_count ?? null,
+        finalizedAt: g.finalized_at || null,
+        evaluatedDate: g.evaluated_date || null,
         dependencies: g.dependencies || [],
         habits,
       });
@@ -392,7 +436,7 @@ export async function fetchGoals(userId) {
   }
 }
 
-export async function upsertGoal(userId, goal) {
+export async function upsertGoal(userId, goal, immediate = false) {
   const payload = {
     title: goal.title,
     description: goal.description ?? '',
@@ -414,6 +458,13 @@ export async function upsertGoal(userId, goal) {
     order: goal.order ?? 1,
     is_focus_goal: !!goal.isFocusGoal,
     status: goal.status ?? 'active',
+    final_result: goal.finalResult ?? null,
+    final_completion_percentage: goal.finalCompletionPercentage ?? null,
+    completed_tasks_count: goal.completedTasksCount ?? null,
+    total_planned_tasks_count: goal.totalPlannedTasksCount ?? null,
+    failed_tasks_count: goal.failedTasksCount ?? null,
+    finalized_at: goal.finalizedAt || null,
+    evaluated_date: goal.evaluatedDate || null,
     dependencies: goal.dependencies || [],
     created_at: goal.createdAt || new Date().toISOString(),
     updated_at: new Date().toISOString(),
@@ -421,6 +472,9 @@ export async function upsertGoal(userId, goal) {
 
   const pathKey = `users/${userId}/goals/${goal.id}`;
   const docRef = userDoc(userId, 'goals', String(goal.id));
+  if (immediate) {
+    return immediateWrite(docRef, payload, pathKey);
+  }
   return smartWrite(docRef, payload, pathKey, true, 1000);
 }
 
@@ -936,6 +990,53 @@ export async function upsertUserProfile(userId, profile) {
   return smartWrite(docRef, payload, pathKey, false, 2000);
 }
 
+// ── Goal Performance Profile Statistics ────────────────────
+export async function fetchProfileStats(userId) {
+  try {
+    const snap = await getDocs(userCol(userId, 'stats'));
+    if (snap.empty) return null;
+    const statsDoc = snap.docs.find(d => d.id === 'profile');
+    if (!statsDoc) return null;
+
+    const data = statsDoc.data();
+    const pathKey = `users/${userId}/stats/profile`;
+    writeCache.set(pathKey, cleanPayload(data));
+
+    return {
+      totalGoals: data.total_goals ?? 0,
+      passedGoals: data.passed_goals ?? 0,
+      failedGoals: data.failed_goals ?? 0,
+      averageGoalCompletion: data.average_goal_completion ?? 0,
+      totalTasksCompleted: data.total_tasks_completed ?? 0,
+      totalTasksFailed: data.total_tasks_failed ?? 0,
+      evaluatedGoals: data.evaluated_goals || {},
+    };
+  } catch (err) {
+    log('fetchProfileStats', err);
+    return null;
+  }
+}
+
+export async function upsertProfileStats(userId, stats, immediate = false) {
+  const payload = {
+    total_goals: stats.totalGoals ?? 0,
+    passed_goals: stats.passedGoals ?? 0,
+    failed_goals: stats.failedGoals ?? 0,
+    average_goal_completion: stats.averageGoalCompletion ?? 0,
+    total_tasks_completed: stats.totalTasksCompleted ?? 0,
+    total_tasks_failed: stats.totalTasksFailed ?? 0,
+    evaluated_goals: stats.evaluatedGoals || {},
+    updated_at: new Date().toISOString(),
+  };
+
+  const pathKey = `users/${userId}/stats/profile`;
+  const docRef = userDoc(userId, 'stats', 'profile');
+  if (immediate) {
+    return immediateWrite(docRef, payload, pathKey);
+  }
+  return smartWrite(docRef, payload, pathKey, false, 1500);
+}
+
 // ── Story Moment Memories ──────────────────────────────────
 export async function upsertMemory(userId, memory) {
   const payload = {
@@ -1070,6 +1171,21 @@ export async function clearUserDataDb(userId) {
     };
     await setDoc(xpRef, xpPayload, { merge: true });
     writeCache.set(`users/${userId}/xp/profile`, cleanPayload(xpPayload));
+
+    // 6b. Reset Goal Performance Profile Stats (full overwrite so evaluated_goals map clears)
+    const statsRef = userDoc(userId, 'stats', 'profile');
+    const statsPayload = {
+      total_goals: 0,
+      passed_goals: 0,
+      failed_goals: 0,
+      average_goal_completion: 0,
+      total_tasks_completed: 0,
+      total_tasks_failed: 0,
+      evaluated_goals: {},
+      updated_at: new Date().toISOString()
+    };
+    await setDoc(statsRef, statsPayload);
+    writeCache.set(`users/${userId}/stats/profile`, cleanPayload(statsPayload));
 
     // 7. Reset Settings preferences (keep theme, reset others)
     const settingsRef = userDoc(userId, 'settings', 'preferences');

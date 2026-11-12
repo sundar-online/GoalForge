@@ -137,8 +137,19 @@ export const isTaskDone = (t) => {
   return (t.timeSpent ?? 0) >= (t.targetTime ?? 30);
 };
 
+export const isGoalFinalized = (goal) => {
+  if (!goal) return false;
+  return goal.status === 'completed' || goal.status === 'failed';
+};
+
+export const isGoalActive = (goal) => {
+  if (!goal || goal.deleted || goal.isDeleted) return false;
+  const status = goal.status || 'active';
+  return status === 'active' && !goal.isMissingDream;
+};
+
 export const calculateAccuracy = (tasks, goals) => {
-  const activeGoals = goals.filter(g => !g.isMissingDream);
+  const activeGoals = (goals || []).filter(isGoalActive);
 
   // Filter to goals that have at least one habit scheduled today
   const goalsWithScheduledHabits = activeGoals.filter(g => {
@@ -301,7 +312,7 @@ export const calculateWeeklyReport = (taskLogs) => {
 export const getSmartAlerts = (accuracy, goals = [], tasks = [], weeklyReport = {}, dismissedInsights = []) => {
   const alerts = [];
   try {
-    const activeGoals = goals.filter(g => !g.isMissingDream);
+    const activeGoals = (goals || []).filter(isGoalActive);
     // 1. Streak Alert
     const hasHabitRisk = activeGoals.some(g => 
       (g.habits || []).some(h => {
@@ -668,6 +679,9 @@ export const calculateGoalStreak = (completedDates, scheduleDays = [], createdAt
 export const calculateOverallProgress = (g) => {
   if (!g) return 0;
   let startStr = g.startDate || normalizeDateStr(g.createdAt, TODAY());
+  if (isGoalFinalized(g) && typeof g.finalCompletionPercentage === 'number') {
+    return g.finalCompletionPercentage;
+  }
   startStr = normalizeDateStr(startStr, TODAY());
   let endStr = normalizeDateStr(g.deadline || addDays(startStr, 30), TODAY());
 
@@ -883,17 +897,13 @@ export const isGoalBlocked = (goal, goals) => {
     const depGoal = goals.find(g => g.id === depId);
     if (!depGoal) return false;
     const progress = calculateOverallProgress(depGoal);
+    if (depGoal.status === 'completed') return false;
     return progress < 100;
   });
 };
 
 export const getRecommendedNextGoal = (goals) => {
-  const activeIncompleteGoals = goals.filter(g => 
-    !g.isMissingDream && 
-    !g.deleted && 
-    !g.isDeleted && 
-    calculateOverallProgress(g) < 100
-  );
+  const activeIncompleteGoals = (goals || []).filter(g => isGoalActive(g) && calculateOverallProgress(g) < 100);
 
   if (activeIncompleteGoals.length === 0) return null;
 

@@ -55,7 +55,7 @@ export const analyzeAccuracyIntelligence = (goals, accuracy) => {
   const insights = [];
 
   const activeGoals = (goals || []).filter(g => {
-    if (g.isMissingDream) return false;
+    if (g.isMissingDream || (g.status || 'active') !== 'active') return false;
     return (g.habits || []).some(isHabitScheduledToday);
   });
 

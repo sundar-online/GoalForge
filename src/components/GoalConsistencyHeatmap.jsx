@@ -61,7 +61,7 @@ function getMostConsistentGoal(goals) {
   const days = new Set(Array.from({ length: 30 }, (_, i) => addDays(today, -(29 - i))));
 
   return (goals || [])
-    .filter(g => !g.isMissingDream && (g.habits || []).length > 0)
+    .filter(g => !g.isMissingDream && (g.status || 'active') === 'active' && (g.habits || []).length > 0)
     .map(g => {
       const scheduledDays = (g.completedDates || []).filter(d => days.has(d)).length;
       // Count how many scheduled days existed in 30 days
@@ -83,7 +83,7 @@ function getMostMissedGoal(goals) {
   const days = new Set(Array.from({ length: 30 }, (_, i) => addDays(today, -(29 - i))));
 
   return (goals || [])
-    .filter(g => !g.isMissingDream && (g.habits || []).length > 0)
+    .filter(g => !g.isMissingDream && (g.status || 'active') === 'active' && (g.habits || []).length > 0)
     .map(g => {
       const completedSet = new Set((g.completedDates || []).filter(d => days.has(d)));
       const goalSchedule = getGoalScheduledDays(g);
@@ -102,7 +102,7 @@ function getMostMissedGoal(goals) {
 /** Best goal streak across all goals */
 function getBestGoalStreak(goals) {
   let best = { title: '', streak: 0, tag: '' };
-  (goals || []).filter(g => !g.isMissingDream).forEach(g => {
+  (goals || []).filter(g => !g.isMissingDream && (g.status || 'active') === 'active').forEach(g => {
     const schedule = getGoalScheduledDays(g);
     const { current } = calculateGoalStreak(g.completedDates || [], schedule, g.startDate || g.createdAt);
     if (current > best.streak) {
@@ -377,7 +377,7 @@ export const GoalConsistencyHeatmap = ({
     return map;
   }, [cells, goals, accuracy]);
 
-  const activeGoalCount = (goals || []).filter(g => !g.isMissingDream && (g.habits || []).length > 0).length;
+  const activeGoalCount = (goals || []).filter(g => !g.isMissingDream && (g.status || 'active') === 'active' && (g.habits || []).length > 0).length;
 
   return (
     <>

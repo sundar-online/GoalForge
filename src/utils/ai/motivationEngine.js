@@ -135,7 +135,7 @@ export const getSmartSuggestion = (accuracy) => {
 export const analyzeMotivation = (goals, accuracy) => {
   const insights = [];
 
-  const activeGoals = (goals || []).filter(g => !g.isMissingDream);
+  const activeGoals = (goals || []).filter(g => !g.isMissingDream && (g.status || 'active') === 'active');
   const allHabits = activeGoals.flatMap(g => g.habits || []);
 
   // ── 1. Identity Statements (habits ≥ 14 days) ────────────────────────────

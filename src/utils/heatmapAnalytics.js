@@ -40,7 +40,7 @@ export function getDayTaskData(date, taskLogs, goals) {
   const accuracy = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
   const habitBreakdown = [];
-  (goals || []).filter(g => !g.isMissingDream).forEach(g => {
+  (goals || []).filter(g => !g.isMissingDream && g.status !== 'archived' && ((g.status || 'active') === 'active' || !g.evaluatedDate || date <= String(g.evaluatedDate).split('T')[0])).forEach(g => {
     (g.habits || []).forEach(h => {
       if (wasHabitScheduledOn(h, date)) {
         const done = wasHabitCompletedOn(h, date);
@@ -71,7 +71,7 @@ export function getDayTaskData(date, taskLogs, goals) {
  */
 export function getDayGoalData(date, goals) {
   return (goals || [])
-    .filter(g => !g.isMissingDream)
+    .filter(g => !g.isMissingDream && g.status !== 'archived' && ((g.status || 'active') === 'active' || !g.evaluatedDate || date <= String(g.evaluatedDate).split('T')[0]))
     .map(g => {
       const habits = (g.habits || []).filter(h => wasHabitScheduledOn(h, date));
       const completedHabits = habits.filter(h => wasHabitCompletedOn(h, date));

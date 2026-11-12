@@ -69,7 +69,7 @@ export const generateRecoveryInsights = (goals, tasks, taskLogs) => {
   const insights = [];
   const today = TODAY();
 
-  const activeGoals = (goals || []).filter(g => !g.isMissingDream);
+  const activeGoals = (goals || []).filter(g => !g.isMissingDream && (g.status || 'active') === 'active');
   const allHabits = activeGoals.flatMap(g =>
     (g.habits || []).map(h => ({ ...h, parentId: g.id, isHabit: true, streak: h.streak || 0, goalTitle: g.title }))
   );

@@ -443,7 +443,7 @@ export const BADGE_DEFINITIONS = [
     icon: '🏗️',
     description: 'Orchestrating multiple paths to growth.',
     hint: 'Manage 10 active goals.',
-    condition: (state) => (state.goals || []).filter(g => !g.isMissingDream).length >= 10,
+    condition: (state) => (state.goals || []).filter(g => !g.isMissingDream && (g.status || 'active') === 'active').length >= 10,
   },
   {
     id: 'empire_builder',
@@ -455,7 +455,7 @@ export const BADGE_DEFINITIONS = [
     condition: (state) => {
       const completedGoalsCount = Math.max(
         (state.memories || []).length,
-        (state.goals || []).filter(g => g.progress === 100).length
+        (state.goals || []).filter(g => g.progress === 100 || g.status === 'completed').length
       );
       return completedGoalsCount >= 25;
     },

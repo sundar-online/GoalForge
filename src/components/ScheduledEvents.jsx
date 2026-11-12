@@ -1000,7 +1000,7 @@ function EventFormModal({ initialDate, editEvent, onSave, onClose, goals }) {
                       >
                         No goal linked
                       </button>
-                      {goals.filter(g => !g.isMissingDream).map(g => {
+                      {goals.filter(g => !g.isMissingDream && (g.status || 'active') === 'active').map(g => {
                         const isSelected = linkedGoalId === g.id;
                         return (
                           <button
@@ -1022,7 +1022,7 @@ function EventFormModal({ initialDate, editEvent, onSave, onClose, goals }) {
                           </button>
                         );
                       })}
-                      {goals.filter(g => !g.isMissingDream).length === 0 && (
+                      {goals.filter(g => !g.isMissingDream && (g.status || 'active') === 'active').length === 0 && (
                         <div className="px-4 py-3 text-xs text-text-muted italic">
                           No active goals available
                         </div>

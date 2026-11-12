@@ -81,7 +81,7 @@ export const analyzeStreakIntelligence = (goals, celebratedMilestones = {}) => {
   const insights = [];
   const newMilestones = {}; // { habitId: milestoneValue }
 
-  const activeGoals = (goals || []).filter(g => !g.isMissingDream);
+  const activeGoals = (goals || []).filter(g => !g.isMissingDream && (g.status || 'active') === 'active');
 
   for (const goal of activeGoals) {
     const habits = goal.habits || [];

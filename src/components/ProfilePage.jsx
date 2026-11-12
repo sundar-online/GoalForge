@@ -29,7 +29,7 @@ const getBadgeProgress = (badge, state) => {
 
   const completedGoalsCount = Math.max(
     memories.length,
-    goals.filter(g => g.progress === 100).length
+    goals.filter(g => g.progress === 100 || g.status === 'completed').length
   );
 
   switch (badge.id) {
@@ -126,7 +126,7 @@ const getBadgeProgress = (badge, state) => {
     case 'architect':
       return { current: goals.length, target: 5, unit: 'goals' };
     case 'forge_master':
-      return { current: goals.filter(g => !g.isMissingDream).length, target: 10, unit: 'active goals' };
+      return { current: goals.filter(g => !g.isMissingDream && (g.status || 'active') === 'active').length, target: 10, unit: 'active goals' };
     case 'empire_builder':
       return { current: completedGoalsCount, target: 25, unit: 'goals mastered' };
 
@@ -239,7 +239,8 @@ export const ProfilePage = () => {
     memories = [], deleteMemory,
     clearProfileData,
     sessionLogs = [],
-    taskLogs = {}
+    taskLogs = {},
+    profileStats = {}
   } = useAppContext();
   const { displayName, user } = useAuth();
   const [selectedBadge, setSelectedBadge] = useState(null);
@@ -735,6 +736,35 @@ export const ProfilePage = () => {
                   </div>
                 );
               })}
+            </div>
+          </section>
+
+          {/* Goal Performance Stats */}
+          <section className="bg-bg-card rounded-[32px] p-6 shadow-sm border border-border-light">
+            <div className="flex items-center justify-between gap-2 mb-5">
+              <div className="flex items-center gap-2">
+                <TrendingUp size={18} className="text-accent-blue" />
+                <h3 className="text-[10px] font-black text-text-muted uppercase tracking-[0.15em]">Goal Performance</h3>
+              </div>
+              <span className="text-[10px] font-black text-text-muted uppercase tracking-wider">{(profileStats?.passedGoals ?? 0) + (profileStats?.failedGoals ?? 0)} Evaluated</span>
+            </div>
+            <div className="flex flex-col gap-3.5">
+              {[
+                { label: 'Total Goals', value: profileStats?.totalGoals ?? 0, icon: <Target size={16} className="text-accent-blue" />, color: 'text-text-main' },
+                { label: 'Passed Goals', value: profileStats?.passedGoals ?? 0, icon: <Award size={16} className="text-emerald-500" />, color: 'text-emerald-500' },
+                { label: 'Failed Goals', value: profileStats?.failedGoals ?? 0, icon: <Flame size={16} className="text-rose-500" />, color: 'text-rose-500' },
+                { label: 'Average Goal Completion', value: `${profileStats?.averageGoalCompletion ?? 0}%`, icon: <TrendingUp size={16} className="text-accent-blue" />, color: 'text-accent-blue' },
+                { label: 'Total Tasks Completed', value: (profileStats?.totalTasksCompleted ?? 0).toLocaleString(), icon: <Sparkles size={16} className="text-emerald-400" />, color: 'text-emerald-400' },
+                { label: 'Total Tasks Failed', value: (profileStats?.totalTasksFailed ?? 0).toLocaleString(), icon: <Clock size={16} className="text-rose-400" />, color: 'text-rose-400' },
+              ].map((stat) => (
+                <div key={stat.label} className="flex items-center justify-between py-1 border-b border-border-light/30 last:border-b-0">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    {stat.icon}
+                    <span className="text-xs font-bold text-text-muted truncate">{stat.label}</span>
+                  </div>
+                  <span className={`text-sm font-black shrink-0 ${stat.color}`}>{stat.value}</span>
+                </div>
+              ))}
             </div>
           </section>
 

@@ -41,7 +41,7 @@ export const analyzeHabitPatterns = (goals, taskLogs) => {
     .sort((a, b) => a.date > b.date ? 1 : -1)
     .slice(-21);
 
-  const activeGoals = (goals || []).filter(g => !g.isMissingDream);
+  const activeGoals = (goals || []).filter(g => !g.isMissingDream && (g.status || 'active') === 'active');
   const allHabits = activeGoals.flatMap(g => g.habits || []);
 
   // ── 1. Best & Worst Day of the Week ──────────────────────────────────────
