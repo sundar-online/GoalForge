@@ -10,7 +10,7 @@
  * Run frequency: Every 6 hours
  */
 
-import { TODAY, addDays } from '../dateUtils';
+import { TODAY } from '../dateUtils';
 import { makeInsight } from './insightSchema';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────

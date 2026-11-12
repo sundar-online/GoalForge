@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence } from 'framer-motion';
 import { useGoals, useTasks, useFocus, useGamification } from '../context/AppContext';
 import {
   Play, Pause, RotateCcw, Target, Award, Zap, Shield, TrendingUp,
@@ -9,10 +9,7 @@ import {
 import { TODAY } from '../utils/dateUtils';
 import {
   scheduleTimerCompletionNotification,
-  cancelTimerNotification,
-  scheduleLocalNotification,
-  scheduleReminder,
-  cancelReminder
+  cancelTimerNotification
 } from '../utils/notificationUtils';
 
 // ── Audio Themes Synthesizer ──────────────────────────────────────────

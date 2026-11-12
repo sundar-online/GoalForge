@@ -235,7 +235,7 @@ export const ProfilePage = () => {
   const {
     xpData: rawXpData, goals, tasks, notes,
     focusTime, focusHistory, accuracy,
-    disciplineScore, allHabits,
+    disciplineScore,
     memories = [], deleteMemory,
     clearProfileData,
     sessionLogs = [],

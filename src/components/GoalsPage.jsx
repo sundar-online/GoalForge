@@ -578,7 +578,7 @@ export const GoalsPage = () => {
   };
 
   // Smart duplication logic
-  const duplicateGoal = (goal) => {
+  const _duplicateGoal = (goal) => {
     let baseTitle = goal.title;
     const match = goal.title.match(/(.+) \(Copy \d+\)$/);
     if (match) {
@@ -1311,7 +1311,7 @@ export const GoalsPage = () => {
                   const isOpen = activeExpandedGoalIds.includes(goal.id);
                   const dailyProgress = calculateGoalDailyProgress(goal);
                   const doneToday = isGoalDoneToday(goal);
-                  const isFirstIncomplete = firstIncompleteGoal && firstIncompleteGoal.id === goal.id;
+                  const _isFirstIncomplete = firstIncompleteGoal && firstIncompleteGoal.id === goal.id;
                   const isFinalized = isGoalFinalized(goal);
                   const isExpired = !isFinalized && isGoalExpired(goal, TODAY());
                   const finalEval = isFinalized ? getGoalFinalEvaluation(goal) : null;

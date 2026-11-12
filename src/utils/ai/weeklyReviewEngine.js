@@ -14,9 +14,6 @@
 
 import { TODAY, addDays } from '../dateUtils';
 
-const logAccuracy = (log) =>
-  log && log.total_tasks > 0 ? log.completed_tasks / log.total_tasks : 0;
-
 /**
  * @param {object[]} goals
  * @param {object} taskLogs — { [dateStr]: logObject }

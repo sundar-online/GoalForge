@@ -146,7 +146,7 @@ export function getDayFocusData(date, sessionLogs, focusHistory) {
 
 // ── Streak Analysis ─────────────────────────────────────────────────────────
 
-export function getDayStreakImpact(date, taskLogs, goals) {
+export function getDayStreakImpact(date, taskLogs, _goals) {
   const log = taskLogs?.[date];
   const wasActiveDay = (log?.completed_tasks ?? 0) > 0;
 

@@ -1,4 +1,4 @@
-import { TODAY, addDays, diffDays } from './dateUtils';
+import { TODAY } from './dateUtils';
 
 /**
  * AI-Driven Emotional & Behavioral Coaching Engine
@@ -34,7 +34,6 @@ const groupByWeekday = (logs) => {
 export const analyzeUserBehavior = (goals, tasks, taskLogs, focusTime) => {
   const insights = [];
   const today = TODAY();
-  const todayDayName = getTodayDayName();
 
   // Use last 21 days of logs for richer, trend-based analysis
   const allLogs = Object.values(taskLogs || {})

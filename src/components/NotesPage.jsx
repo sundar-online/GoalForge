@@ -56,7 +56,7 @@ const stripHtml = (html) => {
         if (!isNaN(num)) {
           return String.fromCharCode(num);
         }
-      } catch (e) {
+      } catch {
         // ignore
       }
     }
@@ -261,7 +261,7 @@ export const NotesPage = () => {
     updateNote(activeNote.id, { title, updated_at: updated.updated_at });
   };
 
-  const handleUpdateContent = (content) => {
+  const _handleUpdateContent = (content) => {
     const updated = { ...activeNote, content, updated_at: new Date().toISOString() };
     setActiveNote(updated);
     updateNote(activeNote.id, { content, updated_at: updated.updated_at });

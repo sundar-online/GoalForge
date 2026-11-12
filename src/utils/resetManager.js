@@ -11,7 +11,7 @@
  * All functions are pure — no React imports, no side effects.
  */
 
-import { addDays, parseLocalDate } from './dateUtils';
+import { parseLocalDate } from './dateUtils';
 import {
   calculateStreakFromHistory,
   calculateConsecutiveMissedDays,

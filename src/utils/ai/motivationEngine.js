@@ -132,7 +132,7 @@ export const getSmartSuggestion = (accuracy) => {
  * @param {number} accuracy — 0-100
  * @returns {object[]} insights
  */
-export const analyzeMotivation = (goals, accuracy) => {
+export const analyzeMotivation = (goals, _accuracy) => {
   const insights = [];
 
   const activeGoals = (goals || []).filter(g => !g.isMissingDream && (g.status || 'active') === 'active');

@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence } from 'framer-motion';
 import { CheckCircle2, Target, Brain, X, CheckSquare, XCircle, Clock, BarChart2, TrendingUp, Zap, Sparkles } from 'lucide-react';
 import {
   getTaskHeatmapColor,
@@ -13,7 +13,6 @@ import {
   generateDayInsight,
 } from '../utils/heatmapAnalytics';
 import { generateHeatmapData } from '../utils/heatmapUtils';
-import { TODAY } from '../utils/dateUtils';
 
 // ── Tab config ──────────────────────────────────────────────────────────────
 
@@ -367,7 +366,6 @@ const DayDetailModal = ({ date, isToday, onClose, taskLogs, goals, sessionLogs, 
 export const ActivityHeatmap = ({ taskLogs, goals, sessionLogs, focusHistory, accuracy }) => {
   const [activeTab, setActiveTab] = useState('tasks');
   const [selectedDay, setSelectedDay] = useState(null);
-  const today = TODAY();
   const cells = useMemo(() => generateHeatmapData(30), []);
 
   const cellColors = useMemo(() => {

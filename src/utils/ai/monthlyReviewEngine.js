@@ -11,10 +11,7 @@
  * Run frequency: Monthly
  */
 
-import { TODAY, addDays, diffDays } from '../dateUtils';
-
-const logAccuracy = (log) =>
-  log && log.total_tasks > 0 ? log.completed_tasks / log.total_tasks : 0;
+import { TODAY, addDays } from '../dateUtils';
 
 /**
  * @param {object[]} goals
@@ -22,23 +19,12 @@ const logAccuracy = (log) =>
  * @param {string|null} userCreatedAt — ISO date string of account creation (for data sufficiency)
  * @returns {object} monthlyReview — structured review object or placeholder
  */
-export const generateMonthlyReview = (goals, taskLogs, userCreatedAt = null) => {
+export const generateMonthlyReview = (goals, taskLogs, _userCreatedAt = null) => {
   const today = TODAY();
 
   // ── Data Sufficiency Check ────────────────────────────────────────────────
   const logDates = Object.keys(taskLogs || {}).filter(d => d < today).sort();
   const daysWithData = logDates.length;
-
-  // Determine days since account creation (or earliest log)
-  let daysSinceStart = daysWithData;
-  if (userCreatedAt) {
-    try {
-      const createdDate = typeof userCreatedAt === 'string'
-        ? userCreatedAt.split('T')[0]
-        : today;
-      daysSinceStart = diffDays(today, createdDate);
-    } catch { /* use daysWithData */ }
-  }
 
   if (daysWithData < 14) {
     const daysNeeded = Math.max(0, 30 - daysWithData);

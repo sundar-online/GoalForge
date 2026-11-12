@@ -2,14 +2,11 @@ import React, { createContext, useContext, useState, useEffect, useMemo, useCall
 import * as db from '../lib/firebaseDb';
 import { clearWriteCache } from '../lib/firebaseDb';
 import { fireDb } from '../lib/firebase';
-import { onSnapshot, query, collection, doc, orderBy, getDocs } from 'firebase/firestore';
+import { onSnapshot, query, collection, doc, orderBy } from 'firebase/firestore';
 import { useAuth } from './AuthContext';
-import { TODAY, addDays, diffDays, parseLocalDate } from '../utils/dateUtils';
+import { TODAY, addDays } from '../utils/dateUtils';
 import {
-  isGoalDoneToday,
-  isTaskDone,
   isHabitDoneToday,
-  calculateAccuracy,
   calculateGoalDailyProgress,
   calculateDisciplineScore,
   getUserLevel,
@@ -41,9 +38,8 @@ import {
 // ── Service modules (reset / analytics / recurring task orchestration) ────
 import { shouldRunReset, computeHabitResetPayload, computeGoalResetPayload, computeTaskResetPayload } from '../utils/resetManager';
 import { buildTaskLogSummary, hasTaskLogChanged } from '../utils/analyticsEngine';
-import { getOrBuildRecDates, buildRecurringPayload, getRecId } from '../utils/recurringTaskEngine';
 
-import { XP_SOURCES, getLevelFromXP, evaluateBadges, getNewlyEarnedBadges, getBadgeById } from '../utils/gamificationEngine';
+import { XP_SOURCES, getLevelFromXP, evaluateBadges, getBadgeById } from '../utils/gamificationEngine';
 import {
   scheduleLocalNotification,
   scheduleReminder,
@@ -53,11 +49,6 @@ import {
   initNotificationChannel,
   setupNotificationListeners,
 } from '../utils/notificationUtils';
-import {
-  analyzeUserBehavior,
-  generateRecoveryStrategies,
-  getSmartSuggestions
-} from '../utils/aiAnalysisEngine';
 
 
 const AppContext = createContext();
@@ -449,16 +440,6 @@ export const AppProvider = ({ children }) => {
   }, [goals]);
 
   const allHabits = useMemo(() => (sortedGoals || []).filter(isGoalActive).flatMap(g => g.habits || []), [sortedGoals]);
-  const todayGoals = useMemo(() => (sortedGoals || []).filter(g => {
-    if (!isGoalActive(g)) return false;
-    const habits = g.habits || [];
-    if (habits.length === 0) return false;
-    return habits.some(isHabitScheduledToday);
-  }), [sortedGoals]);
-
-  const goalsDone = useMemo(() => (todayGoals || []).filter(g => isGoalDoneToday(g)).length, [todayGoals]);
-  const tasksDone = useMemo(() => (todayTasks || []).filter(t => isTaskDone(t)).length, [todayTasks]);
-
   const todayHabits = useMemo(() => {
     return (sortedGoals || [])
       .filter(isGoalActive)
@@ -2060,7 +2041,6 @@ export const AppProvider = ({ children }) => {
     };
 
     // Recalculate goal-level variables dynamically
-    const today = TODAY();
     const updatedGoalDates = recalculateGoalCompletedDates(updatedGoal);
     const goalSchedule = getGoalScheduledDays(updatedGoal);
     // G5 fix: calculateGoalStreak now returns { current, best }

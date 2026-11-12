@@ -361,16 +361,10 @@ export const Dashboard = ({ setView }) => {
     focusTime, focusHistory, taskLogs,
     sessionLogs,
     disciplineScore, insights,
-    theme, toggleTheme, setTheme, themeSource, loading, weeklyReport, syncError, retrySync,
+    theme, setTheme, themeSource, loading, weeklyReport, syncError, retrySync,
     xpData: rawXpData, currentLevelInfo: rawLevelInfo,
     tasks,
-    setFocusGoal,
-    settings,
-    updateAiSettings,
-    isAiAnalyzing,
-    triggerNeuralAudit,
-    setGoalsAction,
-    addQuickThought
+    setFocusGoal
   } = useAppContext();
 
   const focusGoal = goals.find(g => g.isFocusGoal && isGoalActive(g));

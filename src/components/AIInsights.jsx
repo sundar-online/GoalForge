@@ -6,7 +6,7 @@ import {
   ChevronRight, AlertTriangle, CheckCircle2, BarChart2, RefreshCw,
   Award, Clock
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence } from 'framer-motion';
 
 // ── Card type → visual config ────────────────────────────────────────────────
 const CARD_CONFIG = {

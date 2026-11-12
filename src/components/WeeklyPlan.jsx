@@ -5,8 +5,8 @@ import {
   Target, Zap, Flame, Pencil, X, CheckCircle2, Circle,
   Clock, Layers, Calendar, Sparkles
 } from 'lucide-react';
-import { isHabitScheduledToday, isTaskDone, isHabitDoneToday } from '../utils/calculationUtils';
-import { TODAY, addDays } from '../utils/dateUtils';
+import { isTaskDone, isHabitDoneToday } from '../utils/calculationUtils';
+import { TODAY } from '../utils/dateUtils';
 
 // ── Helpers ────────────────────────────────────────────────
 const DAY_ABBRS   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
@@ -235,7 +235,7 @@ const DayColumn = ({ dateStr, dayAbbr, dayNum, monthName, isToday, goals, tasks,
 
 // ── Main Component ──────────────────────────────────────────
 export const WeeklyPlan = () => {
-  const { goals, tasks, addTask, taskLogs, disciplineScore, accuracy, weeklyReport, settings, saveWeeklyIntention } = useAppContext();
+  const { goals, tasks, addTask, taskLogs, disciplineScore, weeklyReport, settings, saveWeeklyIntention } = useAppContext();
 
   const [weekOffset, setWeekOffset] = useState(0);
   const [editingIntention, setEditingIntention] = useState(false);
@@ -402,7 +402,7 @@ export const WeeklyPlan = () => {
 
       {/* 7-Day Grid */}
       <div className="grid grid-cols-1 min-[480px]:grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
-        {weekDays.map((d, idx) => {
+        {weekDays.map((d, _idx) => {
           const ds = dateToStr(d);
           const dayAbbr = DAY_ABBRS[d.getDay()];
           const dayNum = d.getDate();

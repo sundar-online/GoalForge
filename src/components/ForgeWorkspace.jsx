@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { useAppContext, useGoals } from '../context/AppContext';
+import { useAppContext } from '../context/AppContext';
 import {
   Sparkles, Brain, Bot, Zap, Clock, Target,
   CheckCircle2, CalendarDays, Sliders, Wrench,
   ChevronLeft, Plus, Flame, Trash2, Cpu,
   TrendingUp, TrendingDown, Activity, AlertCircle
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence } from 'framer-motion';
 import AIInsights from './AIInsights';
 
 // Subcomponent for Capturing sparks
@@ -107,8 +107,8 @@ const WorkspaceSparkForm = ({ addQuickThought, quickThoughts, deleteQuickThought
 
 export const ForgeWorkspace = ({ setView }) => {
   const {
-    goals, accuracy, alerts,
-    allHabits, focusTime,
+    accuracy, alerts,
+    allHabits,
     disciplineScore, settings,
     updateAiSettings, isAiAnalyzing,
     triggerNeuralAudit, setGoalsAction,
@@ -165,15 +165,15 @@ export const ForgeWorkspace = ({ setView }) => {
           { label: 'Smart Alerts', val: `${alerts.length} Active`, color: alerts.length > 0 ? 'text-amber-400' : 'text-emerald-400', bg: alerts.length > 0 ? 'bg-amber-500/10' : 'bg-emerald-500/10', icon: AlertCircle },
           { label: 'Habit Threads', val: allHabits.length, color: 'text-indigo-400', bg: 'bg-indigo-500/10', icon: Brain },
           { label: 'Accuracy Score', val: `${accuracy}%`, color: 'text-purple-400', bg: 'bg-purple-500/10', icon: Target },
-        ].map(({ label, val, color, bg, icon: Icon }) => (
+        ].map(({ label, val, color, bg, icon: _Icon }) => { const CardIcon = _Icon; return (
           <div key={label} className="bg-bg-card rounded-[22px] p-4 border border-border-light shadow-sm flex flex-col items-center gap-2 text-center">
             <div className={`w-9 h-9 rounded-xl ${bg} flex items-center justify-center`}>
-              <Icon size={17} className={color} />
+              <CardIcon size={17} className={color} />
             </div>
             <p className={`text-2xl font-black tracking-tighter leading-none ${color}`}>{val}</p>
             <p className="text-[9px] font-black text-text-muted uppercase tracking-widest">{label}</p>
           </div>
-        ))}
+        ); })}
       </div>
 
       {/* Two-column layout grid */}

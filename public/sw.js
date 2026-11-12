@@ -3,7 +3,7 @@
 const CACHE_VERSION = 'v20260602-1';
 const CACHE_NAME = `goalforge-${CACHE_VERSION}`;
 
-self.addEventListener('install', (event) => {
+self.addEventListener('install', () => {
 
   // Skip waiting immediately — do not wait for old SW to be unregistered
   self.skipWaiting();
@@ -43,7 +43,7 @@ self.addEventListener('push', (event) => {
   if (event.data) {
     try {
       data = event.data.json();
-    } catch(e) {
+    } catch {
       data = { body: event.data.text() };
     }
   }

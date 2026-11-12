@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence } from 'framer-motion';
 import {
   Target, Flame, Trophy, TrendingUp, TrendingDown,
   CheckCircle2, XCircle, BarChart2, Sparkles, X,
@@ -8,7 +8,7 @@ import {
 import { generateHeatmapData } from '../utils/heatmapUtils';
 import { getGoalHeatmapColor, getDayGoalData, generateDayInsight, getDayFocusData, getDayTaskData, getDayStreakImpact } from '../utils/heatmapAnalytics';
 import { calculateGoalStreak, getGoalScheduledDays } from '../utils/calculationUtils';
-import { TODAY, addDays, parseLocalDate } from '../utils/dateUtils';
+import { TODAY, addDays } from '../utils/dateUtils';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -125,7 +125,7 @@ const HabitRow = ({ habit, done }) => (
   </div>
 );
 
-const GoalDayModal = ({ date, isToday, onClose, goals, taskLogs, sessionLogs, focusHistory, accuracy }) => {
+const GoalDayModal = ({ date, isToday, onClose, goals, taskLogs, sessionLogs, focusHistory, accuracy: _accuracy }) => {
   const [expandedGoal, setExpandedGoal] = useState(null);
 
   const goalData = useMemo(() => getDayGoalData(date, goals), [date, goals]);
@@ -139,7 +139,6 @@ const GoalDayModal = ({ date, isToday, onClose, goals, taskLogs, sessionLogs, fo
 
   const completedGoals = goalData.filter(g => g.goalCompleted).length;
   const totalGoals = goalData.length;
-  const displayAccuracy = isToday ? accuracy : taskData.accuracy;
 
   // Goal-level accuracy for this day
   const goalDayAccuracy = totalGoals > 0
@@ -351,7 +350,6 @@ export const GoalConsistencyHeatmap = ({
   accuracy,
 }) => {
   const [selectedDay, setSelectedDay] = useState(null);
-  const today = TODAY();
   const cells = useMemo(() => generateHeatmapData(30), []);
 
   // ── Stats ────────────────────────────────────────────────────────────────

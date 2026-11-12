@@ -17,7 +17,7 @@ export const AuthPage = () => {
   // Combine local + context errors — context error wins (it has Firebase error codes)
   const displayError = contextAuthError || authError;
 
-  const isAndroidAPK = typeof window !== 'undefined' && (
+  const _isAndroidAPK = typeof window !== 'undefined' && (
     !!window.Capacitor || 
     navigator.userAgent.includes('wv') || 
     (navigator.userAgent.includes('Android') && !navigator.userAgent.includes('Chrome'))
