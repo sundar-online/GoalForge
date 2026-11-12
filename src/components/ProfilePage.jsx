@@ -231,7 +231,7 @@ const CATEGORY_METADATA = {
   legendary: { title: 'Hidden Legendary', icon: '🌟', description: 'Secret elite accomplishments' }
 };
 
-export const ProfilePage = () => {
+export const ProfilePage = ({ setView }) => {
   const {
     xpData: rawXpData, goals, tasks, notes,
     focusTime, focusHistory, accuracy,
@@ -240,7 +240,9 @@ export const ProfilePage = () => {
     clearProfileData,
     sessionLogs = [],
     taskLogs = {},
-    profileStats = {}
+    profileStats = {},
+    disciplineLockState = {},
+    disciplineDecision = {}
   } = useAppContext();
   const { displayName, user } = useAuth();
   const [selectedBadge, setSelectedBadge] = useState(null);
@@ -810,6 +812,26 @@ export const ProfilePage = () => {
               <h3 className="text-[10px] font-black text-text-muted uppercase tracking-[0.15em]">App Settings</h3>
             </div>
             
+            <div className="space-y-3">
+              <button
+                type="button"
+                onClick={() => setView?.('settings')}
+                className="w-full flex items-center justify-between p-4 bg-bg-input hover:bg-bg-input/80 rounded-2xl border border-border-light hover:border-accent-blue/40 transition-all text-left"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-9 h-9 rounded-xl bg-accent-blue/10 text-accent-blue flex items-center justify-center shrink-0">
+                    <Lock size={16} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-black text-text-main">Discipline Lock</p>
+                    <p className="text-[10px] font-bold text-text-muted mt-0.5 truncate">
+                      {disciplineLockState?.enabled ? (disciplineDecision?.statusLabel || 'Active') : 'Disabled (Settings → Productivity)'}
+                    </p>
+                  </div>
+                </div>
+                <ChevronRight size={16} className="text-text-muted shrink-0" />
+              </button>
+
             <div className="flex items-center justify-between p-4 bg-bg-input rounded-2xl border border-border-light">
               <div>
                 <p className="text-sm font-black text-text-main">Smart Notifications</p>
@@ -824,6 +846,7 @@ export const ProfilePage = () => {
               >
                 <div className={`w-4 h-4 rounded-full bg-white absolute top-1 transition-transform ${pushPerm === 'granted' ? 'translate-x-7' : 'translate-x-1'}`} aria-hidden="true" />
               </button>
+            </div>
             </div>
           </section>
 

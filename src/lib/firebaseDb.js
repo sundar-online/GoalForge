@@ -785,6 +785,7 @@ export async function fetchUserSettings(userId) {
       lastReset: data.last_reset || null,
       dailyResetProcessed: data.daily_reset_processed || '',
       aiSettings: data.ai_settings || null,
+      disciplineLock: data.discipline_lock || null,
     };
   } catch (err) {
     log('fetchUserSettings', err);
@@ -806,6 +807,9 @@ export async function upsertUserSettings(userId, settings) {
     }),
     // Fix: persist weeklyIntentions so they survive refresh and sync cross-device
     weekly_intentions: settings.weeklyIntentions || {},
+    ...(settings.disciplineLock !== undefined && {
+      discipline_lock: settings.disciplineLock
+    }),
     updated_at: new Date().toISOString(),
   };
   const pathKey = `users/${userId}/settings/preferences`;
@@ -1201,6 +1205,15 @@ export async function clearUserDataDb(userId) {
       theme: currentTheme,
       focus_time_today: 0,
       last_reset: '',
+      discipline_lock: {
+        enabled: false,
+        targetApp: 'com.instagram.android',
+        lastSyncedAt: null,
+        lastEvaluatedDate: null,
+        isLocked: false,
+        totalRequiredTasks: 0,
+        completedRequiredTasks: 0,
+      },
       updated_at: new Date().toISOString()
     };
     await setDoc(settingsRef, settingsPayload, { merge: true });

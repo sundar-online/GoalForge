@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   Target, Flame, Trophy, TrendingUp, TrendingDown,
   CheckCircle2, XCircle, BarChart2, Sparkles, X,

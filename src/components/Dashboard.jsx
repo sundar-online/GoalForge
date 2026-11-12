@@ -4,7 +4,7 @@ import { calculateGoalDailyProgress, isHabitDoneToday, calculateOverallProgress,
 import { TODAY } from '../utils/dateUtils';
 import { BADGE_DEFINITIONS } from '../utils/gamificationEngine';
 import { useAuth } from '../context/AuthContext';
-import { AlertTriangle, AlertCircle, TrendingUp, TrendingDown, CheckCircle2, Clock, Zap, LogOut, Moon, Sun, Monitor, Sparkles, Trophy, ChevronRight, Target, Award, CalendarDays, Brain, Plus, Trash2, ChevronDown, ChevronUp, Flame, Star, Calendar } from 'lucide-react';
+import { AlertTriangle, AlertCircle, TrendingUp, TrendingDown, CheckCircle2, Clock, Zap, LogOut, Moon, Sun, Monitor, Sparkles, Trophy, ChevronRight, Target, Award, CalendarDays, Brain, Plus, Trash2, ChevronDown, ChevronUp, Flame, Star, Calendar, Sliders } from 'lucide-react';
 // eslint-disable-next-line no-unused-vars
 import { motion, AnimatePresence } from 'framer-motion';
 import { ActivityHeatmap } from './ActivityHeatmap';
@@ -652,6 +652,9 @@ export const Dashboard = ({ setView }) => {
                 </div>
                 <button onClick={() => { setView('profile'); setShowSignOut(false); }} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-text-main hover:bg-bg-input transition-colors font-bold text-sm mb-1">
                   <Award size={16} /> Profile
+                </button>
+                <button onClick={() => { setView('settings'); setShowSignOut(false); }} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-text-main hover:bg-bg-input transition-colors font-bold text-sm mb-1">
+                  <Sliders size={16} /> Settings
                 </button>
                 <button onClick={signOut} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-500 hover:bg-red-500/10 transition-colors font-bold text-sm">
                   <LogOut size={16} /> Sign Out

@@ -35,6 +35,21 @@ import {
   evaluateGoalPerformance,
   reconcileProfileStats
 } from '../utils/goalEvaluation';
+import {
+  DEFAULT_DISCIPLINE_LOCK_SETTINGS,
+  evaluateDailyGoalProgress,
+  computeDisciplineLockDecision
+} from '../utils/dailyGoalCompletionService';
+import {
+  getDisciplinePermissionStatus,
+  requestDisciplinePermissions,
+  disableDisciplineBlocking,
+  addDisciplineLockListener
+} from '../services/disciplineLockService';
+import {
+  syncDisciplineLockState,
+  getDisciplineSyncSignature
+} from '../services/disciplineLockSyncService';
 // ── Service modules (reset / analytics / recurring task orchestration) ────
 import { shouldRunReset, computeHabitResetPayload, computeGoalResetPayload, computeTaskResetPayload } from '../utils/resetManager';
 import { buildTaskLogSummary, hasTaskLogChanged } from '../utils/analyticsEngine';
@@ -322,9 +337,26 @@ export const AppProvider = ({ children }) => {
       aiSettings: {
         ...DEFAULT_AI_SETTINGS,
         ...(s.aiSettings || {})
+      },
+      disciplineLock: {
+        ...DEFAULT_DISCIPLINE_LOCK_SETTINGS,
+        ...(s.disciplineLock || {})
       }
     };
   });
+
+  const [disciplinePermissionStatus, setDisciplinePermissionStatus] = useState({
+    isNativeSupported: false,
+    accessibilityEnabled: false,
+    usageStatsGranted: false,
+    overlayGranted: false,
+    batteryOptimizationIgnored: false,
+    instagramInstalled: false,
+    allCriticalGranted: false
+  });
+  const [disciplineSyncing, setDisciplineSyncing] = useState(false);
+  const [showDisciplineLockPreview, setShowDisciplineLockPreview] = useState(false);
+  const lastDisciplineSyncSigRef = useRef('');
 
   // AI Insights State
   const [aiInsights, setAiInsights] = useState([]);
@@ -600,6 +632,8 @@ export const AppProvider = ({ children }) => {
       setSmartSuggestions(null);
       setDeletedGoalIds([]);
       setDeletedHabitIds([]);
+
+      disableDisciplineBlocking().catch(() => {});
 
       // Clear local storage keys on user logout to prevent data leakage between sessions.
       // Theme preference is intentionally re-saved after clearing (see localStorage effect).
@@ -1182,6 +1216,9 @@ export const AppProvider = ({ children }) => {
               // Fix: read weeklyIntentions back from Firestore so cross-device edits are picked up.
               // Falls back to prev.weeklyIntentions (local) if the field doesn't exist yet in DB.
               weeklyIntentions: s.weekly_intentions || prev.weeklyIntentions || {},
+              disciplineLock: s.discipline_lock
+                ? { ...DEFAULT_DISCIPLINE_LOCK_SETTINGS, ...s.discipline_lock }
+                : (prev.disciplineLock || DEFAULT_DISCIPLINE_LOCK_SETTINGS),
             };
           });
         } else {
@@ -1198,7 +1235,8 @@ export const AppProvider = ({ children }) => {
             weeklyIntentions: {},
             lastPushDate: '',
             dailyResetProcessed: '',
-            aiSettings: DEFAULT_AI_SETTINGS
+            aiSettings: DEFAULT_AI_SETTINGS,
+            disciplineLock: DEFAULT_DISCIPLINE_LOCK_SETTINGS
           });
         }
       }, (error) => {
@@ -1450,6 +1488,24 @@ export const AppProvider = ({ children }) => {
     }, 60000);
     return () => clearInterval(itv);
   }, [currentDate, accuracy, settings, user]);
+
+  useEffect(() => {
+    const checkDateChange = () => {
+      const now = TODAY();
+      setCurrentDate(prev => (prev !== now ? now : prev));
+    };
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        checkDateChange();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('focus', checkDateChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('focus', checkDateChange);
+    };
+  }, []);
 
   // setTheme: the canonical way to change the theme. source is 'manual' or 'system'.
   // - 'manual': user picked a specific theme; never auto-override until changed again.
@@ -3547,7 +3603,8 @@ export const AppProvider = ({ children }) => {
         dismissedInsights: [],
         weeklyIntentions: {},
         lastPushDate: '',
-        aiSettings: DEFAULT_AI_SETTINGS
+        aiSettings: DEFAULT_AI_SETTINGS,
+        disciplineLock: DEFAULT_DISCIPLINE_LOCK_SETTINGS
       }));
 
       // 3. Perform Firestore delete
@@ -3927,6 +3984,164 @@ export const AppProvider = ({ children }) => {
     });
   }, [user]);
 
+  // ── Discipline Lock System ────────────────────────────────────────────────
+  const disciplineLockState = useMemo(() => ({
+    ...DEFAULT_DISCIPLINE_LOCK_SETTINGS,
+    ...(settings.disciplineLock || {}),
+  }), [settings.disciplineLock]);
+
+  const disciplineProgress = useMemo(
+    () => evaluateDailyGoalProgress(sortedGoals, currentDate),
+    [sortedGoals, currentDate]
+  );
+
+  const disciplineDecision = useMemo(
+    () => computeDisciplineLockDecision(disciplineLockState.enabled, disciplineProgress),
+    [disciplineLockState.enabled, disciplineProgress]
+  );
+
+  const refreshDisciplinePermissions = useCallback(async () => {
+    const status = await getDisciplinePermissionStatus();
+    setDisciplinePermissionStatus(status);
+    return status;
+  }, []);
+
+  const requestDisciplineLockPermission = useCallback(async (type = 'all') => {
+    const res = await requestDisciplinePermissions(type);
+    await refreshDisciplinePermissions();
+    return res;
+  }, [refreshDisciplinePermissions]);
+
+  const syncDisciplineLockNow = useCallback(async ({ forceFirestore = false, transitionAction = null, overrideEnabled = null } = {}) => {
+    const effectiveSettings = overrideEnabled !== null
+      ? {
+          ...settingsRef.current,
+          disciplineLock: {
+            ...DEFAULT_DISCIPLINE_LOCK_SETTINGS,
+            ...(settingsRef.current.disciplineLock || {}),
+            enabled: !!overrideEnabled,
+          },
+        }
+      : settingsRef.current;
+
+    setDisciplineSyncing(true);
+    try {
+      const result = await syncDisciplineLockState({
+        userId: user?.id || null,
+        settings: effectiveSettings,
+        goals: sortedGoals,
+        dateStr: currentDate,
+        previousSignature: lastDisciplineSyncSigRef.current,
+        forceFirestore,
+        transitionAction,
+      });
+      lastDisciplineSyncSigRef.current = result.nextSignature;
+      setSettings(prev => {
+        const cur = prev.disciplineLock || DEFAULT_DISCIPLINE_LOCK_SETTINGS;
+        if (getDisciplineSyncSignature(cur) === getDisciplineSyncSignature(result.nextDisciplineSettings) && cur.lastSyncedAt) {
+          return prev;
+        }
+        return {
+          ...prev,
+          disciplineLock: result.nextDisciplineSettings,
+        };
+      });
+      return result;
+    } finally {
+      setDisciplineSyncing(false);
+    }
+  }, [user, sortedGoals, currentDate]);
+
+  const enableDisciplineLock = useCallback(async () => {
+    await refreshDisciplinePermissions();
+    setSettings(prev => ({
+      ...prev,
+      disciplineLock: {
+        ...DEFAULT_DISCIPLINE_LOCK_SETTINGS,
+        ...(prev.disciplineLock || {}),
+        enabled: true,
+      },
+    }));
+    return syncDisciplineLockNow({
+      forceFirestore: true,
+      transitionAction: 'enable',
+      overrideEnabled: true,
+    });
+  }, [refreshDisciplinePermissions, syncDisciplineLockNow]);
+
+  const disableDisciplineLock = useCallback(async () => {
+    setSettings(prev => ({
+      ...prev,
+      disciplineLock: {
+        ...DEFAULT_DISCIPLINE_LOCK_SETTINGS,
+        ...(prev.disciplineLock || {}),
+        enabled: false,
+        isLocked: false,
+      },
+    }));
+    return syncDisciplineLockNow({
+      forceFirestore: true,
+      transitionAction: 'disable',
+      overrideEnabled: false,
+    });
+  }, [syncDisciplineLockNow]);
+
+  // Refresh permissions on mount, app resume, and native listener events
+  useEffect(() => {
+    refreshDisciplinePermissions();
+
+    const handleResume = () => {
+      const now = TODAY();
+      setCurrentDate(prev => (prev !== now ? now : prev));
+      refreshDisciplinePermissions();
+    };
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') handleResume();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('focus', handleResume);
+
+    let listenerHandles = [];
+    Promise.resolve(addDisciplineLockListener('permissionStatusChanged', () => {
+      refreshDisciplinePermissions();
+    })).then(h => { if (h) listenerHandles.push(h); }).catch(() => {});
+
+    Promise.resolve(addDisciplineLockListener('lockStateChanged', () => {
+      handleResume();
+    })).then(h => { if (h) listenerHandles.push(h); }).catch(() => {});
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('focus', handleResume);
+      listenerHandles.forEach(h => h?.remove?.());
+    };
+  }, [refreshDisciplinePermissions]);
+
+  // Synchronize Discipline Lock state whenever goals/tasks/date/enabled change
+  useEffect(() => {
+    if (loading) return;
+    const isEnabled = !!disciplineLockState.enabled;
+    const targetSig = [
+      isEnabled ? '1' : '0',
+      disciplineDecision.shouldLockInstagram ? '1' : '0',
+      disciplineProgress.date,
+      disciplineProgress.completedRequiredTasks,
+      disciplineProgress.totalRequiredTasks,
+    ].join('|');
+
+    if (!isEnabled) {
+      if (lastDisciplineSyncSigRef.current.startsWith('1|')) {
+        syncDisciplineLockNow({ transitionAction: 'disable' });
+      }
+      return;
+    }
+
+    if (lastDisciplineSyncSigRef.current !== targetSig) {
+      syncDisciplineLockNow({ transitionAction: null });
+    }
+  }, [loading, disciplineLockState.enabled, disciplineDecision.shouldLockInstagram, disciplineProgress, syncDisciplineLockNow]);
+
   const goalsValue = {
     goals: sortedGoals, addGoal, updateGoal, editGoalSystem, deleteGoal, extendGoalDeadline,
     continueExpiredGoal, finalizeExpiredGoal, expiredGoals,
@@ -3947,6 +4162,10 @@ export const AppProvider = ({ children }) => {
     focusTime, focusHistory, addFocusTime, addFocusTimeToHabit,
     sessionLogs, logFocusSession,
     theme, toggleTheme, setTheme, themeSource: settings.themeSource || 'manual', settings, saveWeeklyIntention,
+    disciplineLockState, disciplineProgress, disciplineDecision, disciplinePermissionStatus, disciplineSyncing,
+    enableDisciplineLock, disableDisciplineLock, refreshDisciplinePermissions,
+    requestDisciplineLockPermission, syncDisciplineLockNow,
+    showDisciplineLockPreview, setShowDisciplineLockPreview,
     loading, syncError, retrySync: syncFromCloud
   };
 
@@ -4001,6 +4220,10 @@ export const AppProvider = ({ children }) => {
     settings,
     saveWeeklyIntention,
     updateAiSettings,
+    disciplineLockState, disciplineProgress, disciplineDecision, disciplinePermissionStatus, disciplineSyncing,
+    enableDisciplineLock, disableDisciplineLock, refreshDisciplinePermissions,
+    requestDisciplineLockPermission, syncDisciplineLockNow,
+    showDisciplineLockPreview, setShowDisciplineLockPreview,
     isAiAnalyzing,
     triggerNeuralAudit,
     goalsAction,

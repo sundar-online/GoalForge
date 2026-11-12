@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { AppProvider, useAppContext } from './context/AppContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -6,6 +7,7 @@ import { LevelUpModal } from './components/LevelUpModal';
 import { BadgeToast } from './components/BadgeToast';
 import { GoalCompletionModal } from './components/GoalCompletionModal';
 import { ExpiredGoalModal } from './components/ExpiredGoalModal';
+import { DisciplineLockScreen } from './components/DisciplineLockScreen';
 import { registerServiceWorker } from './utils/notificationUtils';
 import ErrorBoundary from './components/ErrorBoundary';
 
@@ -20,6 +22,7 @@ const ProfilePage = React.lazy(() => import('./components/ProfilePage').then(m =
 const WeeklyPlan = React.lazy(() => import('./components/WeeklyPlan').then(m => ({ default: m.WeeklyPlan })));
 const ScheduledEvents = React.lazy(() => import('./components/ScheduledEvents').then(m => ({ default: m.ScheduledEvents })));
 const ForgeWorkspace = React.lazy(() => import('./components/ForgeWorkspace').then(m => ({ default: m.ForgeWorkspace })));
+const SettingsPage = React.lazy(() => import('./components/SettingsPage').then(m => ({ default: m.SettingsPage })));
 
 // Premium fallback loading skeleton
 function ViewSkeleton() {
@@ -125,7 +128,10 @@ function AppInner() {
       case 'focus': return <FocusMode />;
       case 'weeklyplan': return <WeeklyPlan />;
       case 'events': return <ScheduledEvents />;
-      case 'profile': return <ProfilePage />;
+      case 'profile': return <ProfilePage setView={setCurrentView} />;
+      case 'workspace': return <ForgeWorkspace setView={setCurrentView} />;
+      case 'settings': return <SettingsPage setView={setCurrentView} />;
+      case 'settings': return <SettingsPage setView={setCurrentView} />;
       case 'workspace': return <ForgeWorkspace setView={setCurrentView} />;
       default: return <Dashboard setView={setCurrentView} />;
     }
@@ -138,7 +144,7 @@ function AppInner() {
     // user. Without this, a persistent AppProvider could serve stale state from a
     // previous session during the brief window between logout and new Firestore data.
     <AppProvider key={user.uid}>
-      <GamificationOverlays />
+      <GamificationOverlays setView={setCurrentView} />
       <Layout currentView={currentView} setView={setCurrentView}>
         <React.Suspense fallback={<ViewSkeleton />}>
           {renderView()}
@@ -149,12 +155,14 @@ function AppInner() {
 }
 
 /** Renders level-up and badge modals, reading from context. */
-function GamificationOverlays() {
+function GamificationOverlays({ setView }) {
   const {
     levelUpEvent, setLevelUpEvent,
     badgeUnlockEvent, dismissBadgeEvent,
     completedGoalForCelebration, setCompletedGoalForCelebration,
-    expiredGoals, continueExpiredGoal, finalizeExpiredGoal
+    expiredGoals, continueExpiredGoal, finalizeExpiredGoal,
+    showDisciplineLockPreview, setShowDisciplineLockPreview,
+    disciplineProgress, disciplineDecision
   } = useAppContext();
   return (
     <>
@@ -177,6 +185,14 @@ function GamificationOverlays() {
           totalExpiredCount={expiredGoals.length}
           onContinueGoal={continueExpiredGoal}
           onEndGoal={finalizeExpiredGoal}
+        />
+      )}
+      {showDisciplineLockPreview && (
+        <DisciplineLockScreen
+          dailyProgress={disciplineProgress}
+          decision={disciplineDecision}
+          onClose={() => setShowDisciplineLockPreview(false)}
+          onGoToGoals={() => { setShowDisciplineLockPreview(false); setView('goals'); }}
         />
       )}
       {completedGoalForCelebration && (

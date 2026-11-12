@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle2, Target, Brain, X, CheckSquare, XCircle, Clock, BarChart2, TrendingUp, Zap, Sparkles } from 'lucide-react';
 import {
   getTaskHeatmapColor,

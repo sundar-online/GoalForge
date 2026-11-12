@@ -4,4 +4,6 @@
     <string name="title_activity_main">GoalForge</string>
     <string name="package_name">com.goalforge.app</string>
     <string name="custom_url_scheme">com.goalforge.app</string>
+    <string name="discipline_accessibility_service_label">GoalForge Discipline Lock</string>
+    <string name="discipline_accessibility_service_description">Detects only when Instagram (com.instagram.android) launches so GoalForge can enforce your active Discipline Lock. Never collects screen content, messages, or keystrokes.</string>
 </resources>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useGoals, useTasks, useFocus, useGamification } from '../context/AppContext';
 import {
   Play, Pause, RotateCcw, Target, Award, Zap, Shield, TrendingUp,

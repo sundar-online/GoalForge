@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <queries>
+        <package android:name="com.instagram.android" />
+    </queries>
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
@@ -27,6 +32,42 @@
             android:grantUriPermissions="true">
             <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" />
         </provider>
+
+        <!-- Native Discipline Lock Blocking Screen -->
+        <activity
+            android:name=".disciplinelock.DisciplineLockActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:launchMode="singleTop"
+            android:noHistory="true"
+            android:theme="@style/AppTheme.DisciplineLock" />
+
+        <!-- Targeted Accessibility Service for com.instagram.android foreground detection only -->
+        <service
+            android:name=".disciplinelock.DisciplineAccessibilityService"
+            android:exported="true"
+            android:label="@string/discipline_accessibility_service_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/discipline_accessibility_service" />
+        </service>
+
+        <!-- Restores Discipline Lock state and handles date/timezone changes -->
+        <receiver
+            android:name=".disciplinelock.DisciplineLockBootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.DATE_CHANGED" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.intent.action.TIME_CHANGED" />
+            </intent-filter>
+        </receiver>
 
         <!-- Broadcast receiver for scheduled local notifications (required by Capacitor LocalNotifications) -->
         <receiver
@@ -61,5 +102,12 @@
     <!-- Use Exact Alarm: Android 13+ (API 33+) alternative to SCHEDULE_EXACT_ALARM -->
     <!-- This does NOT require user interaction — granted automatically if approved by Google Play -->
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+
+    <!-- Discipline Lock: optional UsageStats verification & reliable lock screen presentation -->
+    <uses-permission
+        android:name="android.permission.PACKAGE_USAGE_STATS"
+        tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
 </manifest>
