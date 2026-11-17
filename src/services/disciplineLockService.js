@@ -94,8 +94,8 @@ class DisciplineLockWeb extends WebPlugin {
     return snapshot;
   }
 
-  async getLockStatus() {
-    const todayStr = TODAY();
+  async getLockStatus(options = {}) {
+    const todayStr = options?.date || TODAY();
     const saved = readWebSnapshot();
     if (!saved) {
       return {
@@ -176,8 +176,8 @@ export async function updateDisciplineLockStatus(payload) {
   return DisciplineLockPlugin.updateLockStatus(payload);
 }
 
-export async function getDisciplineLockStatus() {
-  return DisciplineLockPlugin.getLockStatus();
+export async function getDisciplineLockStatus(options = {}) {
+  return DisciplineLockPlugin.getLockStatus(options);
 }
 
 export async function syncDisciplineGoalCompletion(payload) {

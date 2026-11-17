@@ -129,8 +129,6 @@ function AppInner() {
       case 'weeklyplan': return <WeeklyPlan />;
       case 'events': return <ScheduledEvents />;
       case 'profile': return <ProfilePage setView={setCurrentView} />;
-      case 'workspace': return <ForgeWorkspace setView={setCurrentView} />;
-      case 'settings': return <SettingsPage setView={setCurrentView} />;
       case 'settings': return <SettingsPage setView={setCurrentView} />;
       case 'workspace': return <ForgeWorkspace setView={setCurrentView} />;
       default: return <Dashboard setView={setCurrentView} />;

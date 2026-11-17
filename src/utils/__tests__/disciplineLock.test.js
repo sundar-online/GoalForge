@@ -177,7 +177,7 @@ describe('Discipline Lock System — Business Logic & Scenarios', () => {
     expect(syncRes.nativePayload.isLocked).toBe(false);
     expect(syncRes.nativePayload.completedRequiredTasks).toBe(1);
 
-    const pluginStatus = await getDisciplineLockStatus();
+    const pluginStatus = await getDisciplineLockStatus({ date: TEST_DATE });
     expect(pluginStatus.enabled).toBe(true);
     expect(pluginStatus.isLocked).toBe(false);
   });
