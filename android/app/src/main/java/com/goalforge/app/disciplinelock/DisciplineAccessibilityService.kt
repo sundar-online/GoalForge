@@ -45,7 +45,7 @@ class DisciplineAccessibilityService : AccessibilityService() {
             }
             try {
                 startActivity(intent)
-            } catch (_: Exception) {
+            } catch (e: Exception) {
                 // On strict OEM background launch policies, user is guided to grant Overlay permission.
             }
         }

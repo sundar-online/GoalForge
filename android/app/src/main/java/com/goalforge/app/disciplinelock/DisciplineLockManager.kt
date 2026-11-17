@@ -195,7 +195,7 @@ object DisciplineLockManager {
                 next.put(obj)
             }
             next.toString()
-        } catch (_: Exception) {
+        } catch (e: Exception) {
             "[]"
         }
     }
@@ -266,7 +266,7 @@ object DisciplineLockManager {
                 )
             }
             mode == AppOpsManager.MODE_ALLOWED
-        } catch (_: Exception) {
+        } catch (e: Exception) {
             false
         }
     }
@@ -279,7 +279,7 @@ object DisciplineLockManager {
         return try {
             val pm = context.getSystemService(Context.POWER_SERVICE) as PowerManager
             pm.isIgnoringBatteryOptimizations(context.packageName)
-        } catch (_: Exception) {
+        } catch (e: Exception) {
             false
         }
     }
@@ -296,7 +296,7 @@ object DisciplineLockManager {
                 context.packageManager.getPackageInfo(TARGET_INSTAGRAM_PACKAGE, 0)
             }
             true
-        } catch (_: Exception) {
+        } catch (e: Exception) {
             false
         }
     }
@@ -317,7 +317,7 @@ object DisciplineLockManager {
                 }
             }
             lastPkg == TARGET_INSTAGRAM_PACKAGE
-        } catch (_: Exception) {
+        } catch (e: Exception) {
             false
         }
     }

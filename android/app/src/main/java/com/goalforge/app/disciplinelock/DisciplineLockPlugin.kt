@@ -15,7 +15,7 @@ import org.json.JSONArray
 class DisciplineLockPlugin : Plugin() {
 
     @PluginMethod
-    fun requestPermissions(call: PluginCall) {
+    override fun requestPermissions(call: PluginCall) {
         val type = call.getString("type", "all") ?: "all"
         val ctx = context
 
@@ -53,7 +53,7 @@ class DisciplineLockPlugin : Plugin() {
             try {
                 intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 ctx.startActivity(intent)
-            } catch (_: Exception) {
+            } catch (e: Exception) {
                 // Fallback to app details settings if specific action isn't supported on OEM ROM
                 val fallback = Intent(
                     Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
@@ -197,7 +197,7 @@ class DisciplineLockPlugin : Plugin() {
         val state = DisciplineLockManager.getEffectiveLockState(context)
         val goalsArr = try {
             JSArray(JSONArray(state.goalsJson).toString())
-        } catch (_: Exception) {
+        } catch (e: Exception) {
             JSArray()
         }
 

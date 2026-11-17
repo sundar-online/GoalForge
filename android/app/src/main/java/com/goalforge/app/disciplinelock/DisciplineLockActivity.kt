@@ -114,7 +114,7 @@ class DisciplineLockActivity : AppCompatActivity() {
     override fun onStop() {
         try {
             unregisterReceiver(lockUpdateReceiver)
-        } catch (_: Exception) {
+        } catch (e: Exception) {
             // Receiver already unregistered
         }
         super.onStop()
@@ -155,7 +155,7 @@ class DisciplineLockActivity : AppCompatActivity() {
         llGoalCirclesContainer.removeAllViews()
         val arr = try {
             JSONArray(goalsJson)
-        } catch (_: Exception) {
+        } catch (e: Exception) {
             JSONArray()
         }
 
